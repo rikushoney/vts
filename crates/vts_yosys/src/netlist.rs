@@ -24,7 +24,7 @@
 //! start at 2 to avoid confusion with the logic levels 0 and 1.
 
 use fnv::FnvHashMap as HashMap;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use std::error;
 use std::fs;
@@ -32,7 +32,7 @@ use std::io::Read;
 use std::path::Path;
 
 /// A structural description of a circuit
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Netlist {
     /// The program that created the netlist
     pub creator: String,
@@ -71,7 +71,7 @@ impl Netlist {
 
 /// A design unit encapsulating ports, cells, memories and wires that implement
 /// some functionality
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Module {
     /// Module attributes
     pub attributes: HashMap<String, String>,
@@ -90,7 +90,7 @@ pub struct Module {
 }
 
 /// A connection point for wires that is either an input, output or both
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Port {
     /// Port direction
     pub direction: PortDirection,
@@ -108,7 +108,7 @@ pub struct Port {
 }
 
 /// Indicates the direction of a [`Port`]
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PortDirection {
     Input,
@@ -117,7 +117,7 @@ pub enum PortDirection {
 }
 
 /// A reference to a single wire "bit" or a constant value
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SignalBit {
     /// A reference to a numbered wire
@@ -127,7 +127,7 @@ pub enum SignalBit {
 }
 
 /// The possible states of a wire
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ConstBit {
     #[serde(rename = "0")]
@@ -143,7 +143,7 @@ pub enum ConstBit {
 }
 
 /// A basic building block of a circuit such as logic gates or registers
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Cell {
     /// 1 if the name of the cell is hidden, otherwise 0
     pub hide_name: usize,
@@ -161,8 +161,8 @@ pub struct Cell {
     pub connections: HashMap<String, Vec<SignalBit>>,
 }
 
-/// A bank of memory
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+/// A block of memory
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Memory {
     /// 1 if the name of the memory is hidden, otherwise 0
     pub hide_name: usize,
@@ -177,7 +177,7 @@ pub struct Memory {
 }
 
 /// The name given to a net in a circuit
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Netname {
     /// 1 if the net name is hidden, otherwise 0
     pub hide_name: usize,
