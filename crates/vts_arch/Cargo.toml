@@ -1,0 +1,8 @@
+[package]
+name = "vts_arch"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+fnv = "1.0.7"
+serde = { version = "1.0.196", features = ["derive"] }

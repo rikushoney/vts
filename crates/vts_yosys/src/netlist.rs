@@ -30,6 +30,7 @@ use std::error;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
+use std::str::FromStr;
 
 /// A structural description of a circuit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -50,13 +51,8 @@ impl Netlist {
         Self::from_str(json.as_str()).map_err(|e| e.into())
     }
 
-    /// Read a netlist from the contents of a string
-    pub fn from_str<'a>(s: &'a str) -> serde_json::Result<Self> {
-        serde_json::from_str(s)
-    }
-
     /// Read a netlist from the contents of a byte slice
-    pub fn from_slice<'a>(s: &'a [u8]) -> serde_json::Result<Self> {
+    pub fn from_slice(s: &[u8]) -> serde_json::Result<Self> {
         serde_json::from_slice(s)
     }
 
@@ -66,6 +62,15 @@ impl Netlist {
         R: Read,
     {
         serde_json::from_reader(r)
+    }
+}
+
+impl FromStr for Netlist {
+    type Err = serde_json::Error;
+
+    /// Read a netlist from a string
+    fn from_str(s: &str) -> serde_json::Result<Self> {
+        serde_json::from_str(s)
     }
 }
 
