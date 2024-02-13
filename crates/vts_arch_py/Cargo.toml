@@ -1,0 +1,12 @@
+[package]
+name = "vts_arch_py"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+hashbrown = "0.14.3"
+pyo3 = { version = "0.20.2", features = ["extension-module", "hashbrown"] }
+
+[lib]
+name = "vts_arch"
+crate-type = ["cdylib"]
