@@ -324,6 +324,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "vts_shared"
+version = "0.0.0"
+dependencies = [
+ "fnv",
+]
+
+[[package]]
 name = "vts_yosys"
 version = "0.0.0"
 dependencies = [
