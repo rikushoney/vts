@@ -6,21 +6,21 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Module {
-    pub cells: HashMap<Arc<str>, Arc<Cell>>,
+    pub cells: HashMap<Arc<str>, Arc<Component>>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
-pub enum CellClass {
+pub enum ComponentClass {
     Lut,
     Latch,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
-pub struct Cell {
+pub struct Component {
     pub ports: HashMap<Arc<str>, Arc<Port>>,
-    pub subcells: HashMap<Arc<str>, Arc<Cell>>,
-    pub class: Option<CellClass>,
+    pub subcells: HashMap<Arc<str>, Arc<Component>>,
+    pub class: Option<ComponentClass>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]

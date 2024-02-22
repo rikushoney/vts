@@ -1,7 +1,0 @@
-[build-system]
-requires = ["maturin>=1,<2"]
-build-backend = "maturin"
-
-[project]
-name = "vts_arch"
-requires-python = ">=3.11"
