@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-hashbrown = "0.14.3"
+vts_arch = { path = "../vts_arch" }
 pyo3 = { version = "0.20.2", features = ["extension-module", "hashbrown"] }
 
 [lib]

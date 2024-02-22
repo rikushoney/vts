@@ -311,8 +311,8 @@ dependencies = [
 name = "vts_arch_py"
 version = "0.0.0"
 dependencies = [
- "hashbrown",
  "pyo3",
+ "vts_arch",
 ]
 
 [[package]]

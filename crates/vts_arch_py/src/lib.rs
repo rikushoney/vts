@@ -1,39 +1,32 @@
-use hashbrown::HashMap;
 use pyo3::prelude::*;
 
-use std::sync::Arc;
+extern crate vts_arch as vts_arch_rs;
 
 #[pyclass]
-struct Block {
-    name: Arc<str>,
-    ports: HashMap<Arc<str>, Port>,
+pub struct PyCell {
+    _cell: vts_arch_rs::Cell,
 }
 
 #[pymethods]
-impl Block {
+impl PyCell {
     #[new]
-    fn new(name: &str) -> Self {
-        let name = name.into();
-        Self {
-            name,
-            ports: HashMap::new(),
-        }
+    pub fn __init__() -> Self {
+        todo!()
     }
 
-    #[getter]
-    fn name(&self) -> &str {
-        &self.name
+    pub fn add_port(&mut self, _name: &str, _port: &PyPort) {
+        todo!()
     }
 }
 
 #[pyclass]
-struct Port {
-    dummy: usize,
+pub struct PyPort {
+    _port: vts_arch_rs::Port,
 }
 
 #[pymodule]
 fn vts_arch(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<Block>()?;
-    m.add_class::<Port>()?;
+    m.add_class::<PyCell>()?;
+    m.add_class::<PyPort>()?;
     Ok(())
 }

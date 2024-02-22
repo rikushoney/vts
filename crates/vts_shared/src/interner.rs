@@ -6,7 +6,7 @@ pub struct StringId(u32);
 
 /// A [string interning](https://en.wikipedia.org/wiki/String_interning) database
 ///
-/// Implementation based on <https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html>
+/// Implementation adapted from <https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html>
 #[derive(Default)]
 pub struct Interner {
     strings: HashMap<&'static str, StringId>,
