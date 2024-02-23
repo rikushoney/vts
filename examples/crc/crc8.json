@@ -1,5 +1,5 @@
 {
-  "creator": "Yosys 0.33+65 (git sha1 934c82254, gcc 13.2.1 -fPIC -Os)",
+  "creator": "Yosys 0.37 (git sha1 a5c7f69ed8f, gcc 13.2.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
   "modules": {
     "crc8_07": {
       "attributes": {
