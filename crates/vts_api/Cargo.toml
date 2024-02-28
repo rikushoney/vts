@@ -5,4 +5,9 @@ edition = "2021"
 
 [dependencies]
 fnv.workspace = true
-pyo3 = { version = "0.20.2", features = ["extension-module"] }
+pyo3 = { version = "0.20.3", features = ["extension-module"] }
+vts_arch = { path = "../vts_arch" }
+
+[lib]
+name = "vts_api_rs"
+crate-type = ["cdylib"]
