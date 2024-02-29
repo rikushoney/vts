@@ -5,21 +5,21 @@ use pyo3::types::PyDict;
 use vts_arch::{Component, ComponentClass, Port, PortClass, PortKind};
 
 macro_rules! wrap_enum {
-    ($py_name:ident => $name:ident : $variant0:ident, $($variant:ident),*$(,)*) => {
+    ($py_name:ident => $name:ident : $($variant:ident = $py_variant:ident $(,)*)+) => {
         #[pyclass]
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Debug, PartialEq)]
         pub enum $py_name {
-            $variant0,
             $(
-                $variant,
+                $py_variant,
             )*
         }
 
         impl From<$py_name> for $name {
             fn from(py_kind: $py_name) -> Self {
                 match py_kind {
-                    $py_name::$variant0 => { $name::$variant0 }
                     $(
-                        $py_name::$variant => { $name::$variant }
+                        $py_name::$py_variant => { $name::$variant }
                     )*
                 }
             }
@@ -28,9 +28,8 @@ macro_rules! wrap_enum {
         impl From<$name> for $py_name {
             fn from(kind: $name) -> Self {
                 match kind {
-                    $name::$variant0 => { $py_name::$variant0 }
                     $(
-                        $name::$variant => { $py_name::$variant }
+                        $name::$variant => { $py_name::$py_variant }
                     )*
                 }
             }
@@ -39,75 +38,63 @@ macro_rules! wrap_enum {
 }
 
 #[pyclass]
-#[repr(transparent)]
 pub struct PyComponent {
-    component: Arc<Component>,
+    pub ports: Py<PyDict>,
+    pub children: Py<PyDict>,
+    pub class: Option<PyComponentClass>,
 }
 
 #[pymethods]
 impl PyComponent {
     #[new]
-    pub fn new() -> Self {
+    pub fn new(py: Python<'_>, class: Option<PyComponentClass>) -> Self {
         Self {
-            component: Arc::new(Component::default()),
+            ports: PyDict::new(py).into(),
+            children: PyDict::new(py).into(),
+            class,
         }
     }
 
-    pub fn add_port(&mut self, _name: &str, _port: PyPort) -> PyResult<()> {
+    pub fn add_port(&mut self, py: Python<'_>, name: &str, port: Py<PyPort>) -> PyResult<()> {
+        let ports = self.ports.try_borrow_mut(py)?;
+        ports.set_item(0, 3);
         Ok(())
-    }
-
-    pub fn ports_to_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
-        for (name, port) in self.component.ports.iter() {
-            let port = PyPort { port: port.clone() };
-            dict.set_item(name.to_string(), port.into_py(py))?;
-        }
-        Ok(dict.into())
     }
 }
 
 wrap_enum!(PyComponentClass => ComponentClass:
-    Lut,
-    Latch,
+    Lut = LUT,
+    Latch = LATCH,
 );
 
 #[pyclass]
-#[repr(transparent)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PyPort {
-    #[allow(dead_code)]
-    port: Arc<Port>,
-}
-
-impl Clone for PyPort {
-    fn clone(&self) -> Self {
-        Self {
-            port: Arc::new(Port::new(PortKind::Input, 0, None)),
-        }
-    }
+    pub kind: PyPortKind,
+    pub n_pins: usize,
+    pub class: Option<PyPortClass>,
 }
 
 #[pymethods]
 impl PyPort {
     #[new]
     pub fn new() -> Self {
-        Self {
-            port: Arc::new(Port::new(PortKind::Input, 0, None)),
-        }
+        todo!()
+        // Self {}
     }
 }
 
 wrap_enum!(PyPortKind => PortKind:
-    Input,
-    Output,
+    Input = INPUT,
+    Output = OUTPUT,
 );
 
 wrap_enum!(PyPortClass => PortClass:
-    Clock,
-    LutIn,
-    LutOut,
-    LatchIn,
-    LatchOut,
+    Clock = CLOCK,
+    LutIn = LUT_IN,
+    LutOut = LUT_OUT,
+    LatchIn = LATCH_IN,
+    LatchOut = LATCH_OUT,
 );
 
 #[pymodule]
