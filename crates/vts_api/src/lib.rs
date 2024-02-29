@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use vts_arch::{Component, ComponentClass, Port, PortClass, PortKind};
+use pyo3::types::{PyDict, PyMapping, PyString};
+use vts_arch::{ComponentClass, PortClass, PortKind};
 
 macro_rules! wrap_enum {
     ($py_name:ident => $name:ident : $($variant:ident = $py_variant:ident $(,)*)+) => {
@@ -39,26 +37,34 @@ macro_rules! wrap_enum {
 
 #[pyclass]
 pub struct PyComponent {
+    #[pyo3(get)]
+    pub name: Py<PyString>,
+    #[pyo3(get)]
     pub ports: Py<PyDict>,
+    #[pyo3(get)]
     pub children: Py<PyDict>,
+    #[pyo3(get)]
     pub class: Option<PyComponentClass>,
 }
 
 #[pymethods]
 impl PyComponent {
     #[new]
-    pub fn new(py: Python<'_>, class: Option<PyComponentClass>) -> Self {
-        Self {
+    pub fn new(py: Python<'_>, name: &str, class: Option<PyComponentClass>) -> PyResult<Self> {
+        Ok(Self {
+            name: PyString::new(py, name).into_py(py),
             ports: PyDict::new(py).into(),
             children: PyDict::new(py).into(),
             class,
-        }
+        })
     }
 
     pub fn add_port(&mut self, py: Python<'_>, name: &str, port: Py<PyPort>) -> PyResult<()> {
-        let ports = self.ports.try_borrow_mut(py)?;
-        ports.set_item(0, 3);
-        Ok(())
+        self.ports.as_ref(py).set_item(name, port.clone_ref(py))
+    }
+
+    pub fn add_ports(&mut self, py: Python<'_>, ports: &PyMapping) -> PyResult<()> {
+        self.ports.as_ref(py).update(ports)
     }
 }
 
@@ -68,19 +74,36 @@ wrap_enum!(PyComponentClass => ComponentClass:
 );
 
 #[pyclass]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct PyPort {
+    #[pyo3(get)]
+    pub name: Py<PyString>,
+    #[pyo3(get)]
     pub kind: PyPortKind,
+    #[pyo3(get)]
     pub n_pins: usize,
+    #[pyo3(get)]
     pub class: Option<PyPortClass>,
 }
 
 #[pymethods]
 impl PyPort {
     #[new]
-    pub fn new() -> Self {
-        todo!()
-        // Self {}
+    pub fn new(
+        py: Python<'_>,
+        name: &str,
+        kind: PyPortKind,
+        n_pins: Option<usize>,
+        class: Option<PyPortClass>,
+    ) -> Self {
+        let n_pins = n_pins.unwrap_or(1);
+        let name = PyString::new(py, name).into_py(py);
+        Self {
+            name,
+            kind,
+            n_pins,
+            class,
+        }
     }
 }
 
