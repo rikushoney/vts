@@ -9,7 +9,7 @@ pub struct Module {
     pub cells: HashMap<Arc<str>, Arc<Component>>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ComponentClass {
     Lut,
@@ -31,14 +31,14 @@ impl Component {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum PortKind {
     Input,
     Output,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub enum PortClass {
     #[serde(rename = "CLOCK")]
     Clock,

@@ -4,4 +4,4 @@ build-backend = "maturin"
 
 [tool.maturin]
 python-source = "python"
-module-name = "vts_api_rs"
+module-name = "vts_api._vts_api_rs"

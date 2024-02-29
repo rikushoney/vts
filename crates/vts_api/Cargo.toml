@@ -9,5 +9,5 @@ pyo3 = { version = "0.20.3", features = ["extension-module"] }
 vts_arch = { path = "../vts_arch" }
 
 [lib]
-name = "vts_api_rs"
+name = "_vts_api_rs"
 crate-type = ["cdylib"]

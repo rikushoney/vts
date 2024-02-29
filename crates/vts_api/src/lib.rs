@@ -6,7 +6,7 @@ macro_rules! wrap_enum {
     ($py_name:ident => $name:ident : $($variant:ident = $py_variant:ident $(,)*)+) => {
         #[pyclass]
         #[allow(non_camel_case_types)]
-        #[derive(Clone, Debug, PartialEq)]
+        #[derive(Clone, Copy, Debug, PartialEq)]
         pub enum $py_name {
             $(
                 $py_variant,
@@ -44,18 +44,18 @@ pub struct PyComponent {
     #[pyo3(get)]
     pub children: Py<PyDict>,
     #[pyo3(get)]
-    pub class: Option<PyComponentClass>,
+    pub class_: Option<PyComponentClass>,
 }
 
 #[pymethods]
 impl PyComponent {
     #[new]
-    pub fn new(py: Python<'_>, name: &str, class: Option<PyComponentClass>) -> PyResult<Self> {
+    pub fn new(py: Python<'_>, name: &str, class_: Option<PyComponentClass>) -> PyResult<Self> {
         Ok(Self {
             name: PyString::new(py, name).into_py(py),
             ports: PyDict::new(py).into(),
             children: PyDict::new(py).into(),
-            class,
+            class_,
         })
     }
 
@@ -83,7 +83,7 @@ pub struct PyPort {
     #[pyo3(get)]
     pub n_pins: usize,
     #[pyo3(get)]
-    pub class: Option<PyPortClass>,
+    pub class_: Option<PyPortClass>,
 }
 
 #[pymethods]
@@ -94,7 +94,7 @@ impl PyPort {
         name: &str,
         kind: PyPortKind,
         n_pins: Option<usize>,
-        class: Option<PyPortClass>,
+        class_: Option<PyPortClass>,
     ) -> Self {
         let n_pins = n_pins.unwrap_or(1);
         let name = PyString::new(py, name).into_py(py);
@@ -102,15 +102,10 @@ impl PyPort {
             name,
             kind,
             n_pins,
-            class,
+            class_,
         }
     }
 }
-
-wrap_enum!(PyPortKind => PortKind:
-    Input = INPUT,
-    Output = OUTPUT,
-);
 
 wrap_enum!(PyPortClass => PortClass:
     Clock = CLOCK,
@@ -120,12 +115,18 @@ wrap_enum!(PyPortClass => PortClass:
     LatchOut = LATCH_OUT,
 );
 
+wrap_enum!(PyPortKind => PortKind:
+    Input = INPUT,
+    Output = OUTPUT,
+);
+
 #[pymodule]
+#[pyo3(name = "_vts_api_rs")]
 fn vts_api_rs(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyComponent>()?;
     m.add_class::<PyComponentClass>()?;
     m.add_class::<PyPort>()?;
-    m.add_class::<PyPortKind>()?;
     m.add_class::<PyPortClass>()?;
+    m.add_class::<PyPortKind>()?;
     Ok(())
 }
