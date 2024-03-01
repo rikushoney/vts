@@ -37,13 +37,13 @@ macro_rules! wrap_enum {
 
 #[pyclass]
 pub struct PyComponent {
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub name: Py<PyString>,
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub ports: Py<PyDict>,
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub children: Py<PyDict>,
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub class_: Option<PyComponentClass>,
 }
 
@@ -76,13 +76,13 @@ wrap_enum!(PyComponentClass => ComponentClass:
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct PyPort {
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub name: Py<PyString>,
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub kind: PyPortKind,
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub n_pins: usize,
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     pub class_: Option<PyPortClass>,
 }
 
@@ -104,6 +104,10 @@ impl PyPort {
             n_pins,
             class_,
         }
+    }
+
+    pub fn copy(&self) -> Self {
+        self.clone()
     }
 }
 
