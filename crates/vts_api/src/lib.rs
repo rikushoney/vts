@@ -64,7 +64,8 @@ impl PyComponent {
         let ports = self.ports.as_ref(py);
         if ports.contains(name)? {
             return Err(PyValueError::new_err(format!(
-                r#"component already has port with name "{name}""#
+                r#"port with name "{name}" already in "{}""#,
+                self.name
             )));
         }
         self.ports.as_ref(py).set_item(name, port.clone_ref(py))

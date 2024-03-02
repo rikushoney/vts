@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, Literal
 
-from vts_api._vts_api_rs import (
+from vts._vts_api_rs import (
     PyComponent as _Component,
     PyComponentClass as ComponentClass,
     PyPort as _Port,
@@ -79,8 +79,6 @@ class Component:
 
             port = Port(name, kind, n_pins, class_)
 
-        if port.name in self._component.ports:
-            raise ValueError(f'port with name "{port.name}" already in "{self.name}"')
         self._component.add_port(port._port.name, port._port)
 
         return port
@@ -110,6 +108,9 @@ def _port_kind_from_str(kind_str: str) -> PortKind:
     raise ValueError(f'invalid port kind "{kind_str}"')
 
 
+_PortKindStr = Literal["input", "in", "INPUT", "IN", "output", "out", "OUTPUT", "OUT"]
+
+
 def _port_class_from_str(class_str: str) -> PortClass:
     class_ = class_str.lower()
     if class_ == "lut_in":
@@ -124,7 +125,6 @@ def _port_class_from_str(class_str: str) -> PortClass:
     raise ValueError(f'invalid port class "{class_str}"')
 
 
-_PortKindStr = Literal["input", "in", "INPUT", "IN", "output", "out", "OUTPUT", "OUT"]
 _PortClassStr = Literal[
     "lut_in",
     "LUT_IN",

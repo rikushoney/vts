@@ -3,8 +3,10 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
+features = ["pyo3/extension-module"]
+manifest-path = "crates/vts_api/Cargo.toml"
 python-source = "python"
-module-name = "vts_api._vts_api_rs"
+module-name = "vts._vts_api_rs"
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
