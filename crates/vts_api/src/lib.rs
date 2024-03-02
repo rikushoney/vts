@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
 use vts_arch::{ComponentClass, PortClass, PortKind};
@@ -60,6 +61,12 @@ impl PyComponent {
     }
 
     pub fn add_port(&mut self, py: Python<'_>, name: &str, port: Py<PyPort>) -> PyResult<()> {
+        let ports = self.ports.as_ref(py);
+        if ports.contains(name)? {
+            return Err(PyValueError::new_err(format!(
+                r#"component already has port with name "{name}""#
+            )));
+        }
         self.ports.as_ref(py).set_item(name, port.clone_ref(py))
     }
 
