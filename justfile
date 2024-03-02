@@ -1,6 +1,10 @@
 install:
    pip install -r requirements/dev.txt
 
+format:
+   ruff check --select I --fix python/vts
+   black --quiet python/vts
+
 lock:
    pip-compile requirements/tests.in > requirements/tests.txt
    pip-compile requirements/check.in > requirements/check.txt

@@ -37,6 +37,54 @@ macro_rules! wrap_enum {
 }
 
 #[pyclass]
+pub struct PyModule_ {
+    #[pyo3(get, set)]
+    pub name: Py<PyString>,
+    #[pyo3(get, set)]
+    pub components: Py<PyDict>,
+}
+
+#[pymethods]
+impl PyModule_ {
+    #[new]
+    pub fn new(py: Python<'_>, name: &str) -> Self {
+        Self {
+            name: PyString::new(py, name).into_py(py),
+            components: PyDict::new(py).into_py(py),
+        }
+    }
+
+    pub fn add_component(
+        &mut self,
+        py: Python<'_>,
+        name: &str,
+        component: Py<PyComponent>,
+    ) -> PyResult<()> {
+        let components = self.components.as_ref(py);
+        if components.contains(name)? {
+            return Err(PyValueError::new_err(format!(
+                r#"component with name "{name}" already in "{}""#,
+                self.name
+            )));
+        }
+        components.set_item(name, component.clone_ref(py))
+    }
+
+    pub fn add_components(&mut self, py: Python<'_>, components: &PyMapping) -> PyResult<()> {
+        for (name, component) in components
+            .items()?
+            .iter()?
+            .map(|x| x.and_then(PyAny::extract::<(Py<PyString>, Py<PyComponent>)>))
+            .collect::<PyResult<Vec<(Py<PyString>, Py<PyComponent>)>>>()?
+            .iter()
+        {
+            self.add_component(py, name.as_ref(py).to_str()?, component.clone_ref(py))?;
+        }
+        Ok(())
+    }
+}
+
+#[pyclass]
 pub struct PyComponent {
     #[pyo3(get, set)]
     pub name: Py<PyString>,
@@ -68,11 +116,20 @@ impl PyComponent {
                 self.name
             )));
         }
-        self.ports.as_ref(py).set_item(name, port.clone_ref(py))
+        ports.set_item(name, port.clone_ref(py))
     }
 
     pub fn add_ports(&mut self, py: Python<'_>, ports: &PyMapping) -> PyResult<()> {
-        self.ports.as_ref(py).update(ports)
+        for (name, port) in ports
+            .items()?
+            .iter()?
+            .map(|x| x.and_then(PyAny::extract::<(Py<PyString>, Py<PyPort>)>))
+            .collect::<PyResult<Vec<(Py<PyString>, Py<PyPort>)>>>()?
+            .iter()
+        {
+            self.add_port(py, name.as_ref(py).to_str()?, port.clone_ref(py))?;
+        }
+        Ok(())
     }
 }
 
@@ -135,6 +192,7 @@ wrap_enum!(PyPortKind => PortKind:
 #[pymodule]
 #[pyo3(name = "_vts_api_rs")]
 fn vts_api_rs(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    m.add_class::<PyModule_>()?;
     m.add_class::<PyComponent>()?;
     m.add_class::<PyComponentClass>()?;
     m.add_class::<PyPort>()?;

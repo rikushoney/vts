@@ -6,7 +6,7 @@ use serde::Deserialize;
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Module {
     pub name: Arc<str>,
-    pub cells: HashMap<Arc<str>, Arc<Component>>,
+    pub components: HashMap<Arc<str>, Arc<Component>>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
