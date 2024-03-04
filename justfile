@@ -10,4 +10,13 @@ lock:
     pip-compile -o requirements/check.txt requirements/check.in 
     pip-compile -o requirements/format.txt requirements/format.in 
     pip-compile -o requirements/build.txt requirements/build.in 
-    pip-compile -o requirements/dev.txt requirements/dev.in 
+    pip-compile -o requirements/dev.txt requirements/dev.in
+
+check:
+    cargo check --workspace
+    cargo clippy --workspace
+    nox -s check
+
+test:
+    cargo test --workspace --exclude vts_api
+    nox -s tests

@@ -9,64 +9,12 @@ from vts._vts_api_rs import (
     PyPort as _Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
+    _component_class_from_str,
+    _port_class_from_str,
+    _port_kind_from_str,
 )
 
-
-def _component_class_from_str(class_str: str) -> ComponentClass:
-    class_ = class_str.lower()
-
-    if class_ == "lut":
-        return ComponentClass.LUT
-    elif class_ in ("latch", "ff"):
-        return ComponentClass.LATCH
-
-    raise ValueError(f'unknown component class "{class_str}"')
-
-
 _ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
-
-
-def _port_kind_from_str(kind_str: str) -> PortKind:
-    kind = kind_str.lower()
-
-    if kind in ["input", "in", "i"]:
-        return PortKind.INPUT
-    elif kind in ["output", "out", "o"]:
-        return PortKind.OUTPUT
-
-    raise ValueError(f'unknown port kind "{kind_str}"')
-
-
-_PortKindStr = Literal[
-    "input", "in", "i", "INPUT", "IN", "I", "output", "out", "o", "OUTPUT", "OUT", "O"
-]
-
-
-def _port_class_from_str(class_str: str) -> PortClass:
-    class_ = class_str.lower()
-
-    if class_ == "lut_in":
-        return PortClass.LUT_IN
-    elif class_ == "lut_out":
-        return PortClass.LUT_OUT
-    elif class_ == "latch_in":
-        return PortClass.LATCH_IN
-    elif class_ == "latch_out":
-        return PortClass.LATCH_OUT
-
-    raise ValueError(f'unknown port class "{class_str}"')
-
-
-_PortClassStr = Literal[
-    "lut_in",
-    "LUT_IN",
-    "lut_out",
-    "LUT_OUT",
-    "latch_in",
-    "LATCH_IN",
-    "latch_out",
-    "LATCH_OUT",
-]
 
 
 class Module:
@@ -127,6 +75,23 @@ class Module:
         else:
             for name, component in components.items():
                 self.add_component(name, component=component)
+
+
+_PortKindStr = Literal[
+    "input", "in", "i", "INPUT", "IN", "I", "output", "out", "o", "OUTPUT", "OUT", "O"
+]
+
+
+_PortClassStr = Literal[
+    "lut_in",
+    "LUT_IN",
+    "lut_out",
+    "LUT_OUT",
+    "latch_in",
+    "LATCH_IN",
+    "latch_out",
+    "LATCH_OUT",
+]
 
 
 class Component:
