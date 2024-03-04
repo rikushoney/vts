@@ -17,27 +17,29 @@ def _component_class_from_str(class_str: str) -> ComponentClass:
 
     if class_ == "lut":
         return ComponentClass.LUT
-    elif class_ == "latch":
+    elif class_ in ("latch", "ff"):
         return ComponentClass.LATCH
 
     raise ValueError(f'unknown component class "{class_str}"')
 
 
-_ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH"]
+_ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
 
 
 def _port_kind_from_str(kind_str: str) -> PortKind:
     kind = kind_str.lower()
 
-    if kind in ["input", "in"]:
+    if kind in ["input", "in", "i"]:
         return PortKind.INPUT
-    elif kind in ["output", "out"]:
+    elif kind in ["output", "out", "o"]:
         return PortKind.OUTPUT
 
     raise ValueError(f'unknown port kind "{kind_str}"')
 
 
-_PortKindStr = Literal["input", "in", "INPUT", "IN", "output", "out", "OUTPUT", "OUT"]
+_PortKindStr = Literal[
+    "input", "in", "i", "INPUT", "IN", "I", "output", "out", "o", "OUTPUT", "OUT", "O"
+]
 
 
 def _port_class_from_str(class_str: str) -> PortClass:
@@ -257,3 +259,6 @@ class Port:
             self._port.n_pins,
             self._port.class_,
         )
+
+
+__all__ = ["Module", "Component", "ComponentClass", "Port", "PortKind", "PortClass"]

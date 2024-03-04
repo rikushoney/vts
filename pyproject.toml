@@ -1,3 +1,9 @@
+[project]
+name = "vts"
+description = "Framework for superconducting FPGA architecture exploraion"
+authors = [{ name = "Rikus Honey", email = "rikushoney2@gmail.com" }]
+requires-python = ">=3.8"
+
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
@@ -7,6 +13,12 @@ features = ["pyo3/extension-module"]
 manifest-path = "crates/vts_api/Cargo.toml"
 python-source = "python"
 module-name = "vts._vts_api_rs"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
