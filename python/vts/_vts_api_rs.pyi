@@ -3,6 +3,10 @@ from __future__ import annotations
 from enum import Enum
 from typing import Iterable, Literal, Mapping
 
+
+def _component_class_from_str(class_: str) -> PyComponentClass: ...
+
+
 _ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
 
 
@@ -32,13 +36,33 @@ class PyComponentClass(Enum):
     LATCH = ...
 
 
-def _component_class_from_str(class_: str) -> PyComponentClass: ...
 def _port_kind_from_str(kind: str) -> PyPortKind: ...
+
+
+_PortKindStr = Literal[
+    "input", "in", "i", "INPUT", "IN", "I", "output", "out", "o", "OUTPUT", "OUT", "O"
+]
+
+
 def _port_class_from_str(class_: str) -> PyPortClass: ...
 
 
+_PortClassStr = Literal[
+    "lut_in",
+    "LUT_IN",
+    "lut_out",
+    "LUT_OUT",
+    "latch_in",
+    "LATCH_IN",
+    "latch_out",
+    "LATCH_OUT",
+]
+
+
 class PyComponent:
-    def __init__(self, name: str, class_: PyComponentClass | None = None) -> None: ...
+    def __init__(
+        self, name: str, class_: PyComponentClass | _ComponentClassStr | None = None
+    ) -> None: ...
     @property
     def name(self) -> str: ...
     @name.setter
@@ -56,8 +80,16 @@ class PyComponent:
     @class_.setter
     def class_(self, value: PyComponentClass) -> None: ...
     def copy(self) -> PyComponent: ...
-    def add_port(self, name: str, port: PyPort) -> None: ...
-    def add_ports(self, ports: Mapping) -> None: ...
+    def add_port(
+        self,
+        name: str | PyPort | None = None,
+        *,
+        port: PyPort | None = None,
+        kind: PyPortKind | _PortKindStr | None = None,
+        n_pins: int | None = None,
+        class_: PyPortClass | _PortClassStr | None = None,
+    ) -> PyPort: ...
+    def add_ports(self, ports: Mapping[str, PyPort] | Iterable[PyPort]) -> None: ...
 
 
 class PyPortKind(Enum):
@@ -77,9 +109,9 @@ class PyPort:
     def __init__(
         self,
         name: str,
-        kind: PyPortKind,
+        kind: PyPortKind | _PortKindStr,
         n_pins: int | None = None,
-        class_: PyPortClass | None = None,
+        class_: PyPortClass | _PortClassStr | None = None,
     ) -> None: ...
     @property
     def name(self) -> str: ...

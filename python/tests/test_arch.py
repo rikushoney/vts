@@ -25,7 +25,7 @@ def test_add_port():
     c = Component("_")
     p = c.add_port("test_port", kind="i")
     assert p.name == "test_port"
-    assert p.name in c.ports_dict().keys()
+    assert p.name in c.ports.keys()
 
 
 def test_port():
