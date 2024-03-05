@@ -5,7 +5,7 @@ from typing import Iterable, Literal
 from vts._vts_api_rs import (
     PyComponent as _Component,
     PyComponentClass as ComponentClass,
-    PyModule_ as _Module,
+    PyModule_ as Module,
     PyPort as _Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
@@ -15,66 +15,6 @@ from vts._vts_api_rs import (
 )
 
 _ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
-
-
-class Module:
-    def __init__(self, name: str) -> None:
-        self._module = _Module(name)
-
-    @property
-    def name(self) -> str:
-        return self._module.name
-
-    def components_dict(self) -> dict[str, Component]:
-        return {
-            component.name: Component._ref(component)
-            for component in self._module.components.values()
-        }
-
-    def components_list(self) -> list[Component]:
-        return [
-            Component._ref(component) for component in self._module.components.values()
-        ]
-
-    def add_component(
-        self,
-        name: str | Component | None = None,
-        *,
-        component: Component | None = None,
-        class_: ComponentClass | _ComponentClassStr | None = None,
-    ) -> Component:
-        if component is not None:
-            component = component.copy()
-
-            if name is not None:
-                if not isinstance(name, str):
-                    raise TypeError(f'expected "name" to be "str" not "{type(name)}"')
-                component._component.name = name
-            if class_ is not None:
-                if isinstance(class_, str):
-                    class_ = _component_class_from_str(class_)
-                component._component.class_ = class_
-        elif isinstance(name, Component):
-            component = name.copy()
-        else:
-            if name is None:
-                raise ValueError("component must have a name")
-
-            component = Component(name)
-
-        self._module.add_component(component._component.name, component._component)
-
-        return component
-
-    def add_components(
-        self, components: Iterable[Component] | dict[str, Component]
-    ) -> None:
-        if not isinstance(components, dict):
-            for component in components:
-                self.add_component(component)
-        else:
-            for name, component in components.items():
-                self.add_component(name, component=component)
 
 
 _PortKindStr = Literal[

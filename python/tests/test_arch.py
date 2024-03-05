@@ -10,7 +10,7 @@ def test_add_component():
     m = Module("_")
     c = m.add_component("test_comp")
     assert c.name == "test_comp"
-    assert c.name in m.components_dict().keys()
+    assert c.name in m.components.keys()
 
 
 def test_component():

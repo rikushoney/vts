@@ -1,6 +1,7 @@
-use pyo3::exceptions::PyValueError;
+use either::Either;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyMapping, PyString};
+use pyo3::types::{PyDict, PyIterator, PyMapping, PyString};
 use vts_arch::{ComponentClass, PortClass, PortKind};
 
 #[pyclass]
@@ -21,37 +22,101 @@ impl PyModule_ {
         }
     }
 
+    #[pyo3(signature = (name=None, *, component=None, class_=None))]
     pub fn add_component(
         &mut self,
         py: Python<'_>,
-        name: &str,
-        component: Py<PyComponent>,
-    ) -> PyResult<()> {
+        name: Option<Either<&str, Py<PyComponent>>>,
+        component: Option<Py<PyComponent>>,
+        class_: Option<Either<PyComponentClass, &str>>,
+    ) -> PyResult<Py<PyComponent>> {
+        let class_ = class_
+            .map(|class_| {
+                class_.either(
+                    |class_| Ok(class_),
+                    |class_str| _component_class_from_str(class_str),
+                )
+            })
+            .transpose()?;
+
+        let component = if let Some(component) = component {
+            let mut component = component.as_ref(py).try_borrow()?.copy(py)?;
+
+            if let Some(name) = name {
+                match name {
+                    Either::Left(name) => {
+                        component.name = name.into_py(py);
+                    }
+                    Either::Right(component) => {
+                        let type_name = component.as_ref(py).get_type().name()?;
+                        return Err(PyTypeError::new_err(format!(
+                            r#"expected "name" to be "str" not "{type_name}""#
+                        )));
+                    }
+                }
+            }
+
+            component
+        } else {
+            if let Some(name) = name {
+                match name {
+                    Either::Left(name) => PyComponent::new(py, name, class_)?,
+                    Either::Right(component) => component.as_ref(py).try_borrow()?.copy(py)?,
+                }
+            } else {
+                return Err(PyValueError::new_err("component must have a name"));
+            }
+        };
+
+        let name = component.name.clone_ref(py);
+        let component = Py::new(py, component)?;
         let components = self.components.as_ref(py);
-        if components.contains(name)? {
+
+        if components.contains(name.clone_ref(py))? {
+            let component_name = name.as_ref(py).to_str()?;
+            let module_name = self.name.as_ref(py).to_str()?;
             return Err(PyValueError::new_err(format!(
-                r#"component with name "{name}" already in "{}""#,
-                self.name
+                r#"component with name "{component_name}" already in "{module_name}""#
             )));
         }
-        components.set_item(name, component.clone_ref(py))
+
+        components.set_item(name, component.clone_ref(py))?;
+        Ok(component)
     }
 
-    pub fn add_components(&mut self, py: Python<'_>, components: &PyMapping) -> PyResult<()> {
-        for (name, component) in components
-            .items()?
-            .iter()?
-            .map(|x| x.and_then(PyAny::extract::<(Py<PyString>, Py<PyComponent>)>))
-            .collect::<PyResult<Vec<(Py<PyString>, Py<PyComponent>)>>>()?
-            .iter()
-        {
-            self.add_component(py, name.as_ref(py).to_str()?, component.clone_ref(py))?;
+    pub fn add_components(
+        &mut self,
+        py: Python<'_>,
+        components: Either<&PyMapping, &PyIterator>,
+    ) -> PyResult<()> {
+        match components {
+            Either::Left(components) => {
+                for item in components.items()?.iter()? {
+                    let (name, component) = item.and_then(PyAny::extract::<(&str, PyComponent)>)?;
+                    let component = Py::new(py, component)?;
+                    self.add_component(py, Some(Either::Left(name)), Some(component), None)?;
+                }
+            }
+            Either::Right(components) => {
+                for item in components {
+                    let component = item.and_then(PyAny::extract::<PyComponent>)?;
+                    let name = component.name.clone_ref(py);
+                    let component = Py::new(py, component)?;
+                    self.add_component(
+                        py,
+                        Some(Either::Left(name.as_ref(py).to_str()?)),
+                        Some(component),
+                        None,
+                    )?;
+                }
+            }
         }
         Ok(())
     }
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct PyComponent {
     #[pyo3(get, set)]
     pub name: Py<PyString>,
@@ -73,6 +138,21 @@ impl PyComponent {
             children: PyDict::new(py).into(),
             class_,
         })
+    }
+
+    pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
+        let mut component = Self::new(py, self.name.as_ref(py).to_str()?, self.class_)?;
+        for (name, port) in self.ports.as_ref(py).iter() {
+            let name = PyAny::extract::<&str>(name)?;
+            let port = PyAny::extract::<PyPort>(port)?.copy(py)?;
+            component.add_port(py, name, Py::new(py, port)?)?;
+        }
+        for (name, component) in self.children.as_ref(py).iter() {
+            let _name = PyAny::extract::<&str>(name)?;
+            let _component = PyAny::extract::<PyComponent>(component)?.copy(py)?;
+            // TODO: add_child(name, component)
+        }
+        Ok(component)
     }
 
     pub fn add_port(&mut self, py: Python<'_>, name: &str, port: Py<PyPort>) -> PyResult<()> {
@@ -149,8 +229,14 @@ impl PyPort {
         }
     }
 
-    pub fn copy(&self) -> Self {
-        self.clone()
+    pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
+        Ok(Self::new(
+            py,
+            self.name.as_ref(py).to_str()?,
+            self.kind,
+            Some(self.n_pins),
+            self.class_,
+        ))
     }
 }
 
