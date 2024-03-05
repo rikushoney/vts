@@ -10,7 +10,7 @@ def test_add_component():
     m = Module("_")
     c = m.add_component("test_comp")
     assert c.name == "test_comp"
-    assert c.name in m.components.keys()
+    assert c.name in m.components_dict().keys()
 
 
 def test_component():
@@ -25,7 +25,7 @@ def test_add_port():
     c = Component("_")
     p = c.add_port("test_port", kind="i")
     assert p.name == "test_port"
-    assert p.name in c.ports.keys()
+    assert p.name in c.ports_dict().keys()
 
 
 def test_port():
