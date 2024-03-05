@@ -326,12 +326,10 @@ impl PyPort {
         n_pins: Option<usize>,
         class_: Option<Either<PyPortClass, &str>>,
     ) -> PyResult<Self> {
-        let n_pins = n_pins.unwrap_or(1);
-        let name = PyString::new(py, name).into_py(py);
         Ok(Self {
-            name,
+            name: PyString::new(py, name).into_py(py),
             kind: to_port_kind(kind)?,
-            n_pins,
+            n_pins: n_pins.unwrap_or(1),
             class_: class_.map(to_port_class).transpose()?,
         })
     }

@@ -3,12 +3,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Iterable, Literal, Mapping
 
-
 def _component_class_from_str(class_: str) -> PyComponentClass: ...
 
-
 _ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
-
 
 class PyModule_:
     def __init__(self, name: str) -> None: ...
@@ -30,22 +27,17 @@ class PyModule_:
         self, components: Mapping[str, PyComponent] | Iterable[PyComponent]
     ) -> None: ...
 
-
 class PyComponentClass(Enum):
     LUT = ...
     LATCH = ...
 
-
 def _port_kind_from_str(kind: str) -> PyPortKind: ...
-
 
 _PortKindStr = Literal[
     "input", "in", "i", "INPUT", "IN", "I", "output", "out", "o", "OUTPUT", "OUT", "O"
 ]
 
-
 def _port_class_from_str(class_: str) -> PyPortClass: ...
-
 
 _PortClassStr = Literal[
     "lut_in",
@@ -57,7 +49,6 @@ _PortClassStr = Literal[
     "latch_out",
     "LATCH_OUT",
 ]
-
 
 class PyComponent:
     def __init__(
@@ -91,11 +82,9 @@ class PyComponent:
     ) -> PyPort: ...
     def add_ports(self, ports: Mapping[str, PyPort] | Iterable[PyPort]) -> None: ...
 
-
 class PyPortKind(Enum):
     INPUT = ...
     OUTPUT = ...
-
 
 class PyPortClass(Enum):
     CLOCK = ...
@@ -103,7 +92,6 @@ class PyPortClass(Enum):
     LUT_OUT = ...
     LATCH_IN = ...
     LATCH_OUT = ...
-
 
 class PyPort:
     def __init__(
