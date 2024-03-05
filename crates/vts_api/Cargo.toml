@@ -4,9 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-either = "1.10.0"
 fnv.workspace = true
-pyo3 = { version = "0.20.3", features = ["abi3-py38", "either"] }
+pyo3 = { version = "0.20.3", features = ["abi3-py38"] }
 vts_arch = { path = "../vts_arch" }
 
 [lib]

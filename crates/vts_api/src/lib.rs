@@ -41,11 +41,8 @@ fn vts_api_rs(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<arch::PyModule_>()?;
     m.add_class::<arch::PyComponent>()?;
     m.add_class::<arch::PyComponentClass>()?;
-    m.add_function(wrap_pyfunction!(arch::_component_class_from_str, m)?)?;
     m.add_class::<arch::PyPort>()?;
     m.add_class::<arch::PyPortClass>()?;
-    m.add_function(wrap_pyfunction!(arch::_port_class_from_str, m)?)?;
     m.add_class::<arch::PyPortKind>()?;
-    m.add_function(wrap_pyfunction!(arch::_port_kind_from_str, m)?)?;
     Ok(())
 }
