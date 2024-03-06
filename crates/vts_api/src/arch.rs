@@ -44,7 +44,7 @@ impl PyModule_ {
         self.components
             .as_ref(py)
             .set_item(name, component.clone_ref(py))?;
-        Ok(Py::new(py, component)?)
+        Ok(component)
     }
 
     pub fn add_components(&mut self, py: Python<'_>, components: &PyMapping) -> PyResult<()> {

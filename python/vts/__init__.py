@@ -84,13 +84,14 @@ class Module:
 
     def components_dict(self) -> dict[str, Component]:
         return {
-            component.name: Component._ref(component)
+            component.name: Component._from_inner(component)
             for component in self._module.components.values()
         }
 
     def components_list(self) -> list[Component]:
         return [
-            Component._ref(component) for component in self._module.components.values()
+            Component._from_inner(component)
+            for component in self._module.components.values()
         ]
 
     def add_component(
@@ -152,10 +153,12 @@ class Component:
         return self._component.class_
 
     def ports_dict(self) -> dict[str, Port]:
-        return {port.name: Port._ref(port) for port in self._component.ports.values()}
+        return {
+            port.name: Port._from_inner(port) for port in self._component.ports.values()
+        }
 
     def ports_list(self) -> list[Port]:
-        return [Port._ref(port) for port in self._component.ports.values()]
+        return [Port._from_inner(port) for port in self._component.ports.values()]
 
     def add_port(
         self,
@@ -206,7 +209,7 @@ class Component:
                 self.add_port(port.name, port=port)
 
     @classmethod
-    def _ref(cls, component: _Component) -> Component:
+    def _from_inner(cls, component: _Component) -> Component:
         c = cls.__new__(cls)
         c._component = component
         return c
@@ -252,7 +255,7 @@ class Port:
         return self._port.class_
 
     @classmethod
-    def _ref(cls, port: _Port) -> Port:
+    def _from_inner(cls, port: _Port) -> Port:
         p = cls.__new__(cls)
         p._port = port
         return p
