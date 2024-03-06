@@ -19,7 +19,7 @@ def check(session: nox.Session):
 def format(session: nox.Session):
     session.install("-r", "requirements/format.txt")
     session.run("ruff", "check", "--select", "I", "python/vts")
-    session.run("black", "--check", "python/vts")
+    session.run("ruff", "format", "--check", "python/vts")
 
 
 @nox.session

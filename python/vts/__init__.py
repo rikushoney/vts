@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Iterable, Literal
 
 from vts._vts_api_rs import (
@@ -15,7 +16,7 @@ from vts._vts_api_rs import (
 def _component_class_from_str(class_str: str) -> ComponentClass:
     class_ = class_str.lower()
 
-    if class_ == "lut":
+    if class_ in ["lut", "ff"]:
         return ComponentClass.LUT
     elif class_ == "latch":
         return ComponentClass.LATCH
@@ -23,21 +24,23 @@ def _component_class_from_str(class_str: str) -> ComponentClass:
     raise ValueError(f'unknown component class "{class_str}"')
 
 
-_ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH"]
+_ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
 
 
 def _port_kind_from_str(kind_str: str) -> PortKind:
     kind = kind_str.lower()
 
-    if kind in ["input", "in"]:
+    if kind in ["input", "in", "i"]:
         return PortKind.INPUT
-    elif kind in ["output", "out"]:
+    elif kind in ["output", "out", "o"]:
         return PortKind.OUTPUT
 
     raise ValueError(f'unknown port kind "{kind_str}"')
 
 
-_PortKindStr = Literal["input", "in", "INPUT", "IN", "output", "out", "OUTPUT", "OUT"]
+_PortKindStr = Literal[
+    "input", "in", "i", "INPUT", "IN", "I", "output", "out", "o", "OUTPUT", "OUT", "O"
+]
 
 
 def _port_class_from_str(class_str: str) -> PortClass:
@@ -47,9 +50,9 @@ def _port_class_from_str(class_str: str) -> PortClass:
         return PortClass.LUT_IN
     elif class_ == "lut_out":
         return PortClass.LUT_OUT
-    elif class_ == "latch_in":
+    elif class_ in ["latch_in", "ff_in"]:
         return PortClass.LATCH_IN
-    elif class_ == "latch_out":
+    elif class_ in ["latch_out", "ff_out"]:
         return PortClass.LATCH_OUT
 
     raise ValueError(f'unknown port class "{class_str}"')
@@ -64,6 +67,10 @@ _PortClassStr = Literal[
     "LATCH_IN",
     "latch_out",
     "LATCH_OUT",
+    "ff_in",
+    "FF_IN",
+    "FF_OUT",
+    "ff_out",
 ]
 
 
@@ -117,14 +124,14 @@ class Module:
         return component
 
     def add_components(
-        self, components: Iterable[Component] | dict[str, Component]
+        self, components: Iterable[Component] | Mapping[str, Component]
     ) -> None:
-        if not isinstance(components, dict):
-            for component in components:
-                self.add_component(component)
-        else:
+        if isinstance(components, Mapping):
             for name, component in components.items():
                 self.add_component(name, component=component)
+        else:
+            for component in components:
+                self.add_component(component.name, component=component)
 
 
 class Component:
@@ -190,13 +197,13 @@ class Component:
 
         return port
 
-    def add_ports(self, ports: Iterable[Port] | dict[str, Port]) -> None:
-        if not isinstance(ports, dict):
-            for port in ports:
-                self.add_port(port)
-        else:
+    def add_ports(self, ports: Iterable[Port] | Mapping[str, Port]) -> None:
+        if isinstance(ports, Mapping):
             for name, port in ports.items():
                 self.add_port(name, port=port)
+        else:
+            for port in ports:
+                self.add_port(port.name, port=port)
 
     @classmethod
     def _ref(cls, component: _Component) -> Component:
