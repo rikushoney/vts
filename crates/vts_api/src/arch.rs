@@ -4,6 +4,7 @@ use pyo3::types::{PyDict, PyMapping, PyString};
 use vts_arch::{ComponentClass, PortClass, PortKind};
 
 #[pyclass]
+#[pyo3(name = "PyModule")]
 pub struct PyModule_ {
     #[pyo3(get, set)]
     pub name: Py<PyString>,
@@ -64,7 +65,7 @@ pub struct PyComponent {
     #[pyo3(get, set)]
     pub ports: Py<PyDict>,
     #[pyo3(get, set)]
-    pub children: Py<PyDict>,
+    pub references: Py<PyDict>,
     #[pyo3(get, set)]
     pub class_: Option<PyComponentClass>,
 }
@@ -76,7 +77,7 @@ impl PyComponent {
         Ok(Self {
             name: PyString::new(py, name).into_py(py),
             ports: PyDict::new(py).into(),
-            children: PyDict::new(py).into(),
+            references: PyDict::new(py).into(),
             class_,
         })
     }
@@ -89,9 +90,9 @@ impl PyComponent {
             component.add_port(py, name, port)?;
         }
 
-        for item in self.children.as_ref(py).items().iter() {
+        for item in self.references.as_ref(py).items().iter() {
             let (_name, _component) = PyAny::extract::<(&str, Py<PyComponent>)>(item)?;
-            // TODO: component.add_child(name, component)
+            // TODO: component.add_ref(name, component)
         }
 
         Ok(component)

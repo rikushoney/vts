@@ -6,7 +6,7 @@ from typing import Iterable, Literal
 from vts._vts_api_rs import (
     PyComponent as _Component,
     PyComponentClass as ComponentClass,
-    PyModule_ as _Module,
+    PyModule as _Module,
     PyPort as _Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,

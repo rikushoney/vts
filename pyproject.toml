@@ -14,7 +14,7 @@ python-source = "python"
 module-name = "vts._vts_api_rs"
 
 [tool.ruff.lint]
-select = ["F", "I"]
+select = ["F", "E", "W", "N", "I"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

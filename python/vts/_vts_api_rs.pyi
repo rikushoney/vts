@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Mapping
 
-class PyModule_:
+class PyModule:
     def __init__(self, name: str) -> None: ...
     @property
     def name(self) -> str: ...
