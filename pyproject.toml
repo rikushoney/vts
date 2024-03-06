@@ -1,3 +1,8 @@
+[project]
+name = "vts"
+authors = [{ name = "Rikus Honey", email = "rikushoney2@gmail.com" }]
+requires-python = ">=3.10"
+
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"

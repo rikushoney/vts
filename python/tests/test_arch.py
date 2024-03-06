@@ -1,4 +1,4 @@
-from vts import Component, ComponentClass, Module, Port, PortClass, PortKind
+from vts.arch import Component, ComponentClass, Module, Port, PortClass, PortKind
 
 
 def test_module():
