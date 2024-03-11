@@ -1,5 +1,5 @@
 pub mod database;
-pub mod symboltable;
+pub mod stringtable;
 
 pub trait OpaqueKey {
     fn as_index(&self) -> usize;

@@ -11,7 +11,7 @@ impl TableKey for u64 {}
 
 // Based on https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 
-pub struct SymbolTable<I = u32> {
+pub struct StringTable<I = u32> {
     str_key_map: HashMap<&'static str, I>,
     lookup_table: Vec<&'static str>,
     storage: String,
@@ -20,13 +20,13 @@ pub struct SymbolTable<I = u32> {
 
 const DEFAULT_TABLE_CAPACITY: usize = 16;
 
-impl<I: Clone + TableKey> Default for SymbolTable<I> {
+impl<I: Clone + TableKey> Default for StringTable<I> {
     fn default() -> Self {
         Self::with_capacity(DEFAULT_TABLE_CAPACITY)
     }
 }
 
-impl<I: Clone + TableKey> SymbolTable<I> {
+impl<I: Clone + TableKey> StringTable<I> {
     pub fn with_capacity(capacity: usize) -> Self {
         let str_key_map = HashMap::default();
         let lookup_table = Vec::new();
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_interning() {
-        let mut table = SymbolTable::<u32>::with_capacity(1);
+        let mut table = StringTable::<u32>::with_capacity(1);
         let id1 = table.entry("test");
         let id2 = table.entry("test2");
         assert_eq!(table.lookup(id1), "test");
