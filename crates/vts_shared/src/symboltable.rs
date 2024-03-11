@@ -1,7 +1,6 @@
-use crate::OpaqueKey;
 use fnv::FnvHashMap as HashMap;
 
-// Based on https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
+use crate::OpaqueKey;
 
 pub trait TableKey: OpaqueKey {}
 
@@ -9,6 +8,8 @@ impl TableKey for u8 {}
 impl TableKey for u16 {}
 impl TableKey for u32 {}
 impl TableKey for u64 {}
+
+// Based on https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 
 pub struct SymbolTable<I = u32> {
     str_key_map: HashMap<&'static str, I>,
