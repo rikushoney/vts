@@ -42,9 +42,7 @@ impl PyModule_ {
         let component = component.as_ref(py).try_borrow()?;
         let component = Py::new(py, component.copy(py)?)?;
 
-        self.components
-            .as_ref(py)
-            .set_item(name, component.clone_ref(py))?;
+        components.set_item(name, component.clone_ref(py))?;
         Ok(component)
     }
 
@@ -91,10 +89,34 @@ impl PyComponent {
         }
 
         for item in self.references.as_ref(py).items().iter() {
-            let (_name, _component) = PyAny::extract::<(&str, Py<PyComponent>)>(item)?;
-            // TODO: component.add_ref(name, component)
+            let (name, reference) = PyAny::extract::<(&str, Py<PyComponent>)>(item)?;
+            component.add_ref(py, name, reference)?;
         }
 
+        Ok(component)
+    }
+
+    pub fn add_ref(
+        &mut self,
+        py: Python<'_>,
+        name: &str,
+        component: Py<PyComponent>,
+    ) -> PyResult<Py<PyComponent>> {
+        let references = self.references.as_ref(py);
+        let name = PyString::new(py, name);
+
+        if references.contains(name)? {
+            let reference_name = name.to_str()?;
+            let component_name = self.name.as_ref(py).to_str()?;
+            return Err(PyValueError::new_err(format!(
+                r#"component with name "{reference_name}" already referenced in "{component_name}""#
+            )));
+        }
+
+        let component = component.as_ref(py).try_borrow()?;
+        let component = Py::new(py, component.copy(py)?)?;
+
+        references.set_item(name, component.clone_ref(py))?;
         Ok(component)
     }
 
@@ -118,7 +140,7 @@ impl PyComponent {
         let port = port.as_ref(py).try_borrow()?;
         let port = Py::new(py, port.copy(py)?)?;
 
-        self.ports.as_ref(py).set_item(name, port.clone_ref(py))?;
+        ports.set_item(name, port.clone_ref(py))?;
         Ok(port)
     }
 
