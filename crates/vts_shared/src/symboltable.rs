@@ -1,62 +1,63 @@
-use std::fmt::Debug;
-
+use crate::OpaqueKey;
 use fnv::FnvHashMap as HashMap;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub struct TableKey<I = u32>(I);
 
 // Based on https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 
-#[derive(Default)]
+pub trait TableKey: OpaqueKey {}
+
+impl TableKey for u8 {}
+impl TableKey for u16 {}
+impl TableKey for u32 {}
+impl TableKey for u64 {}
+
 pub struct SymbolTable<I = u32> {
-    str_keys: HashMap<&'static str, TableKey<I>>,
-    table: Vec<&'static str>,
+    str_key_map: HashMap<&'static str, I>,
+    lookup_table: Vec<&'static str>,
     storage: String,
     archived: Vec<String>,
 }
 
-impl<I> SymbolTable<I>
-where
-    I: Copy + TryFrom<usize> + TryInto<usize>,
-    <I as TryFrom<usize>>::Error: Debug,
-    <I as TryInto<usize>>::Error: Debug,
-{
+impl<I: Clone + TableKey> SymbolTable<I> {
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity = capacity.next_power_of_two();
+        let str_key_map = HashMap::default();
+        let lookup_table = Vec::new();
+        let storage = String::with_capacity(capacity.next_power_of_two());
+        let archived = Vec::new();
+
         Self {
-            str_keys: HashMap::default(),
-            table: vec![],
-            storage: String::with_capacity(capacity),
-            archived: vec![],
+            str_key_map,
+            lookup_table,
+            storage,
+            archived,
         }
     }
 
-    pub fn intern(&mut self, string: &str) -> TableKey<I> {
-        if let Some(interned) = self.str_keys.get(string) {
-            return *interned;
+    pub fn entry(&mut self, string: &str) -> I {
+        if let Some(interned) = self.str_key_map.get(string) {
+            return interned.clone();
         }
 
+        assert!(self.lookup_table.len() <= I::max_index());
+
+        // SAFETY: `interned` is not shared outself of `self` as `'static`
         let interned = unsafe { self.alloc(string) };
-        let key = self
-            .table
-            .len()
-            .try_into()
-            .expect("symbol table capacity limit exceeded");
-        let key = TableKey(key);
-        self.str_keys.insert(interned, key);
-        self.table.push(interned);
+        let key = I::from_index(self.lookup_table.len());
+        self.str_key_map.insert(interned, key.clone());
+        self.lookup_table.push(interned);
 
         key
     }
 
-    pub fn lookup(&self, key: TableKey<I>) -> &str {
-        debug_assert!(
-            (key.0.try_into().expect("key should fit in usize")) < self.table.len(),
-            "key is not in table"
-        );
-        self.table[key.0.try_into().expect("key should fit in usize")]
+    #[allow(clippy::needless_lifetimes)]
+    pub fn lookup<'a>(&'a self, key: I) -> &'a str {
+        let key = key.as_index();
+        assert!(key < self.lookup_table.len());
+
+        self.lookup_table[key]
     }
 
+    /// # Safety
+    /// The caller must ensure that the returned string reference does not outlive `self`
     unsafe fn alloc(&mut self, string: &str) -> &'static str {
         use std::cmp;
         use std::mem;
@@ -73,7 +74,7 @@ where
         self.storage.push_str(string);
         let interned = &self.storage[start..];
 
-        unsafe { &*(interned as *const str) }
+        &*(interned as *const str)
     }
 }
 
@@ -83,13 +84,19 @@ mod tests {
 
     #[test]
     fn test_interning() {
-        let mut table = SymbolTable::<u32>::default();
-        let id1 = table.intern("test");
-        let id2 = table.intern("test2");
-        let id3 = table.intern("test");
+        let mut table = SymbolTable::<u32>::with_capacity(1);
+        let id1 = table.entry("test");
+        let id2 = table.entry("test2");
         assert_eq!(table.lookup(id1), "test");
         assert_eq!(table.lookup(id2), "test2");
+
+        let id1_copy = table.entry("test");
+        assert_eq!(id1, id1_copy);
         assert_ne!(id1, id2);
-        assert_eq!(id1, id3);
+
+        let id3 = table.entry("test3");
+        assert_eq!(table.lookup(id3), "test3");
+        assert_eq!(table.lookup(id1), "test");
+        assert_eq!(table.lookup(id2), "test2");
     }
 }
