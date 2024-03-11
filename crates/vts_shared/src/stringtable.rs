@@ -11,6 +11,7 @@ impl TableKey for u64 {}
 
 // Based on https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct StringTable<I = u32> {
     str_key_map: HashMap<&'static str, I>,
     lookup_table: Vec<&'static str>,
@@ -63,6 +64,10 @@ impl<I: Clone + TableKey> StringTable<I> {
         assert!(key < self.lookup_table.len());
 
         self.lookup_table[key]
+    }
+
+    pub fn rlookup(&self, string: &str) -> Option<I> {
+        self.str_key_map.get(string).cloned()
     }
 
     /// # Safety

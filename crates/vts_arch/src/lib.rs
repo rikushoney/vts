@@ -1,26 +1,80 @@
-use std::sync::Arc;
+use std::collections::HashMap;
 
-use fnv::FnvHashMap as HashMap;
 use serde::Deserialize;
+use vts_shared::{
+    database::{Database, DbKey},
+    stringtable::{StringTable, TableKey},
+    OpaqueKey,
+};
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-pub struct Module {
-    pub name: Arc<str>,
-    pub components: HashMap<Arc<str>, Arc<Component>>,
+// TODO: make this a derive macro in vts_shared
+macro_rules! impl_opaquekey_wrapper {
+    ($name:ident, $base:path) => {
+        #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+        struct $name($base);
+
+        impl OpaqueKey for $name {
+            fn as_index(&self) -> usize {
+                self.0.as_index()
+            }
+
+            fn from_index(idx: usize) -> Self {
+                $name(<$base as OpaqueKey>::from_index(idx))
+            }
+
+            fn max_index() -> usize {
+                <$base as OpaqueKey>::max_index()
+            }
+        }
+    };
 }
 
-impl Module {
+macro_rules! impl_dbkey_wrapper {
+    ($name:ident, $base:path) => {
+        impl_opaquekey_wrapper!($name, $base);
+
+        impl DbKey for $name {}
+    };
+}
+
+impl_dbkey_wrapper!(ComponentId, u32);
+impl_dbkey_wrapper!(PortId, u32);
+
+impl_opaquekey_wrapper!(StringId, u32);
+
+impl TableKey for StringId {}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Module<'m> {
+    name: StringId,
+    strings: StringTable<StringId>,
+    components: Database<Component<'m>, ComponentId>,
+    component_name_map: HashMap<StringId, ComponentId>,
+    ports: Database<Port<'m>, PortId>,
+    port_name_map: HashMap<StringId, PortId>,
+}
+
+impl<'m> Module<'m> {
     pub fn new(name: &str) -> Self {
-        let name = name.into();
-        let components = HashMap::default();
-        Self { name, components }
+        let mut strings = StringTable::default();
+        let name = strings.entry(name);
+        let components = Database::default();
+        let component_name_map = HashMap::default();
+        let ports = Database::default();
+        let port_name_map = HashMap::default();
+
+        Self {
+            name,
+            strings,
+            components,
+            component_name_map,
+            ports,
+            port_name_map,
+        }
     }
 
-    pub fn add_component(&mut self, component: Component) -> Arc<Component> {
-        let component = Arc::new(component);
-        self.components
-            .insert(Arc::clone(&component.name), Arc::clone(&component));
-        component
+    pub fn name(&self) -> &str {
+        self.strings.lookup(self.name)
     }
 }
 
@@ -31,31 +85,32 @@ pub enum ComponentClass {
     Latch,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-pub struct Component {
-    pub name: Arc<str>,
-    pub ports: HashMap<Arc<str>, Arc<Port>>,
-    pub children: HashMap<Arc<str>, Arc<Component>>,
-    pub class: Option<ComponentClass>,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Component<'m> {
+    module: &'m Module<'m>,
+    name: StringId,
+    ports: HashMap<StringId, PortId>,
+    references: HashMap<StringId, ComponentId>,
+    class: Option<ComponentClass>,
 }
 
-impl Component {
-    pub fn new(name: &str, class: Option<ComponentClass>) -> Self {
-        let name = name.into();
+impl<'m> Component<'m> {
+    pub fn new(module: &'m mut Module, name: &str, class: Option<ComponentClass>) -> Self {
+        let name = module.strings.entry(name);
         let ports = HashMap::default();
-        let children = HashMap::default();
+        let references = HashMap::default();
+
         Self {
+            module,
             name,
             ports,
-            children,
+            references,
             class,
         }
     }
 
-    pub fn add_port(&mut self, port: Port) -> Arc<Port> {
-        let port = Arc::new(port);
-        self.ports.insert(Arc::clone(&port.name), Arc::clone(&port));
-        port
+    pub fn name(&self) -> &str {
+        self.module.strings.lookup(self.name)
     }
 }
 
@@ -80,22 +135,35 @@ pub enum PortClass {
     LatchOut,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-pub struct Port {
-    pub name: Arc<str>,
-    pub kind: PortKind,
-    pub n_pins: usize,
-    pub class: Option<PortClass>,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Port<'m> {
+    module: &'m Module<'m>,
+    name: StringId,
+    kind: PortKind,
+    n_pins: usize,
+    class: Option<PortClass>,
 }
 
-impl Port {
-    pub fn new(name: &str, kind: PortKind, n_pins: usize, class: Option<PortClass>) -> Self {
-        let name = name.into();
+impl<'m> Port<'m> {
+    pub fn new(
+        module: &'m mut Module,
+        name: &str,
+        kind: PortKind,
+        n_pins: usize,
+        class: Option<PortClass>,
+    ) -> Self {
+        let name = module.strings.entry(name);
+
         Self {
+            module,
             name,
             kind,
             n_pins,
             class,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        self.module.strings.lookup(self.name)
     }
 }

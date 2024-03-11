@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 fnv.workspace = true
 serde.workspace = true
+vts_shared = { path = "../vts_shared" }

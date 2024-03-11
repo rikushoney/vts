@@ -9,6 +9,7 @@ impl DbKey for u16 {}
 impl DbKey for u32 {}
 impl DbKey for u64 {}
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Database<T, I = u32> {
     lookup_table: Vec<*const T>,
     current: Vec<T>,
