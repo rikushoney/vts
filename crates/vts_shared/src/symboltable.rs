@@ -18,6 +18,14 @@ pub struct SymbolTable<I = u32> {
     archived: Vec<String>,
 }
 
+const DEFAULT_TABLE_CAPACITY: usize = 16;
+
+impl<I: Clone + TableKey> Default for SymbolTable<I> {
+    fn default() -> Self {
+        Self::with_capacity(DEFAULT_TABLE_CAPACITY)
+    }
+}
+
 impl<I: Clone + TableKey> SymbolTable<I> {
     pub fn with_capacity(capacity: usize) -> Self {
         let str_key_map = HashMap::default();
@@ -40,7 +48,7 @@ impl<I: Clone + TableKey> SymbolTable<I> {
 
         assert!(self.lookup_table.len() <= I::max_index());
 
-        // SAFETY: `interned` is not shared outself of `self` as `'static`
+        // SAFETY: `interned` is not shared outself of `self` as 'static
         let interned = unsafe { self.alloc(string) };
         let key = I::from_index(self.lookup_table.len());
         self.str_key_map.insert(interned, key.clone());

@@ -16,6 +16,14 @@ pub struct Database<T, I = u32> {
     _unused: PhantomData<I>,
 }
 
+const DEFAULT_DATABASE_CAPACITY: usize = 16;
+
+impl<T, I: DbKey> Default for Database<T, I> {
+    fn default() -> Self {
+        Self::with_capacity(DEFAULT_DATABASE_CAPACITY)
+    }
+}
+
 impl<T, I: DbKey> Database<T, I> {
     pub fn with_capacity(capacity: usize) -> Self {
         let lookup_table = Vec::new();
