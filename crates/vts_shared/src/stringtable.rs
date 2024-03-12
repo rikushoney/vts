@@ -47,7 +47,7 @@ impl<I: Clone + TableKey> StringTable<I> {
             return interned.clone();
         }
 
-        assert!(self.lookup_table.len() <= I::max_index());
+        assert!(self.lookup_table.len() < I::max_index());
 
         // SAFETY: `interned` is not shared outside of `self` as 'static
         let interned = unsafe { self.alloc(string) };
@@ -61,7 +61,7 @@ impl<I: Clone + TableKey> StringTable<I> {
     #[allow(clippy::needless_lifetimes)]
     pub fn lookup<'a>(&'a self, key: I) -> &'a str {
         let key = key.as_index();
-        assert!(key < self.lookup_table.len());
+        assert!(key <= self.lookup_table.len());
 
         self.lookup_table[key]
     }

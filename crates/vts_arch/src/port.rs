@@ -33,21 +33,13 @@ pub struct Port<'m> {
 }
 
 impl<'m> Port<'m> {
-    pub fn new(
-        module: &'m mut Module,
+    pub(crate) fn new(
         parent: &'m Component,
-        name: &str,
+        name: StringId,
         kind: PortKind,
         n_pins: usize,
         class: Option<PortClass>,
     ) -> Self {
-        assert!(
-            module.component_name_map.get(&parent.name).is_some(),
-            "parent must be a component of module"
-        );
-
-        let name = module.strings.entry(name);
-
         Self {
             parent,
             name,

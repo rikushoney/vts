@@ -35,7 +35,13 @@ macro_rules! impl_dbkey_wrapper {
     };
 }
 
-pub(crate) use impl_dbkey_wrapper;
+macro_rules! assert_ptr_eq {
+    ($left:expr, $right:expr) => {
+        assert!(std::ptr::eq($left as *const _, $right as *const _))
+    };
+}
+
+pub(crate) use {assert_ptr_eq, impl_dbkey_wrapper};
 
 mod component;
 mod module;

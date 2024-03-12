@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::{ComponentId, Module, Port, PortId, StringId};
+use crate::{assert_ptr_eq, ComponentId, Module, Port, PortClass, PortId, PortKind, StringId};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -44,5 +44,27 @@ impl<'m> Component<'m> {
         let id = *self.ports.get(&name)?;
 
         Some(self.module.ports.lookup(id))
+    }
+
+    pub fn add_port(
+        &'m mut self,
+        module: &'m mut Module<'m>,
+        name: &str,
+        kind: PortKind,
+        n_pins: usize,
+        class: Option<PortClass>,
+    ) -> &Port<'m> {
+        assert_ptr_eq!(module, self.module);
+
+        let name = module.strings.entry(name);
+        let port = Port::new(self, name, kind, n_pins, class);
+        let id = module.ports.entry(port);
+        match module.port_name_map.insert(name, id) {
+            Some(_) => {
+                let name = module.strings.lookup(name);
+                panic!(r#""{name}" already in module"#);
+            }
+            None => module.ports.lookup(id),
+        }
     }
 }

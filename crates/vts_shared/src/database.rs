@@ -42,7 +42,7 @@ impl<T, I: DbKey> Database<T, I> {
     pub fn entry(&mut self, entity: T) -> I {
         use std::mem;
 
-        assert!(self.lookup_table.len() <= I::max_index());
+        assert!(self.lookup_table.len() < I::max_index());
 
         if self.current.len() == self.current.capacity() {
             let new_capacity = self.current.capacity().next_power_of_two();
@@ -65,7 +65,7 @@ impl<T, I: DbKey> Database<T, I> {
 
     pub fn lookup(&self, id: I) -> &T {
         let id = id.as_index();
-        assert!(id < self.lookup_table.len());
+        assert!(id <= self.lookup_table.len());
         let ptr = self.lookup_table[id];
 
         // SAFETY: `ptr` is valid for the same lifetime as `self`.
