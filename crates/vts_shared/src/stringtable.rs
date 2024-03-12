@@ -49,7 +49,7 @@ impl<I: Clone + TableKey> StringTable<I> {
 
         assert!(self.lookup_table.len() <= I::max_index());
 
-        // SAFETY: `interned` is not shared outself of `self` as 'static
+        // SAFETY: `interned` is not shared outside of `self` as 'static
         let interned = unsafe { self.alloc(string) };
         let key = I::from_index(self.lookup_table.len());
         self.str_key_map.insert(interned, key.clone());
