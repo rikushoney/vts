@@ -1,6 +1,6 @@
 pub mod arch;
-pub mod database;
-pub mod stringtable;
+mod database;
+mod stringtable;
 pub mod yosys;
 
 pub trait OpaqueKey {

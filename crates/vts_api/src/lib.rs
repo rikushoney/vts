@@ -38,7 +38,7 @@ mod arch;
 #[pymodule]
 #[pyo3(name = "_vts_api_rs")]
 fn vts_api_rs(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<arch::PyModule_>()?;
+    m.add_class::<arch::PyModule>()?;
     m.add_class::<arch::PyComponent>()?;
     m.add_class::<arch::PyComponentClass>()?;
     m.add_class::<arch::PyPort>()?;
