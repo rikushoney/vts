@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::{assert_ptr_eq, ComponentId, Module, Port, PortClass, PortId, PortKind, StringId};
+use crate::arch::{
+    assert_ptr_eq, ComponentId, Module, Port, PortClass, PortId, PortKind, StringId,
+};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]

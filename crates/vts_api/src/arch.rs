@@ -1,7 +1,7 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
-use vts_arch::{ComponentClass, PortClass, PortKind};
+use vts::arch::{ComponentClass, PortClass, PortKind};
 
 #[pyclass]
 #[pyo3(name = "PyModule")]

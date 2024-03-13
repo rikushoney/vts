@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 serde_json.workspace = true
-vts_yosys = { path = "../vts_yosys" }
+vts = { path = "../vts" }

@@ -1,6 +1,6 @@
 use std::env;
 use std::process::exit;
-use vts_yosys::netlist::Netlist;
+use vts::yosys::Netlist;
 
 fn usage() {
     println!("usage: vts [JSON_NETLIST]");

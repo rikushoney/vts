@@ -1,11 +1,10 @@
-use vts_shared::{stringtable::TableKey, OpaqueKey};
+use crate::stringtable::TableKey;
 
-pub use crate::component::{Component, ComponentClass};
-pub use crate::module::Module;
-use crate::module::{ComponentId, PortId};
-pub use crate::port::{Port, PortClass, PortKind};
+pub use component::{Component, ComponentClass};
+pub use module::Module;
+use module::{ComponentId, PortId};
+pub use port::{Port, PortClass, PortKind};
 
-// TODO: eventually make this a derive macro in vts_shared
 macro_rules! impl_opaquekey_wrapper {
     ($name:ident, $base:path) => {
         #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -31,7 +30,7 @@ macro_rules! impl_dbkey_wrapper {
     ($name:ident, $base:path) => {
         impl_opaquekey_wrapper!($name, $base);
 
-        impl vts_shared::database::DbKey for $name {}
+        impl crate::database::DbKey for $name {}
     };
 }
 

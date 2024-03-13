@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use vts_shared::{database::Database, stringtable::StringTable};
+use crate::{database::Database, stringtable::StringTable};
 
-use crate::{impl_dbkey_wrapper, Component, Port, StringId};
+use crate::arch::{impl_dbkey_wrapper, Component, Port, StringId};
 
 impl_dbkey_wrapper!(ComponentId, u32);
 impl_dbkey_wrapper!(PortId, u32);

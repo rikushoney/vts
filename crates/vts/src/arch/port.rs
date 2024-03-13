@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{Component, Module, StringId};
+use crate::arch::{Component, StringId};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]

@@ -1,5 +1,7 @@
+pub mod arch;
 pub mod database;
 pub mod stringtable;
+pub mod yosys;
 
 pub trait OpaqueKey {
     fn as_index(&self) -> usize;

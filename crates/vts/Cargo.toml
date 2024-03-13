@@ -1,9 +1,9 @@
 [package]
-name = "vts_arch"
+name = "vts"
 version = "0.0.0"
 edition = "2021"
 
 [dependencies]
 fnv.workspace = true
 serde.workspace = true
-vts_shared = { path = "../vts_shared" }
+serde_json.workspace = true
