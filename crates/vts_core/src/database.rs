@@ -85,9 +85,9 @@ impl<T, I: DbKey> Database<T, I> {
     }
 
     pub fn lookup(&self, id: I) -> &T {
-        let id = id.as_index();
-        assert!(id <= self.lookup_table.len());
-        let ptr = self.lookup_table[id];
+        let index = id.as_index();
+        assert!(index < self.lookup_table.len());
+        let ptr = self.lookup_table[index];
 
         // SAFETY: `ptr` is valid for the same lifetime as `self`.
         unsafe { &*ptr }
