@@ -71,6 +71,10 @@ impl<T, I: DbKey> Database<T, I> {
         // SAFETY: `ptr` is valid for the same lifetime as `self`.
         unsafe { &*ptr }
     }
+
+    pub fn len(&self) -> usize {
+        self.lookup_table.len()
+    }
 }
 
 #[cfg(test)]
