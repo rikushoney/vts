@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 fnv.workspace = true
 pyo3 = { version = "0.20.3", features = ["abi3-py310"] }
-vts = { path = "../vts" }
+vts_core = { path = "../vts_core" }
 
 [lib]
 name = "_vts_api_rs"

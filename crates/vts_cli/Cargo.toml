@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 serde_json.workspace = true
-vts = { path = "../vts" }
+vts_core = { path = "../vts_core" }

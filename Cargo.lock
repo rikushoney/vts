@@ -273,21 +273,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7de7d73e1754487cb58364ee906a499937a0dfabd86bcb980fa99ec8c8fa2ce"
 
 [[package]]
-name = "vts"
-version = "0.0.0"
-dependencies = [
- "fnv",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "vts_api"
 version = "0.1.0"
 dependencies = [
  "fnv",
  "pyo3",
- "vts",
+ "vts_core",
 ]
 
 [[package]]
@@ -295,7 +286,16 @@ name = "vts_cli"
 version = "0.1.0"
 dependencies = [
  "serde_json",
- "vts",
+ "vts_core",
+]
+
+[[package]]
+name = "vts_core"
+version = "0.0.0"
+dependencies = [
+ "fnv",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

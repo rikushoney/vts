@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyString;
-use vts::arch::{PortClass, PortKind};
+use vts_core::arch::{PortClass, PortKind};
 
 wrap_enum!(PyPortClass => PortClass:
     CLOCK = Clock,
