@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::OpaqueKey;
 
-pub trait DbKey: OpaqueKey {}
+pub trait DbKey: Copy + Clone + OpaqueKey {}
 
 impl DbKey for u8 {}
 impl DbKey for u16 {}
@@ -22,6 +22,27 @@ const DEFAULT_DATABASE_CAPACITY: usize = 16;
 impl<T, I: DbKey> Default for Database<T, I> {
     fn default() -> Self {
         Self::with_capacity(DEFAULT_DATABASE_CAPACITY)
+    }
+}
+
+pub struct DatabaseIter<'a, T, I> {
+    iter: std::slice::Iter<'a, *const T>,
+    index: I,
+}
+
+impl<'a, T, I: DbKey> Iterator for DatabaseIter<'a, T, I> {
+    type Item = (I, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(&ptr) = self.iter.next() {
+            let index = self.index;
+            self.index = I::from_index(index.as_index() + 1);
+
+            // SAFETY: pointers in the database are valid for the lifetime of the database
+            Some((index, unsafe { &*ptr }))
+        } else {
+            None
+        }
     }
 }
 
@@ -74,6 +95,13 @@ impl<T, I: DbKey> Database<T, I> {
 
     pub fn len(&self) -> usize {
         self.lookup_table.len()
+    }
+
+    pub fn iter(&self) -> DatabaseIter<'_, T, I> {
+        DatabaseIter {
+            iter: self.lookup_table.iter(),
+            index: I::from_index(0),
+        }
     }
 }
 

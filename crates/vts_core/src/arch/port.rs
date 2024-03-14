@@ -1,15 +1,15 @@
-use serde::Deserialize;
+use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
 use crate::arch::{Component, StringId};
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum PortKind {
     Input,
     Output,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub enum PortClass {
     #[serde(rename = "CLOCK")]
     Clock,
@@ -51,5 +51,23 @@ impl<'m> Port<'m> {
 
     pub fn name(&self) -> &str {
         self.parent.module.strings.lookup(self.name)
+    }
+}
+
+impl<'m> Serialize for Port<'m> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut port_serializer = serializer.serialize_struct("Port", 4)?;
+
+        let name = self.parent.module.strings.lookup(self.name);
+        port_serializer.serialize_field("name", name)?;
+
+        port_serializer.serialize_field("kind", &self.kind)?;
+        port_serializer.serialize_field("n_pins", &self.n_pins)?;
+        port_serializer.serialize_field("class", &self.class)?;
+
+        port_serializer.end()
     }
 }
