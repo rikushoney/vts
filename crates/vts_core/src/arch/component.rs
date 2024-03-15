@@ -29,52 +29,61 @@ pub struct Component {
 }
 
 impl Component {
-    pub(crate) fn new(
-        module: &mut Module,
-        name: &str,
-        class: Option<ComponentClass>,
-    ) -> ComponentId {
-        let name = module.strings.borrow_mut().entry(name);
-        if let Some(_) = module.component_name_map.borrow().get(&name) {
-            let name = module.strings.borrow().lookup(name);
-            let module_name = module.strings.borrow().lookup(module.name);
+    pub(crate) fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Component {
+        let name = module.strings.entry(name);
+        if module.component_names.get(&name).is_some() {
+            let name = module.strings.lookup(name);
+            let module_name = module.strings.lookup(module.name);
             panic!(r#"component "{name}" already in module "{module_name}""#)
         }
+
         let ports = HashMap::default();
         let references = HashMap::default();
 
-        let component = module.components.borrow_mut().entry(Self {
+        Self {
             name,
             ports,
             references,
             class,
-        });
-
-        {
-            let mut component_name_map = module.component_name_map.borrow_mut();
-            component_name_map.insert(name, component);
         }
-
-        component
     }
 
     pub fn name<'m>(&'m self, module: &'m Module) -> &str {
-        module.strings.borrow().lookup(self.name)
+        module.strings.lookup(self.name)
     }
 
-    pub fn port<'m>(&'m self, module: &'m Module, name: &str) -> Option<&Port> {
-        let name = module.strings.borrow().rlookup(name)?;
-        let id = *self.ports.get(&name)?;
-
-        Some(module.ports.borrow().lookup(id))
+    pub fn port<'m>(&self, module: &'m Module, port: PortId) -> &'m Port {
+        assert!(self.ports.values().any(|p| p == &port));
+        module.ports.lookup(port)
     }
 
-    pub fn add_port<'m>(&'m mut self, module: &'m mut Module, recipe: &PortRecipe) -> &Port {
-        recipe.instantiaite(module, self)
+    pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: PortId) -> &'m mut Port {
+        assert!(self.ports.values().any(|p| p == &port));
+        module.ports.lookup_mut(port)
+    }
+
+    pub fn port_id(&self, module: &Module, name: &str) -> Option<PortId> {
+        let name = module.strings.rlookup(name)?;
+        self.ports.get(&name).copied()
+    }
+
+    pub fn add_port<'m>(&'m mut self, module: &'m mut Module, recipe: &PortRecipe) -> PortId {
+        let port = recipe.instantiate(module, self);
+
+        debug_assert!(self.ports.values().any(|p| p == &port));
+        debug_assert!({
+            let name = module
+                .strings
+                .rlookup(self.port(module, port).name(module))
+                .expect("port should be instantiated");
+            self.ports.contains_key(&name)
+        });
+
+        port
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ComponentRecipe {
     pub(crate) name: Option<String>,
     ports: Option<HashMap<String, PortRecipe>>,
@@ -84,12 +93,7 @@ pub struct ComponentRecipe {
 
 impl ComponentRecipe {
     pub fn new() -> Self {
-        Self {
-            name: None,
-            ports: None,
-            references: None,
-            class: None,
-        }
+        Self::default()
     }
 
     pub fn name(&mut self, name: &str) -> &mut Self {
@@ -153,8 +157,8 @@ impl ComponentRecipe {
         self
     }
 
-    pub fn instantiate<'m>(&self, module: &'m mut Module) -> &'m Component {
-        let component = Component::new(
+    pub fn instantiate(&self, module: &mut Module) -> ComponentId {
+        let mut component = Component::new(
             module,
             self.name
                 .as_ref()
@@ -162,7 +166,25 @@ impl ComponentRecipe {
                 .as_str(),
             self.class,
         );
-        module.components.borrow().lookup(component)
+
+        if let Some(ref ports) = self.ports {
+            for port in ports.values() {
+                component.add_port(module, port);
+            }
+        }
+
+        // TODO: references
+
+        let name = component.name;
+        let component = module.components.entry(component);
+
+        if module.component_names.insert(name, component).is_some() {
+            let component_name = module.strings.lookup(name);
+            let module_name = module.strings.lookup(name);
+            panic!(r#"component "{component_name}" already in module "{module_name}""#)
+        }
+
+        component
     }
 }
 
@@ -179,8 +201,8 @@ impl<'a, 'm> Serialize for PortsSerializer<'a, 'm> {
         let mut serializer = serializer.serialize_map(Some(self.ports.len()))?;
 
         for (name, port) in self.ports {
-            let name = self.module.strings.borrow().lookup(*name);
-            let port = self.module.ports.borrow().lookup(*port);
+            let name = self.module.strings.lookup(*name);
+            let port = self.module.ports.lookup(*port);
             serializer.serialize_entry(
                 name,
                 &PortSerializer {
@@ -208,7 +230,7 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
 
         #[allow(clippy::for_kv_map)]
         for (name, _component) in self.references {
-            let name = self.module.strings.borrow().lookup(*name);
+            let name = self.module.strings.lookup(*name);
             serializer.serialize_element(name)?;
         }
 
@@ -228,7 +250,7 @@ impl<'m> Serialize for ComponentSerializer<'m> {
     {
         let mut serializer = serializer.serialize_struct("Component", 4)?;
 
-        let name = self.module.strings.borrow().lookup(self.component.name);
+        let name = self.module.strings.lookup(self.component.name);
         serializer.serialize_field("name", name)?;
 
         let ports_serializer = PortsSerializer {

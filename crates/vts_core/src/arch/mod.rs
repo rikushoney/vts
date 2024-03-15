@@ -7,7 +7,7 @@ pub use port::{Port, PortClass, PortKind};
 macro_rules! impl_opaquekey_wrapper {
     ($name:ident, $base:path) => {
         #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-        pub(crate) struct $name($base);
+        pub struct $name($base);
 
         impl $crate::OpaqueKey for $name {
             fn as_index(&self) -> usize {

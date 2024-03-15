@@ -93,6 +93,17 @@ impl<T, I: DbKey> Database<T, I> {
         unsafe { &*ptr }
     }
 
+    pub fn lookup_mut(&mut self, id: I) -> &mut T {
+        let index = id.as_index();
+        assert!(index < self.lookup_table.len());
+        let ptr = self.lookup_table[index] as *mut T;
+
+        // SAFETY: we have an exclusive reference to `self` (which implies
+        // exclusive access to the value behind `ptr`) and `ptr` is valid for
+        // the same lifetime as `self`.
+        unsafe { &mut *ptr }
+    }
+
     pub fn len(&self) -> usize {
         self.lookup_table.len()
     }

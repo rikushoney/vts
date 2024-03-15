@@ -41,32 +41,28 @@ impl Port {
         kind: PortKind,
         n_pins: usize,
         class: Option<PortClass>,
-    ) -> PortId {
-        let name = module.strings.borrow_mut().entry(name);
-        if let Some(_) = parent.ports.get(&name) {
-            let name = module.strings.borrow().lookup(name);
-            let component_name = module.strings.borrow().lookup(parent.name);
+    ) -> Port {
+        let name = module.strings.entry(name);
+        if parent.ports.get(&name).is_some() {
+            let name = module.strings.lookup(name);
+            let component_name = module.strings.lookup(parent.name);
             panic!(r#"port "{name}" already in component "{component_name}""#)
         }
 
-        let port = module.ports.borrow_mut().entry(Self {
+        Self {
             name,
             kind,
             n_pins,
             class,
-        });
-
-        module.port_name_map.borrow_mut().insert(name, port);
-        parent.ports.insert(name, port);
-        port
+        }
     }
 
     pub fn name<'m>(&'m self, module: &'m Module) -> &str {
-        module.strings.borrow().lookup(self.name)
+        module.strings.lookup(self.name)
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct PortRecipe {
     pub(crate) name: Option<String>,
     kind: Option<PortKind>,
@@ -76,12 +72,7 @@ pub struct PortRecipe {
 
 impl PortRecipe {
     pub fn new() -> Self {
-        Self {
-            name: None,
-            kind: None,
-            n_pins: None,
-            class: None,
-        }
+        Self::default()
     }
 
     pub fn name(&mut self, name: &str) -> &mut Self {
@@ -104,11 +95,7 @@ impl PortRecipe {
         self
     }
 
-    pub fn instantiaite<'m>(
-        &self,
-        module: &'m mut Module,
-        component: &'m mut Component,
-    ) -> &'m Port {
+    pub fn instantiate(&self, module: &mut Module, component: &mut Component) -> PortId {
         let port = Port::new(
             module,
             component,
@@ -117,8 +104,17 @@ impl PortRecipe {
             self.n_pins.unwrap_or(1),
             self.class,
         );
-        let ports = module.ports.borrow();
-        ports.lookup(port)
+
+        let name = port.name;
+        let port = module.ports.entry(port);
+
+        if component.ports.insert(name, port).is_some() {
+            let port_name = module.strings.lookup(name);
+            let module_name = module.strings.lookup(name);
+            panic!(r#"port "{port_name}" already in module "{module_name}""#)
+        }
+
+        port
     }
 }
 
@@ -134,8 +130,7 @@ impl<'m> Serialize for PortSerializer<'m> {
     {
         let mut port_serializer = serializer.serialize_struct("Port", 4)?;
 
-        let strings = self.module.strings.borrow();
-        let name = strings.lookup(self.port.name);
+        let name = self.module.strings.lookup(self.port.name);
         port_serializer.serialize_field("name", name)?;
 
         port_serializer.serialize_field("kind", &self.port.kind)?;
