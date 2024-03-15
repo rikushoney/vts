@@ -43,11 +43,11 @@ impl Port {
         class: Option<PortClass>,
     ) -> Port {
         let name = module.strings.entry(name);
-        if parent.ports.get(&name).is_some() {
+        assert!(parent.ports.get(&name).is_none(), "{}", {
             let name = module.strings.lookup(name);
             let component_name = module.strings.lookup(parent.name);
-            panic!(r#"port "{name}" already in component "{component_name}""#)
-        }
+            format!(r#"port "{name}" already in component "{component_name}""#)
+        });
 
         Self {
             name,
@@ -108,11 +108,11 @@ impl PortRecipe {
         let name = port.name;
         let port = module.ports.entry(port);
 
-        if component.ports.insert(name, port).is_some() {
+        assert!(component.ports.insert(name, port).is_none(), "{}", {
             let port_name = module.strings.lookup(name);
             let module_name = module.strings.lookup(name);
-            panic!(r#"port "{port_name}" already in module "{module_name}""#)
-        }
+            format!(r#"port "{port_name}" already in module "{module_name}""#)
+        });
 
         port
     }

@@ -31,11 +31,11 @@ pub struct Component {
 impl Component {
     pub(crate) fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Component {
         let name = module.strings.entry(name);
-        if module.component_names.get(&name).is_some() {
+        assert!(module.component_names.get(&name).is_none(), "{}", {
             let name = module.strings.lookup(name);
             let module_name = module.strings.lookup(module.name);
-            panic!(r#"component "{name}" already in module "{module_name}""#)
-        }
+            format!(r#"component "{name}" already in module "{module_name}""#)
+        });
 
         let ports = HashMap::default();
         let references = HashMap::default();
@@ -53,12 +53,20 @@ impl Component {
     }
 
     pub fn port<'m>(&self, module: &'m Module, port: PortId) -> &'m Port {
-        assert!(self.ports.values().any(|p| p == &port));
+        assert!(self.ports.values().any(|p| p == &port), "{}", {
+            let port_name = module.ports.lookup(port).name(module);
+            let component_name = self.name(module);
+            format!(r#"port "{port_name}" is not in component "{component_name}""#)
+        });
         module.ports.lookup(port)
     }
 
     pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: PortId) -> &'m mut Port {
-        assert!(self.ports.values().any(|p| p == &port));
+        assert!(self.ports.values().any(|p| p == &port), "{}", {
+            let port_name = module.ports.lookup(port).name(module);
+            let component_name = self.name(module);
+            format!(r#"port "{port_name}" is not in component "{component_name}""#)
+        });
         module.ports.lookup_mut(port)
     }
 
@@ -104,16 +112,15 @@ impl ComponentRecipe {
     pub fn port(&mut self, recipe: &PortRecipe) -> &mut Self {
         if let Some(ref mut ports) = self.ports {
             let name = recipe.name.as_ref().expect("port must have a name").clone();
-            if ports.insert(name, recipe.clone()).is_none() {
-                self
-            } else {
+            assert!(ports.insert(name, recipe.clone()).is_none(), "{}", {
                 let port_name = recipe.name.as_ref().unwrap();
                 let component_name = match self.name {
                     Some(ref name) => name.clone(),
                     None => String::new(),
                 };
-                panic!(r#"port "{port_name}" already in "{component_name}""#)
-            }
+                format!(r#"port "{port_name}" already in component "{component_name}""#)
+            });
+            self
         } else {
             self.ports = Some(HashMap::default());
             self.port(recipe)
@@ -129,15 +136,16 @@ impl ComponentRecipe {
 
     pub fn reference(&mut self, reference: &str) -> &mut Self {
         if let Some(ref mut references) = self.references {
-            if references.insert(reference.to_string()) {
-                self
-            } else {
+            assert!(references.insert(reference.to_string()), "{}", {
                 let component_name = match self.name {
                     Some(ref name) => name.clone(),
                     None => String::new(),
                 };
-                panic!(r#"component "{reference}" already referenced in "{component_name}""#)
-            }
+                format!(
+                    r#"component "{reference}" already referenced in component "{component_name}""#
+                )
+            });
+            self
         } else {
             self.references = Some(HashSet::default());
             self.reference(reference)
@@ -148,7 +156,6 @@ impl ComponentRecipe {
         for reference in references {
             self.reference(reference);
         }
-
         self
     }
 
@@ -178,11 +185,15 @@ impl ComponentRecipe {
         let name = component.name;
         let component = module.components.entry(component);
 
-        if module.component_names.insert(name, component).is_some() {
-            let component_name = module.strings.lookup(name);
-            let module_name = module.strings.lookup(name);
-            panic!(r#"component "{component_name}" already in module "{module_name}""#)
-        }
+        assert!(
+            module.component_names.insert(name, component).is_none(),
+            "{}",
+            {
+                let component_name = module.strings.lookup(name);
+                let module_name = module.strings.lookup(name);
+                format!(r#"component "{component_name}" already in module "{module_name}""#)
+            }
+        );
 
         component
     }
