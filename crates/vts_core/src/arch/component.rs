@@ -91,8 +91,9 @@ impl Component {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ComponentRecipe {
+    #[serde(skip_deserializing)]
     pub(crate) name: Option<String>,
     ports: Option<HashMap<String, PortRecipe>>,
     references: Option<HashSet<String>>,
@@ -111,7 +112,11 @@ impl ComponentRecipe {
 
     pub fn port(&mut self, recipe: &PortRecipe) -> &mut Self {
         if let Some(ref mut ports) = self.ports {
-            let name = recipe.name.as_ref().expect("port must have a name").clone();
+            let name = recipe
+                .name
+                .as_ref()
+                .expect("port should have a name")
+                .clone();
             assert!(ports.insert(name, recipe.clone()).is_none(), "{}", {
                 let port_name = recipe.name.as_ref().unwrap();
                 let component_name = match self.name {
@@ -164,12 +169,12 @@ impl ComponentRecipe {
         self
     }
 
-    pub fn instantiate(&self, module: &mut Module) -> ComponentId {
+    pub(crate) fn instantiate(&self, module: &mut Module) -> ComponentId {
         let mut component = Component::new(
             module,
             self.name
                 .as_ref()
-                .expect("component must have a name")
+                .expect("component should have a name")
                 .as_str(),
             self.class,
         );
@@ -217,7 +222,7 @@ impl<'a, 'm> Serialize for PortsSerializer<'a, 'm> {
             serializer.serialize_entry(
                 name,
                 &PortSerializer {
-                    module: self.module,
+                    _module: self.module,
                     port,
                 },
             )?;
@@ -260,9 +265,6 @@ impl<'m> Serialize for ComponentSerializer<'m> {
         S: Serializer,
     {
         let mut serializer = serializer.serialize_struct("Component", 4)?;
-
-        let name = self.module.strings.lookup(self.component.name);
-        serializer.serialize_field("name", name)?;
 
         let ports_serializer = PortsSerializer {
             module: self.module,

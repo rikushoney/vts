@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::{
+    de::{self, MapAccess, Visitor},
     ser::{SerializeMap, SerializeStruct},
-    Serialize, Serializer,
+    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 use super::{
@@ -114,6 +116,74 @@ impl Serialize for Module {
         serializer.serialize_field("components", &components_serializer)?;
 
         serializer.end()
+    }
+}
+
+struct ModuleVisitor;
+
+impl<'de> Visitor<'de> for ModuleVisitor {
+    type Value = Module;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a module definition")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        #[derive(Deserialize)]
+        enum Field {
+            Name,
+            Components,
+        }
+
+        let mut name: Option<&str> = None;
+        let mut components: Option<HashMap<&str, ComponentRecipe>> = None;
+
+        while let Some(key) = map.next_key()? {
+            match key {
+                Field::Name => {
+                    if name.is_some() {
+                        return Err(de::Error::duplicate_field("name"));
+                    }
+                    name = Some(map.next_value()?);
+                }
+                Field::Components => {
+                    if components.is_some() {
+                        return Err(de::Error::duplicate_field("components"));
+                    }
+                    components = Some(map.next_value()?);
+                }
+            }
+        }
+
+        let name = match name {
+            Some(name) => name,
+            None => {
+                return Err(de::Error::missing_field("name"));
+            }
+        };
+        let components = components.unwrap_or_default();
+
+        let mut module = Module::new(name);
+
+        for (name, mut recipe) in components {
+            debug_assert!(recipe.name.is_none());
+            recipe.name = Some(name.to_string());
+            module.add_component(&recipe);
+        }
+
+        Ok(module)
+    }
+}
+
+impl<'de> Deserialize<'de> for Module {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_struct("Module", &["name", "components"], ModuleVisitor)
     }
 }
 

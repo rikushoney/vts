@@ -62,8 +62,9 @@ impl Port {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct PortRecipe {
+    #[serde(skip_deserializing)]
     pub(crate) name: Option<String>,
     kind: Option<PortKind>,
     n_pins: Option<usize>,
@@ -95,7 +96,7 @@ impl PortRecipe {
         self
     }
 
-    pub fn instantiate(&self, module: &mut Module, component: &mut Component) -> PortId {
+    pub(crate) fn instantiate(&self, module: &mut Module, component: &mut Component) -> PortId {
         let port = Port::new(
             module,
             component,
@@ -119,7 +120,8 @@ impl PortRecipe {
 }
 
 pub(crate) struct PortSerializer<'m> {
-    pub(crate) module: &'m Module,
+    // TODO: is this needed?
+    pub(crate) _module: &'m Module,
     pub(crate) port: &'m Port,
 }
 
@@ -129,9 +131,6 @@ impl<'m> Serialize for PortSerializer<'m> {
         S: Serializer,
     {
         let mut port_serializer = serializer.serialize_struct("Port", 4)?;
-
-        let name = self.module.strings.lookup(self.port.name);
-        port_serializer.serialize_field("name", name)?;
 
         port_serializer.serialize_field("kind", &self.port.kind)?;
         port_serializer.serialize_field("n_pins", &self.port.n_pins)?;
