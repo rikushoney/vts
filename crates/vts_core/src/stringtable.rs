@@ -11,6 +11,7 @@ impl TableKey for u64 {}
 
 // Based on https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 
+// TODO: optimise empty string
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringTable<I = u32> {
     str_key_map: HashMap<&'static str, I>,

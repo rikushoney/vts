@@ -1,15 +1,18 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::fmt;
 
 use serde::{
+    de::{self, DeserializeSeed, MapAccess, Visitor},
     ser::{SerializeMap, SerializeSeq, SerializeStruct},
-    Deserialize, Serialize, Serializer,
+    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 use super::{
     impl_dbkey_wrapper,
-    port::{PortId, PortRecipe, PortSerializer},
+    port::{PortId, PortsDeserializer, PortsSerializer},
     Module, Port, StringId,
 };
+use crate::database::Database;
 
 impl_dbkey_wrapper!(ComponentId, u32);
 
@@ -29,9 +32,9 @@ pub struct Component {
 }
 
 impl Component {
-    pub(crate) fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Component {
+    fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Component {
         let name = module.strings.entry(name);
-        assert!(module.component_names.get(&name).is_none(), "{}", {
+        assert!(module.components.get(&name).is_none(), "{}", {
             let name = module.strings.lookup(name);
             let module_name = module.strings.lookup(module.name);
             format!(r#"component "{name}" already in module "{module_name}""#)
@@ -52,183 +55,43 @@ impl Component {
         module.strings.lookup(self.name)
     }
 
+    pub fn set_name<'m>(&'m mut self, module: &'m mut Module, name: &str) {
+        let name = module.strings.entry(name);
+        assert!(module.components.get(&name).is_none(), "{}", {
+            let name = module.strings.lookup(name);
+            let module_name = module.strings.lookup(module.name);
+            format!(r#"component "{name}" already in module "{module_name}""#)
+        });
+
+        let component = module
+            .components
+            .remove(&self.name)
+            .expect("component should be in module");
+        module.components.insert(name, component);
+        self.name = name;
+    }
+
     pub fn port<'m>(&self, module: &'m Module, port: PortId) -> &'m Port {
         assert!(self.ports.values().any(|p| p == &port), "{}", {
-            let port_name = module.ports.lookup(port).name(module);
+            let port_name = module.port_db.lookup(port).name(module);
             let component_name = self.name(module);
-            format!(r#"port "{port_name}" is not in component "{component_name}""#)
+            format!(r#"port "{port_name}" not in component "{component_name}""#)
         });
-        module.ports.lookup(port)
+        module.port_db.lookup(port)
     }
 
     pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: PortId) -> &'m mut Port {
         assert!(self.ports.values().any(|p| p == &port), "{}", {
-            let port_name = module.ports.lookup(port).name(module);
+            let port_name = module.port_db.lookup(port).name(module);
             let component_name = self.name(module);
-            format!(r#"port "{port_name}" is not in component "{component_name}""#)
+            format!(r#"port "{port_name}" not in component "{component_name}""#)
         });
-        module.ports.lookup_mut(port)
+        module.port_db.lookup_mut(port)
     }
 
     pub fn port_id(&self, module: &Module, name: &str) -> Option<PortId> {
         let name = module.strings.rlookup(name)?;
         self.ports.get(&name).copied()
-    }
-
-    pub fn add_port<'m>(&'m mut self, module: &'m mut Module, recipe: &PortRecipe) -> PortId {
-        let port = recipe.instantiate(module, self);
-
-        debug_assert!(self.ports.values().any(|p| p == &port));
-        debug_assert!({
-            let name = module
-                .strings
-                .rlookup(self.port(module, port).name(module))
-                .expect("port should be instantiated");
-            self.ports.contains_key(&name)
-        });
-
-        port
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
-pub struct ComponentRecipe {
-    #[serde(skip_deserializing)]
-    pub(crate) name: Option<String>,
-    ports: Option<HashMap<String, PortRecipe>>,
-    references: Option<HashSet<String>>,
-    class: Option<ComponentClass>,
-}
-
-impl ComponentRecipe {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn name(&mut self, name: &str) -> &mut Self {
-        self.name = Some(name.to_string());
-        self
-    }
-
-    pub fn port(&mut self, recipe: &PortRecipe) -> &mut Self {
-        if let Some(ref mut ports) = self.ports {
-            let name = recipe
-                .name
-                .as_ref()
-                .expect("port should have a name")
-                .clone();
-            assert!(ports.insert(name, recipe.clone()).is_none(), "{}", {
-                let port_name = recipe.name.as_ref().unwrap();
-                let component_name = match self.name {
-                    Some(ref name) => name.clone(),
-                    None => String::new(),
-                };
-                format!(r#"port "{port_name}" already in component "{component_name}""#)
-            });
-            self
-        } else {
-            self.ports = Some(HashMap::default());
-            self.port(recipe)
-        }
-    }
-
-    pub fn ports<'a, I: Iterator<Item = &'a PortRecipe>>(&mut self, recipes: I) -> &mut Self {
-        for recipe in recipes {
-            self.port(recipe);
-        }
-        self
-    }
-
-    pub fn reference(&mut self, reference: &str) -> &mut Self {
-        if let Some(ref mut references) = self.references {
-            assert!(references.insert(reference.to_string()), "{}", {
-                let component_name = match self.name {
-                    Some(ref name) => name.clone(),
-                    None => String::new(),
-                };
-                format!(
-                    r#"component "{reference}" already referenced in component "{component_name}""#
-                )
-            });
-            self
-        } else {
-            self.references = Some(HashSet::default());
-            self.reference(reference)
-        }
-    }
-
-    pub fn references<'a, I: Iterator<Item = &'a str>>(&mut self, references: I) -> &mut Self {
-        for reference in references {
-            self.reference(reference);
-        }
-        self
-    }
-
-    pub fn class(&mut self, class: ComponentClass) -> &mut Self {
-        self.class = Some(class);
-        self
-    }
-
-    pub(crate) fn instantiate(&self, module: &mut Module) -> ComponentId {
-        let mut component = Component::new(
-            module,
-            self.name
-                .as_ref()
-                .expect("component should have a name")
-                .as_str(),
-            self.class,
-        );
-
-        if let Some(ref ports) = self.ports {
-            for port in ports.values() {
-                component.add_port(module, port);
-            }
-        }
-
-        // TODO: references
-
-        let name = component.name;
-        let component = module.components.entry(component);
-
-        assert!(
-            module.component_names.insert(name, component).is_none(),
-            "{}",
-            {
-                let component_name = module.strings.lookup(name);
-                let module_name = module.strings.lookup(name);
-                format!(r#"component "{component_name}" already in module "{module_name}""#)
-            }
-        );
-
-        component
-    }
-}
-
-struct PortsSerializer<'a, 'm> {
-    module: &'m Module,
-    ports: &'a HashMap<StringId, PortId>,
-}
-
-impl<'a, 'm> Serialize for PortsSerializer<'a, 'm> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut serializer = serializer.serialize_map(Some(self.ports.len()))?;
-
-        for (name, port) in self.ports {
-            let name = self.module.strings.lookup(*name);
-            let port = self.module.ports.lookup(*port);
-            serializer.serialize_entry(
-                name,
-                &PortSerializer {
-                    _module: self.module,
-                    port,
-                },
-            )?;
-        }
-
-        serializer.end()
     }
 }
 
@@ -254,9 +117,15 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
     }
 }
 
-pub(crate) struct ComponentSerializer<'m> {
-    pub(crate) module: &'m Module,
-    pub(crate) component: &'m Component,
+pub struct ComponentSerializer<'m> {
+    module: &'m Module,
+    component: &'m Component,
+}
+
+impl<'m> ComponentSerializer<'m> {
+    pub fn new(module: &'m Module, component: &'m Component) -> Self {
+        Self { module, component }
+    }
 }
 
 impl<'m> Serialize for ComponentSerializer<'m> {
@@ -266,10 +135,7 @@ impl<'m> Serialize for ComponentSerializer<'m> {
     {
         let mut serializer = serializer.serialize_struct("Component", 4)?;
 
-        let ports_serializer = PortsSerializer {
-            module: self.module,
-            ports: &self.component.ports,
-        };
+        let ports_serializer = PortsSerializer::new(self.module, &self.component.ports);
         serializer.serialize_field("ports", &ports_serializer)?;
 
         let component_refs_serializer = ComponentRefsSerializer {
@@ -281,5 +147,198 @@ impl<'m> Serialize for ComponentSerializer<'m> {
         serializer.serialize_field("class", &self.component.class)?;
 
         serializer.end()
+    }
+}
+
+pub struct ComponentsSerializer<'m> {
+    module: &'m Module,
+    components: &'m Database<Component, ComponentId>,
+}
+
+impl<'m> ComponentsSerializer<'m> {
+    pub fn new(module: &'m Module, components: &'m Database<Component, ComponentId>) -> Self {
+        Self { module, components }
+    }
+}
+
+impl<'m> Serialize for ComponentsSerializer<'m> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut serializer = serializer.serialize_map(Some(self.components.len()))?;
+
+        for (_id, component) in self.components.iter() {
+            let name = self.module.strings.lookup(component.name);
+            serializer.serialize_entry(
+                name,
+                &ComponentSerializer {
+                    module: self.module,
+                    component,
+                },
+            )?;
+        }
+
+        serializer.end()
+    }
+}
+
+pub struct ComponentDeserializer<'m, 'de> {
+    module: &'m mut Module,
+    name: &'de str,
+}
+
+impl<'m, 'de> ComponentDeserializer<'m, 'de> {
+    pub fn new(module: &'m mut Module, name: &'de str) -> Self {
+        Self { module, name }
+    }
+}
+
+impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ComponentVisitor<'m, 'de> {
+            module: &'m mut Module,
+            name: &'de str,
+        }
+
+        const FIELDS: &[&str] = &["name", "ports", "references", "class"];
+
+        impl<'de, 'm> Visitor<'de> for ComponentVisitor<'m, 'de> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a component description")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                #[derive(Deserialize)]
+                #[serde(rename_all = "lowercase")]
+                enum Field {
+                    Ports,
+                    References,
+                    Class,
+                }
+
+                let mut ports = false;
+                let mut references = false;
+                let mut class = false;
+
+                let mut component = Component::new(self.module, self.name, None);
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Ports => {
+                            if ports {
+                                return Err(de::Error::duplicate_field("ports"));
+                            }
+                            map.next_value_seed(PortsDeserializer::new(
+                                self.module,
+                                &mut component,
+                            ))?;
+                            ports = true;
+                        }
+                        Field::References => {
+                            if references {
+                                return Err(de::Error::duplicate_field("references"));
+                            }
+                            // TODO: deserialize references
+                            references = true;
+                        }
+                        Field::Class => {
+                            if class {
+                                return Err(de::Error::duplicate_field("class"));
+                            }
+                            component.class = Some(map.next_value()?);
+                            class = true;
+                        }
+                    }
+                }
+
+                let name = component.name;
+                let component = self.module.component_db.entry(component);
+
+                let prev = self.module.components.insert(name, component);
+                assert!(prev.is_none(), "{}", {
+                    let component_name = self.module.strings.lookup(name);
+                    let module_name = self.module.strings.lookup(name);
+                    format!(r#"component "{component_name}" already in module "{module_name}""#)
+                });
+
+                debug_assert!(self.module.components.values().any(|c| c == &component));
+                debug_assert!({
+                    let name = self
+                        .module
+                        .strings
+                        .rlookup(self.module.component(component).name(self.module))
+                        .expect("component name should be in module strings");
+                    self.module.components.contains_key(&name)
+                });
+
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_struct(
+            "Component",
+            FIELDS,
+            ComponentVisitor {
+                module: self.module,
+                name: self.name,
+            },
+        )
+    }
+}
+
+pub struct ComponentsDeserializer<'m> {
+    module: &'m mut Module,
+}
+
+impl<'m> ComponentsDeserializer<'m> {
+    pub fn new(module: &'m mut Module) -> Self {
+        Self { module }
+    }
+}
+
+impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ComponentsVisitor<'m> {
+            module: &'m mut Module,
+        }
+
+        impl<'de, 'm> Visitor<'de> for ComponentsVisitor<'m> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a map of component descriptions")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                while let Some(name) = map.next_key()? {
+                    map.next_value_seed(ComponentDeserializer::new(self.module, name))?;
+                }
+
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_map(ComponentsVisitor {
+            module: self.module,
+        })
     }
 }

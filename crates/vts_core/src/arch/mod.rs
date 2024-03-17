@@ -41,9 +41,9 @@ macro_rules! impl_dbkey_wrapper {
 
 pub(crate) use impl_dbkey_wrapper;
 
-mod component;
-mod module;
-mod port;
+pub mod component;
+pub mod module;
+pub mod port;
 
 impl_opaquekey_wrapper!(StringId, u32);
 

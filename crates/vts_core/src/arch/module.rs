@@ -3,40 +3,40 @@ use std::fmt;
 
 use serde::{
     de::{self, MapAccess, Visitor},
-    ser::{SerializeMap, SerializeStruct},
+    ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
 use super::{
-    component::{ComponentId, ComponentRecipe, ComponentSerializer},
+    component::{ComponentId, ComponentsDeserializer, ComponentsSerializer},
     port::PortId,
     Component, Port, StringId,
 };
-use crate::{database::Database, stringtable::StringTable};
+use crate::{database::Database, stringtable::StringTable, OpaqueKey};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Module {
     pub(crate) name: StringId,
     pub(crate) strings: StringTable<StringId>,
-    pub(crate) components: Database<Component, ComponentId>,
-    pub(crate) component_names: HashMap<StringId, ComponentId>,
-    pub(crate) ports: Database<Port, PortId>,
+    pub(crate) component_db: Database<Component, ComponentId>,
+    pub(crate) components: HashMap<StringId, ComponentId>,
+    pub(crate) port_db: Database<Port, PortId>,
 }
 
 impl Module {
     pub fn new(name: &str) -> Self {
         let mut strings = StringTable::default();
         let name = strings.entry(name);
-        let components = Database::default();
-        let component_names = HashMap::default();
-        let ports = Database::default();
+        let component_db = Database::default();
+        let components = HashMap::default();
+        let port_db = Database::default();
 
         Self {
             name,
             strings,
+            component_db,
             components,
-            component_names,
-            ports,
+            port_db,
         }
     }
 
@@ -44,61 +44,33 @@ impl Module {
         self.strings.lookup(self.name)
     }
 
+    pub fn set_name(&mut self, name: &str) {
+        self.name = self.strings.entry(name);
+    }
+
     pub fn component(&self, component: ComponentId) -> &Component {
-        assert!(self.component_names.values().any(|c| c == &component));
-        self.components.lookup(component)
+        assert!(
+            self.components.values().any(|c| c == &component),
+            r#"component with id "{id}" not in module "{mod}""#,
+            id = component.as_index(),
+            mod = self.name()
+        );
+        self.component_db.lookup(component)
     }
 
     pub fn component_mut(&mut self, component: ComponentId) -> &mut Component {
-        assert!(self.component_names.values().any(|c| c == &component));
-        self.components.lookup_mut(component)
+        assert!(
+            self.components.values().any(|c| c == &component),
+            r#"component with id "{id}" not in module "{mod}""#,
+            id = component.as_index(),
+            mod = self.name()
+        );
+        self.component_db.lookup_mut(component)
     }
 
     pub fn component_id(&self, name: &str) -> Option<ComponentId> {
         let name = self.strings.rlookup(name)?;
-        self.component_names.get(&name).copied()
-    }
-
-    pub fn add_component(&mut self, recipe: &ComponentRecipe) -> ComponentId {
-        let component = recipe.instantiate(self);
-
-        debug_assert!(self.component_names.values().any(|c| c == &component));
-        debug_assert!({
-            let name = self
-                .strings
-                .rlookup(self.component(component).name(self))
-                .expect("component should be instantiated");
-            self.component_names.contains_key(&name)
-        });
-
-        component
-    }
-}
-
-struct ComponentsSerializer<'m> {
-    module: &'m Module,
-    components: &'m Database<Component, ComponentId>,
-}
-
-impl<'m> Serialize for ComponentsSerializer<'m> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut serializer = serializer.serialize_map(Some(self.components.len()))?;
-
-        for (_id, component) in self.components.iter() {
-            let name = self.module.strings.lookup(component.name);
-            serializer.serialize_entry(
-                name,
-                &ComponentSerializer {
-                    module: self.module,
-                    component,
-                },
-            )?;
-        }
-
-        serializer.end()
+        self.components.get(&name).copied()
     }
 }
 
@@ -109,72 +81,10 @@ impl Serialize for Module {
         let name = self.strings.lookup(self.name);
         serializer.serialize_field("name", name)?;
 
-        let components_serializer = ComponentsSerializer {
-            module: self,
-            components: &self.components,
-        };
+        let components_serializer = ComponentsSerializer::new(self, &self.component_db);
         serializer.serialize_field("components", &components_serializer)?;
 
         serializer.end()
-    }
-}
-
-struct ModuleVisitor;
-
-impl<'de> Visitor<'de> for ModuleVisitor {
-    type Value = Module;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a module definition")
-    }
-
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        #[derive(Deserialize)]
-        enum Field {
-            Name,
-            Components,
-        }
-
-        let mut name: Option<&str> = None;
-        let mut components: Option<HashMap<&str, ComponentRecipe>> = None;
-
-        while let Some(key) = map.next_key()? {
-            match key {
-                Field::Name => {
-                    if name.is_some() {
-                        return Err(de::Error::duplicate_field("name"));
-                    }
-                    name = Some(map.next_value()?);
-                }
-                Field::Components => {
-                    if components.is_some() {
-                        return Err(de::Error::duplicate_field("components"));
-                    }
-                    components = Some(map.next_value()?);
-                }
-            }
-        }
-
-        let name = match name {
-            Some(name) => name,
-            None => {
-                return Err(de::Error::missing_field("name"));
-            }
-        };
-        let components = components.unwrap_or_default();
-
-        let mut module = Module::new(name);
-
-        for (name, mut recipe) in components {
-            debug_assert!(recipe.name.is_none());
-            recipe.name = Some(name.to_string());
-            module.add_component(&recipe);
-        }
-
-        Ok(module)
     }
 }
 
@@ -183,6 +93,58 @@ impl<'de> Deserialize<'de> for Module {
     where
         D: Deserializer<'de>,
     {
+        struct ModuleVisitor;
+
+        impl<'de> Visitor<'de> for ModuleVisitor {
+            type Value = Module;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a module definition")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                #[derive(Deserialize)]
+                #[serde(rename_all = "lowercase")]
+                enum Field {
+                    Name,
+                    Components,
+                }
+
+                let mut module = Module::new("");
+
+                let mut name = false;
+                let mut components = false;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Name => {
+                            if name {
+                                return Err(de::Error::duplicate_field("name"));
+                            }
+                            module.set_name(map.next_value()?);
+                            name = true;
+                        }
+                        Field::Components => {
+                            if components {
+                                return Err(de::Error::duplicate_field("components"));
+                            }
+                            map.next_value_seed(ComponentsDeserializer::new(&mut module))?;
+                            components = true;
+                        }
+                    }
+                }
+
+                if !name {
+                    return Err(de::Error::missing_field("name"));
+                }
+
+                Ok(module)
+            }
+        }
+
         deserializer.deserialize_struct("Module", &["name", "components"], ModuleVisitor)
     }
 }
@@ -191,36 +153,8 @@ impl<'de> Deserialize<'de> for Module {
 mod tests {
     use super::*;
 
-    use super::super::{port::PortRecipe, PortKind};
-
     #[test]
     fn test_module() {
-        let mut module = Module::new("test_mod");
-
-        let mut test_comp = ComponentRecipe::new();
-        test_comp.name("test_comp");
-
-        let mut test_port = PortRecipe::new();
-        test_port.kind(PortKind::Input);
-        test_comp.port(test_port.clone().name("test_port1"));
-        test_comp.port(test_port.clone().name("test_port2"));
-
-        let component = module.add_component(&test_comp);
-        {
-            let component = module.component(component);
-            assert_eq!(component.name(&module), "test_comp");
-
-            let port1 = {
-                let id = component.port_id(&module, "test_port1").unwrap();
-                component.port(&module, id)
-            };
-            assert_eq!(port1.name(&module), "test_port1");
-
-            let port2 = {
-                let id = component.port_id(&module, "test_port2").unwrap();
-                component.port(&module, id)
-            };
-            assert_eq!(port2.name(&module), "test_port2");
-        }
+        let mut _module = Module::new("test_mod");
     }
 }
