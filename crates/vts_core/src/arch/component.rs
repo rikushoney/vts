@@ -34,11 +34,12 @@ pub struct Component {
 impl Component {
     fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Component {
         let name = module.strings.entry(name);
-        assert!(module.components.get(&name).is_none(), "{}", {
-            let name = module.strings.lookup(name);
-            let module_name = module.strings.lookup(module.name);
-            format!(r#"component "{name}" already in module "{module_name}""#)
-        });
+        assert!(
+            module.components.get(&name).is_none(),
+            r#"component "{component}" already in module "{module}""#,
+            component = module.strings.lookup(name),
+            module = module.strings.lookup(module.name)
+        );
 
         let ports = HashMap::default();
         let references = HashMap::default();
@@ -57,11 +58,12 @@ impl Component {
 
     pub fn set_name<'m>(&'m mut self, module: &'m mut Module, name: &str) {
         let name = module.strings.entry(name);
-        assert!(module.components.get(&name).is_none(), "{}", {
-            let name = module.strings.lookup(name);
-            let module_name = module.strings.lookup(module.name);
-            format!(r#"component "{name}" already in module "{module_name}""#)
-        });
+        assert!(
+            module.components.get(&name).is_none(),
+            r#"component "{component}" already in module "{module}""#,
+            component = module.strings.lookup(name),
+            module = module.strings.lookup(module.name)
+        );
 
         let component = module
             .components
@@ -72,20 +74,22 @@ impl Component {
     }
 
     pub fn port<'m>(&self, module: &'m Module, port: PortId) -> &'m Port {
-        assert!(self.ports.values().any(|p| p == &port), "{}", {
-            let port_name = module.port_db.lookup(port).name(module);
-            let component_name = self.name(module);
-            format!(r#"port "{port_name}" not in component "{component_name}""#)
-        });
+        assert!(
+            self.ports.values().any(|p| p == &port),
+            r#"port "{port}" not in component "{component}""#,
+            port = module.port_db.lookup(port).name(module),
+            component = self.name(module),
+        );
         module.port_db.lookup(port)
     }
 
     pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: PortId) -> &'m mut Port {
-        assert!(self.ports.values().any(|p| p == &port), "{}", {
-            let port_name = module.port_db.lookup(port).name(module);
-            let component_name = self.name(module);
-            format!(r#"port "{port_name}" not in component "{component_name}""#)
-        });
+        assert!(
+            self.ports.values().any(|p| p == &port),
+            r#"port "{port}" not in component "{component}""#,
+            port = module.port_db.lookup(port).name(module),
+            component = self.name(module),
+        );
         module.port_db.lookup_mut(port)
     }
 
@@ -265,12 +269,12 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
                 let name = component.name;
                 let component = self.module.component_db.entry(component);
 
-                let prev = self.module.components.insert(name, component);
-                assert!(prev.is_none(), "{}", {
-                    let component_name = self.module.strings.lookup(name);
-                    let module_name = self.module.strings.lookup(name);
-                    format!(r#"component "{component_name}" already in module "{module_name}""#)
-                });
+                assert!(
+                    self.module.components.insert(name, component).is_none(),
+                    r#"component "{component}" already in module "{module}""#,
+                    component = self.module.strings.lookup(name),
+                    module = self.module.strings.lookup(name),
+                );
 
                 debug_assert!(self.module.components.values().any(|c| c == &component));
                 debug_assert!({

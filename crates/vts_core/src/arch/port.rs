@@ -51,11 +51,12 @@ impl Port {
         class: Option<PortClass>,
     ) -> Port {
         let name = module.strings.entry(name);
-        assert!(parent.ports.get(&name).is_none(), "{}", {
-            let name = module.strings.lookup(name);
-            let component_name = module.strings.lookup(parent.name);
-            format!(r#"port "{name}" already in component "{component_name}""#)
-        });
+        assert!(
+            parent.ports.get(&name).is_none(),
+            r#"port "{port}" already in component "{component}""#,
+            port = module.strings.lookup(name),
+            component = module.strings.lookup(parent.name),
+        );
 
         let parent = *module
             .components
@@ -78,11 +79,12 @@ impl Port {
     pub fn set_name<'m>(&'m mut self, module: &'m mut Module, name: &str) {
         let name = module.strings.entry(name);
         let parent = module.component_mut(self.parent);
-        assert!(parent.ports.get(&name).is_none(), "{}", {
-            let name = module.strings.lookup(name);
-            let module_name = module.strings.lookup(module.name);
-            format!(r#"component "{name}" already in module "{module_name}""#)
-        });
+        assert!(
+            parent.ports.get(&name).is_none(),
+            r#"component "{component}" already in module "{module}""#,
+            component = module.strings.lookup(name),
+            module = module.strings.lookup(module.name),
+        );
 
         let port = parent
             .ports
@@ -251,12 +253,12 @@ impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'de, 'm> {
                 let name = port.name;
                 let port = self.module.port_db.entry(port);
 
-                let prev = self.component.ports.insert(name, port);
-                assert!(prev.is_none(), "{}", {
-                    let port_name = self.module.strings.lookup(name);
-                    let module_name = self.module.strings.lookup(name);
-                    format!(r#"port "{port_name}" already in module "{module_name}""#)
-                });
+                assert!(
+                    self.component.ports.insert(name, port).is_none(),
+                    r#"port "{port}" already in module "{module}""#,
+                    port = self.module.strings.lookup(name),
+                    module = self.module.strings.lookup(name),
+                );
 
                 debug_assert!(self.component.ports.values().any(|p| p == &port));
                 debug_assert!({

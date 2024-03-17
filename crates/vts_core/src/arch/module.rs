@@ -51,9 +51,9 @@ impl Module {
     pub fn component(&self, component: ComponentId) -> &Component {
         assert!(
             self.components.values().any(|c| c == &component),
-            r#"component with id "{id}" not in module "{mod}""#,
+            r#"component with id "{id}" not in module "{module}""#,
             id = component.as_index(),
-            mod = self.name()
+            module = self.name()
         );
         self.component_db.lookup(component)
     }
@@ -61,9 +61,9 @@ impl Module {
     pub fn component_mut(&mut self, component: ComponentId) -> &mut Component {
         assert!(
             self.components.values().any(|c| c == &component),
-            r#"component with id "{id}" not in module "{mod}""#,
+            r#"component with id "{id}" not in module "{module}""#,
             id = component.as_index(),
-            mod = self.name()
+            module = self.name()
         );
         self.component_db.lookup_mut(component)
     }
