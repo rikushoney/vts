@@ -3,16 +3,16 @@ pub mod ser;
 
 use std::collections::HashMap;
 
-use crate::arch::{component::ComponentId, port::PortId, Component, Port, StringId};
+use crate::arch::{component::ComponentData, port::Port, port::PortData, Component, StringId};
 use crate::{database::Database, stringtable::StringTable, OpaqueKey};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Module {
     pub(crate) name: StringId,
     pub(crate) strings: StringTable<StringId>,
-    pub(crate) component_db: Database<Component, ComponentId>,
-    pub(crate) components: HashMap<StringId, ComponentId>,
-    pub(crate) port_db: Database<Port, PortId>,
+    pub(crate) component_db: Database<ComponentData, Component>,
+    pub(crate) components: HashMap<StringId, Component>,
+    pub(crate) port_db: Database<PortData, Port>,
 }
 
 impl Module {
@@ -40,7 +40,7 @@ impl Module {
         self.name = self.strings.entry(name);
     }
 
-    pub fn component(&self, component: ComponentId) -> &Component {
+    pub fn component(&self, component: Component) -> &ComponentData {
         assert!(
             self.components.values().any(|c| c == &component),
             r#"component with id "{id}" not in module "{module}""#,
@@ -50,7 +50,7 @@ impl Module {
         self.component_db.lookup(component)
     }
 
-    pub fn component_mut(&mut self, component: ComponentId) -> &mut Component {
+    pub fn component_mut(&mut self, component: Component) -> &mut ComponentData {
         assert!(
             self.components.values().any(|c| c == &component),
             r#"component with id "{id}" not in module "{module}""#,
@@ -60,7 +60,7 @@ impl Module {
         self.component_db.lookup_mut(component)
     }
 
-    pub fn component_id(&self, name: &str) -> Option<ComponentId> {
+    pub fn component_id(&self, name: &str) -> Option<Component> {
         let name = self.strings.rlookup(name)?;
         self.components.get(&name).copied()
     }

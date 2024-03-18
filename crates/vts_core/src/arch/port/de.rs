@@ -5,19 +5,19 @@ use serde::{
     Deserialize, Deserializer,
 };
 
-use crate::arch::{Component, Module, Port, PortClass, PortKind};
+use crate::arch::{component::ComponentData, port::PortData, Module, PortClass, PortKind};
 
 pub struct PortDeserializer<'de, 'm> {
     module: &'m mut Module,
     name: &'de str,
-    component: &'m mut Component,
+    component: &'m mut ComponentData,
 }
 
 impl<'de, 'm> PortDeserializer<'de, 'm> {
     pub(crate) fn new(
         module: &'m mut Module,
         name: &'de str,
-        component: &'m mut Component,
+        component: &'m mut ComponentData,
     ) -> Self {
         Self {
             module,
@@ -37,7 +37,7 @@ impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'de, 'm> {
         struct PortVisitor<'de, 'm> {
             module: &'m mut Module,
             name: &'de str,
-            component: &'m mut Component,
+            component: &'m mut ComponentData,
         }
 
         const FIELDS: &[&str] = &["name", "kind", "n_pins", "class"];
@@ -96,7 +96,8 @@ impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'de, 'm> {
                 };
                 let n_pins = n_pins.unwrap_or(1);
 
-                let port = Port::new(self.module, self.component, self.name, kind, n_pins, class);
+                let port =
+                    PortData::new(self.module, self.component, self.name, kind, n_pins, class);
 
                 let name = port.name;
                 let port = self.module.port_db.entry(port);
@@ -136,11 +137,11 @@ impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'de, 'm> {
 
 pub struct PortsDeserializer<'m> {
     module: &'m mut Module,
-    component: &'m mut Component,
+    component: &'m mut ComponentData,
 }
 
 impl<'m> PortsDeserializer<'m> {
-    pub fn new(module: &'m mut Module, component: &'m mut Component) -> Self {
+    pub fn new(module: &'m mut Module, component: &'m mut ComponentData) -> Self {
         Self { module, component }
     }
 }
@@ -154,7 +155,7 @@ impl<'de, 'm> DeserializeSeed<'de> for PortsDeserializer<'m> {
     {
         struct PortsVisitor<'m> {
             module: &'m mut Module,
-            component: &'m mut Component,
+            component: &'m mut ComponentData,
         }
 
         impl<'de, 'm> Visitor<'de> for PortsVisitor<'m> {

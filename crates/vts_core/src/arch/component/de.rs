@@ -5,7 +5,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 
-use crate::arch::{port::de::PortsDeserializer, Component, Module};
+use crate::arch::{component::ComponentData, port::de::PortsDeserializer, Module};
 
 pub struct ComponentDeserializer<'m, 'de> {
     module: &'m mut Module,
@@ -55,7 +55,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
                 let mut references = false;
                 let mut class = false;
 
-                let mut component = Component::new(self.module, self.name, None);
+                let mut component = ComponentData::new(self.module, self.name, None);
 
                 while let Some(key) = map.next_key()? {
                     match key {

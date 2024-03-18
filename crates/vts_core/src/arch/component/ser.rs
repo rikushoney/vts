@@ -6,13 +6,13 @@ use serde::{
 };
 
 use crate::arch::{
-    component::ComponentId, port::ser::PortsSerializer, Component, Module, StringId,
+    component::ComponentData, port::ser::PortsSerializer, Component, Module, StringId,
 };
 use crate::database::Database;
 
 struct ComponentRefsSerializer<'a, 'm> {
     module: &'m Module,
-    references: &'a HashMap<StringId, ComponentId>,
+    references: &'a HashMap<StringId, Component>,
 }
 
 impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
@@ -34,11 +34,11 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
 
 pub struct ComponentSerializer<'m> {
     module: &'m Module,
-    component: &'m Component,
+    component: &'m ComponentData,
 }
 
 impl<'m> ComponentSerializer<'m> {
-    pub fn new(module: &'m Module, component: &'m Component) -> Self {
+    pub fn new(module: &'m Module, component: &'m ComponentData) -> Self {
         Self { module, component }
     }
 }
@@ -67,11 +67,11 @@ impl<'m> Serialize for ComponentSerializer<'m> {
 
 pub struct ComponentsSerializer<'m> {
     module: &'m Module,
-    components: &'m Database<Component, ComponentId>,
+    components: &'m Database<ComponentData, Component>,
 }
 
 impl<'m> ComponentsSerializer<'m> {
-    pub fn new(module: &'m Module, components: &'m Database<Component, ComponentId>) -> Self {
+    pub fn new(module: &'m Module, components: &'m Database<ComponentData, Component>) -> Self {
         Self { module, components }
     }
 }

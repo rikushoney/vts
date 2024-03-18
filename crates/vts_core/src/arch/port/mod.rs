@@ -3,9 +3,9 @@ pub mod ser;
 
 use serde::{Deserialize, Serialize};
 
-use crate::arch::{component::ComponentId, impl_dbkey_wrapper, Component, Module, StringId};
+use crate::arch::{component::ComponentData, impl_dbkey_wrapper, Component, Module, StringId};
 
-impl_dbkey_wrapper!(PortId, u32);
+impl_dbkey_wrapper!(Port, u32);
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -29,23 +29,23 @@ pub enum PortClass {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Port {
+pub struct PortData {
     name: StringId,
-    parent: ComponentId,
+    parent: Component,
     pub kind: PortKind,
     pub n_pins: usize,
     pub class: Option<PortClass>,
 }
 
-impl Port {
+impl PortData {
     fn new(
         module: &mut Module,
-        parent: &mut Component,
+        parent: &mut ComponentData,
         name: &str,
         kind: PortKind,
         n_pins: usize,
         class: Option<PortClass>,
-    ) -> Port {
+    ) -> Self {
         let name = module.strings.entry(name);
         assert!(
             parent.ports.get(&name).is_none(),
@@ -90,7 +90,7 @@ impl Port {
         self.name = name;
     }
 
-    pub fn parent(&self) -> ComponentId {
+    pub fn parent(&self) -> Component {
         self.parent
     }
 }

@@ -5,9 +5,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::arch::{impl_dbkey_wrapper, port::PortId, Module, Port, StringId};
+use crate::arch::{impl_dbkey_wrapper, port::PortData, Module, Port, StringId};
 
-impl_dbkey_wrapper!(ComponentId, u32);
+impl_dbkey_wrapper!(Component, u32);
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -17,15 +17,15 @@ pub enum ComponentClass {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Component {
+pub struct ComponentData {
     pub(crate) name: StringId,
-    pub(crate) ports: HashMap<StringId, PortId>,
-    references: HashMap<StringId, ComponentId>,
+    pub(crate) ports: HashMap<StringId, Port>,
+    references: HashMap<StringId, Component>,
     pub class: Option<ComponentClass>,
 }
 
-impl Component {
-    fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Component {
+impl ComponentData {
+    fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Self {
         let name = module.strings.entry(name);
         assert!(
             module.components.get(&name).is_none(),
@@ -66,7 +66,7 @@ impl Component {
         self.name = name;
     }
 
-    pub fn port<'m>(&self, module: &'m Module, port: PortId) -> &'m Port {
+    pub fn port<'m>(&self, module: &'m Module, port: Port) -> &'m PortData {
         assert!(
             self.ports.values().any(|p| p == &port),
             r#"port "{port}" not in component "{component}""#,
@@ -76,7 +76,7 @@ impl Component {
         module.port_db.lookup(port)
     }
 
-    pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: PortId) -> &'m mut Port {
+    pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: Port) -> &'m mut PortData {
         assert!(
             self.ports.values().any(|p| p == &port),
             r#"port "{port}" not in component "{component}""#,
@@ -86,7 +86,7 @@ impl Component {
         module.port_db.lookup_mut(port)
     }
 
-    pub fn port_id(&self, module: &Module, name: &str) -> Option<PortId> {
+    pub fn port_id(&self, module: &Module, name: &str) -> Option<Port> {
         let name = module.strings.rlookup(name)?;
         self.ports.get(&name).copied()
     }
