@@ -1,3 +1,4 @@
+pub mod de;
 pub mod ser;
 
 use pyo3::prelude::*;
@@ -34,14 +35,14 @@ pub struct PyPort {
 impl PyPort {
     #[new]
     pub fn new(
-        py: Python<'_>,
-        name: &str,
+        _py: Python<'_>,
+        name: Py<PyString>,
         kind: PyPortKind,
         n_pins: Option<usize>,
         class_: Option<PyPortClass>,
     ) -> PyResult<Self> {
         Ok(Self {
-            name: PyString::new(py, name).into_py(py),
+            name,
             kind,
             n_pins: n_pins.unwrap_or(1),
             class_,
@@ -49,9 +50,10 @@ impl PyPort {
     }
 
     pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
+        let name = PyString::new(py, self.name.as_ref(py).to_str()?);
         Self::new(
             py,
-            self.name.as_ref(py).to_str()?,
+            name.into_py(py),
             self.kind,
             Some(self.n_pins),
             self.class_,

@@ -1,3 +1,4 @@
+pub mod de;
 pub mod ser;
 
 use pyo3::exceptions::PyValueError;

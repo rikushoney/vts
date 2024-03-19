@@ -30,7 +30,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
             name: &'de str,
         }
 
-        const FIELDS: &[&str] = &["name", "ports", "references", "class"];
+        const FIELDS: &[&str] = &["ports", "references", "class"];
 
         impl<'de, 'm> Visitor<'de> for ComponentVisitor<'m, 'de> {
             type Value = ();
@@ -74,6 +74,8 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
                                 return Err(de::Error::duplicate_field("references"));
                             }
                             // TODO: deserialize references
+                            #[allow(clippy::let_unit_value)]
+                            let _ = map.next_value()?;
                             references = true;
                         }
                         Field::Class => {

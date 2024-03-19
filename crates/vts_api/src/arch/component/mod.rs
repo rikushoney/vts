@@ -1,3 +1,4 @@
+pub mod de;
 pub mod ser;
 
 use pyo3::exceptions::PyValueError;
@@ -28,9 +29,13 @@ pub struct PyComponent {
 #[pymethods]
 impl PyComponent {
     #[new]
-    pub fn new(py: Python<'_>, name: &str, class_: Option<PyComponentClass>) -> PyResult<Self> {
+    pub fn new(
+        py: Python<'_>,
+        name: Py<PyString>,
+        class_: Option<PyComponentClass>,
+    ) -> PyResult<Self> {
         Ok(Self {
-            name: PyString::new(py, name).into_py(py),
+            name,
             ports: PyDict::new(py).into(),
             references: PyDict::new(py).into(),
             class_,
@@ -38,7 +43,8 @@ impl PyComponent {
     }
 
     pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
-        let mut component = PyComponent::new(py, self.name.as_ref(py).to_str()?, self.class_)?;
+        let name = PyString::new(py, self.name.as_ref(py).to_str()?);
+        let mut component = PyComponent::new(py, name.into_py(py), self.class_)?;
 
         for item in self.ports.as_ref(py).items().iter() {
             let (name, port) = PyAny::extract::<(&str, Py<PyPort>)>(item)?;
