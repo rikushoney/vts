@@ -12,18 +12,18 @@ use vts_core::arch::{PortClass, PortKind};
 
 use crate::arch::{map_py_de_err, PyPort, PyPortClass, PyPortKind};
 
-pub struct PyPortDeserializer<'de, 'py> {
+pub struct PyPortDeserializer<'a, 'py> {
     py: Python<'py>,
-    name: &'de str,
+    name: &'a String,
 }
 
-impl<'de, 'py> PyPortDeserializer<'de, 'py> {
-    pub fn new(py: Python<'py>, name: &'de str) -> Self {
+impl<'a, 'py> PyPortDeserializer<'a, 'py> {
+    pub fn new(py: Python<'py>, name: &'a String) -> Self {
         Self { py, name }
     }
 }
 
-impl<'de, 'py> DeserializeSeed<'de> for PyPortDeserializer<'de, 'py> {
+impl<'a, 'de, 'py> DeserializeSeed<'de> for PyPortDeserializer<'a, 'py> {
     type Value = Py<PyPort>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -82,7 +82,6 @@ impl<'de, 'py> DeserializeSeed<'de> for PyPortDeserializer<'de, 'py> {
                     }
                 }
 
-                let name = self.name;
                 let kind = match kind {
                     Some(kind) => PyPortKind::from(kind),
                     None => {
@@ -92,12 +91,12 @@ impl<'de, 'py> DeserializeSeed<'de> for PyPortDeserializer<'de, 'py> {
                 let n_pins = Some(n_pins.unwrap_or(1));
                 let class = class.map(PyPortClass::from);
 
-                let port = map_py_de_err!(PyPort::new(self.py, name, kind, n_pins, class))?;
+                let port = map_py_de_err!(PyPort::new(self.py, self.name, kind, n_pins, class))?;
                 map_py_de_err!(Py::new(self.py, port))
             }
         }
 
-        let name = PyString::new(self.py, self.name);
+        let name = PyString::new(self.py, self.name.as_str());
         deserializer.deserialize_struct(
             "Port",
             &["kind", "n_pins", "class"],
@@ -142,12 +141,12 @@ impl<'de, 'py> DeserializeSeed<'de> for PyPortsDeserializer<'py> {
                 A: MapAccess<'de>,
             {
                 let ports = PyDict::new(self.py);
-                while let Some(name) = map.next_key::<&str>()? {
-                    if map_py_de_err!(ports.contains(name))? {
+                while let Some(name) = map.next_key::<String>()? {
+                    if map_py_de_err!(ports.contains(name.as_str()))? {
                         return Err(de::Error::custom(format!(r#"duplicate port "{name}""#)));
                     }
 
-                    let port = map.next_value_seed(PyPortDeserializer::new(self.py, name))?;
+                    let port = map.next_value_seed(PyPortDeserializer::new(self.py, &name))?;
                     map_py_de_err!(ports.set_item(name, port))?;
                 }
 

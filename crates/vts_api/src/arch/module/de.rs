@@ -47,7 +47,7 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
                     Components,
                 }
 
-                let mut name: Option<&str> = None;
+                let mut name: Option<String> = None;
                 let mut components: Option<Py<PyDict>> = None;
 
                 while let Some(key) = map.next_key()? {
@@ -75,7 +75,7 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
                     }
                 };
 
-                let mut module = PyModule_::new(self.py, name);
+                let mut module = PyModule_::new(self.py, name.as_str());
 
                 if let Some(components) = components {
                     let components = components.as_ref(self.py).as_mapping();

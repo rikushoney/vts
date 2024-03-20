@@ -12,18 +12,18 @@ use vts_core::arch::ComponentClass;
 
 use crate::arch::{map_py_de_err, port::de::PyPortsDeserializer, PyComponent, PyComponentClass};
 
-pub struct PyComponentDeserializer<'de, 'py> {
+pub struct PyComponentDeserializer<'a, 'py> {
     py: Python<'py>,
-    name: &'de str,
+    name: &'a String,
 }
 
-impl<'de, 'py> PyComponentDeserializer<'de, 'py> {
-    pub fn new(py: Python<'py>, name: &'de str) -> Self {
+impl<'a, 'py> PyComponentDeserializer<'a, 'py> {
+    pub fn new(py: Python<'py>, name: &'a String) -> Self {
         Self { py, name }
     }
 }
 
-impl<'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'de, 'py> {
+impl<'a, 'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'a, 'py> {
     type Value = Py<PyComponent>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -100,7 +100,7 @@ impl<'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'de, 'py> {
             }
         }
 
-        let name = PyString::new(self.py, self.name);
+        let name = PyString::new(self.py, self.name.as_str());
         deserializer.deserialize_struct(
             "Component",
             &["ports", "references", "class"],
@@ -144,20 +144,21 @@ impl<'de, 'py> DeserializeSeed<'de> for PyComponentsDeserializer<'py> {
             where
                 A: MapAccess<'de>,
             {
-                let components = PyDict::new(self.py);
-                while let Some(name) = map.next_key()? {
-                    if map_py_de_err!(components.contains(name))? {
+                let py = self.py;
+
+                let components = PyDict::new(py);
+                while let Some(name) = map.next_key::<String>()? {
+                    if map_py_de_err!(components.contains(name.as_str()))? {
                         return Err(de::Error::custom(format!(
                             r#"duplicate component "{name}""#
                         )));
                     }
 
-                    let component =
-                        map.next_value_seed(PyComponentDeserializer::new(self.py, name))?;
+                    let component = map.next_value_seed(PyComponentDeserializer::new(py, &name))?;
                     map_py_de_err!(components.set_item(name, component))?;
                 }
 
-                let components: Py<PyDict> = components.into_py(self.py);
+                let components: Py<PyDict> = components.into_py(py);
                 Ok(components)
             }
         }
