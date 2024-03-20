@@ -14,8 +14,13 @@ manifest-path = "crates/vts_api/Cargo.toml"
 python-source = "python"
 module-name = "vts._vts_api_rs"
 
+[tool.black]
+line-length = 88
+
 [tool.ruff.lint]
 select = ["F", "E", "W", "N", "I"]
+ignore = ["E501"]
+
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

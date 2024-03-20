@@ -62,6 +62,7 @@ impl ComponentData {
             .components
             .remove(&self.name)
             .expect("component should be in module");
+
         module.components.insert(name, component);
         self.name = name;
     }
@@ -73,7 +74,7 @@ impl ComponentData {
             port = module.port_db.lookup(port).name(module),
             component = self.name(module),
         );
-        module.port_db.lookup(port)
+        module.get_data(port)
     }
 
     pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: Port) -> &'m mut PortData {
@@ -83,7 +84,7 @@ impl ComponentData {
             port = module.port_db.lookup(port).name(module),
             component = self.name(module),
         );
-        module.port_db.lookup_mut(port)
+        module.get_data_mut(port)
     }
 
     pub fn port_id(&self, module: &Module, name: &str) -> Option<Port> {

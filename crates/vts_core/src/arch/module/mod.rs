@@ -47,7 +47,7 @@ impl Module {
             id = component.as_index(),
             module = self.name()
         );
-        self.component_db.lookup(component)
+        self.get_data(component)
     }
 
     pub fn component_mut(&mut self, component: Component) -> &mut ComponentData {
@@ -57,7 +57,7 @@ impl Module {
             id = component.as_index(),
             module = self.name()
         );
-        self.component_db.lookup_mut(component)
+        self.get_data_mut(component)
     }
 
     pub fn component_id(&self, name: &str) -> Option<Component> {
@@ -68,12 +68,18 @@ impl Module {
     pub fn get_data<T: DataId>(&self, id: T) -> &T::Data {
         T::get_data(self, id)
     }
+
+    pub fn get_data_mut<T: DataId>(&mut self, id: T) -> &mut T::Data {
+        T::get_data_mut(self, id)
+    }
 }
 
 pub trait DataId {
     type Data;
 
     fn get_data(module: &Module, id: Self) -> &Self::Data;
+
+    fn get_data_mut(module: &mut Module, id: Self) -> &mut Self::Data;
 }
 
 impl DataId for Port {
@@ -82,6 +88,10 @@ impl DataId for Port {
     fn get_data(module: &Module, id: Self) -> &Self::Data {
         module.port_db.lookup(id)
     }
+
+    fn get_data_mut(module: &mut Module, id: Self) -> &mut Self::Data {
+        module.port_db.lookup_mut(id)
+    }
 }
 
 impl DataId for Component {
@@ -89,6 +99,10 @@ impl DataId for Component {
 
     fn get_data(module: &Module, id: Self) -> &Self::Data {
         module.component_db.lookup(id)
+    }
+
+    fn get_data_mut(module: &mut Module, id: Self) -> &mut Self::Data {
+        module.component_db.lookup_mut(id)
     }
 }
 
