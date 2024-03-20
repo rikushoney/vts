@@ -64,7 +64,34 @@ impl Module {
         let name = self.strings.rlookup(name)?;
         self.components.get(&name).copied()
     }
+
+    pub fn get_data<T: DataId>(&self, id: T) -> &T::Data {
+        T::get_data(self, id)
+    }
 }
+
+pub trait DataId {
+    type Data;
+
+    fn get_data(module: &Module, id: Self) -> &Self::Data;
+}
+
+impl DataId for Port {
+    type Data = PortData;
+
+    fn get_data(module: &Module, id: Self) -> &Self::Data {
+        module.port_db.lookup(id)
+    }
+}
+
+impl DataId for Component {
+    type Data = ComponentData;
+
+    fn get_data(module: &Module, id: Self) -> &Self::Data {
+        module.component_db.lookup(id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

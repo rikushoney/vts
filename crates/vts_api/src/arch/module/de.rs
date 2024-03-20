@@ -15,7 +15,7 @@ pub struct ModuleDeserializer<'py> {
     py: Python<'py>,
 }
 
-impl<'de, 'py> ModuleDeserializer<'py> {
+impl<'py> ModuleDeserializer<'py> {
     pub fn new(py: Python<'py>) -> Self {
         Self { py }
     }
