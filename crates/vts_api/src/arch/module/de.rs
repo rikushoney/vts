@@ -12,6 +12,12 @@ pub struct ModuleDeserializer<'py> {
     py: Python<'py>,
 }
 
+impl<'de, 'py> ModuleDeserializer<'py> {
+    pub fn new(py: Python<'py>) -> Self {
+        Self { py }
+    }
+}
+
 impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
     type Value = Py<PyModule_>;
 

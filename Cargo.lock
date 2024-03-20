@@ -279,6 +279,7 @@ dependencies = [
  "fnv",
  "pyo3",
  "serde",
+ "serde_json",
  "vts_core",
 ]
 

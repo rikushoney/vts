@@ -11,6 +11,12 @@ pub struct PyModuleSerializer<'py> {
     module: &'py PyModule_,
 }
 
+impl<'py> PyModuleSerializer<'py> {
+    pub fn new(py: Python<'py>, module: &'py PyModule_) -> Self {
+        Self { py, module }
+    }
+}
+
 impl<'py> Serialize for PyModuleSerializer<'py> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

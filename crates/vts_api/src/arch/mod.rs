@@ -3,7 +3,7 @@ mod module;
 mod port;
 
 pub use component::{PyComponent, PyComponentClass};
-pub use module::PyModule_ as PyModule;
+pub use module::{json_dumps, json_loads, PyModule_ as PyModule};
 pub use port::{PyPort, PyPortClass, PyPortKind};
 
 macro_rules! map_py_de_err {

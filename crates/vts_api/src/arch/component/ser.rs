@@ -64,10 +64,11 @@ impl<'py> Serialize for PyComponentsSerializer<'py> {
         let n_comps = map_py_ser_err!(self.components.len())?;
         let mut components_serializer = map_py_ser_err!(serializer.serialize_map(Some(n_comps)))?;
 
-        for item in map_py_ser_err!(self.components.iter())? {
-            let (name, component) = map_py_ser_err!(PyAny::extract::<(&str, Py<PyComponent>)>(
-                map_py_ser_err!(item)?
-            ))?;
+        let components = map_py_ser_err!(self.components.items())?;
+        let mut iter = map_py_ser_err!(components.iter())?;
+        while let Some(item) = map_py_ser_err!(iter.next().transpose())? {
+            let (name, component) =
+                map_py_ser_err!(PyAny::extract::<(&str, Py<PyComponent>)>(item))?;
             let component = map_py_ser_err!(component.try_borrow(py))?;
 
             let component_serializer = PyComponentSerializer::new(py, component.deref());

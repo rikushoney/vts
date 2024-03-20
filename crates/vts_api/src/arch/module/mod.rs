@@ -4,6 +4,7 @@ pub mod ser;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
+use serde::de::DeserializeSeed;
 
 use crate::arch::PyComponent;
 
@@ -57,4 +58,27 @@ impl PyModule_ {
         }
         Ok(())
     }
+}
+
+macro_rules! map_serde_py_err {
+    ($expr:expr) => {
+        ($expr).map_err(|err| PyValueError::new_err(format!("{err}")))
+    };
+}
+
+#[pyfunction]
+pub fn json_loads(py: Python<'_>, input: &str) -> PyResult<Py<PyModule_>> {
+    let json: serde_json::Value = map_serde_py_err!(serde_json::from_str(input))?;
+    let module_deserializer = de::ModuleDeserializer::new(py);
+    let module: Py<PyModule_> = map_serde_py_err!(module_deserializer.deserialize(json))?;
+    Ok(module)
+}
+
+#[pyfunction]
+pub fn json_dumps(py: Python<'_>, module: Py<PyModule_>) -> PyResult<Py<PyString>> {
+    let module = module.try_borrow(py)?;
+    let module_serializer = ser::PyModuleSerializer::new(py, &module);
+    let json = map_serde_py_err!(serde_json::to_string(&module_serializer))?;
+    let json = PyString::new(py, json.as_str());
+    Ok(json.into_py(py))
 }

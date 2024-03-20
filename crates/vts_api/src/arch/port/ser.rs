@@ -15,7 +15,7 @@ impl Serialize for PyPort {
     where
         S: Serializer,
     {
-        let mut port_serializer = serializer.serialize_struct("Port", 4)?;
+        let mut port_serializer = serializer.serialize_struct("Port", 3)?;
 
         port_serializer.serialize_field("kind", &PortKind::from(self.kind))?;
         port_serializer.serialize_field("n_pins", &self.n_pins)?;
@@ -47,9 +47,10 @@ impl<'py> Serialize for PyPortsSerializer<'py> {
         let n_ports = map_py_ser_err!(self.ports.len())?;
         let mut ports_serializer = map_py_ser_err!(serializer.serialize_map(Some(n_ports)))?;
 
-        for item in map_py_ser_err!(self.ports.iter())? {
-            let (name, port) =
-                map_py_ser_err!(PyAny::extract::<(&str, Py<PyPort>)>(map_py_ser_err!(item)?))?;
+        let ports = map_py_ser_err!(self.ports.items())?;
+        let mut iter = map_py_ser_err!(ports.iter())?;
+        while let Some(item) = map_py_ser_err!(iter.next().transpose())? {
+            let (name, port) = map_py_ser_err!(PyAny::extract::<(&str, Py<PyPort>)>(item))?;
             let port = map_py_ser_err!(port.try_borrow(py))?;
             ports_serializer.serialize_entry(name, port.deref())?;
         }

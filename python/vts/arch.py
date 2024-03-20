@@ -10,6 +10,8 @@ from vts._vts_api_rs import (
     PyPort as _Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
+    json_dumps as _json_dumps,
+    json_loads as _json_loads,
 )
 
 
@@ -118,9 +120,9 @@ class Module:
                 case _:
                     raise ValueError("component must have a name")
 
-        self._module.add_component(component._component.name, component._component)
-
-        return component
+        return Component._wrap(
+            self._module.add_component(component._component.name, component._component)
+        )
 
     def add_components(
         self, components: Iterable[Component] | Mapping[str, Component]
@@ -131,6 +133,12 @@ class Module:
         else:
             for component in components:
                 self.add_component(component)
+
+    @classmethod
+    def _wrap(cls, module: _Module) -> Module:
+        m = cls.__new__(cls)
+        m._module = module
+        return m
 
 
 class Component:
@@ -196,9 +204,7 @@ class Component:
                 case _:
                     raise ValueError("port must have a name")
 
-        self._component.add_port(port._port.name, port=port._port)
-
-        return port
+        return Port._wrap(self._component.add_port(port._port.name, port=port._port))
 
     def add_ports(self, ports: Iterable[Port] | Mapping[str, Port]) -> None:
         if isinstance(ports, Mapping):
@@ -268,3 +274,12 @@ class Port:
             port._port.name = name
 
         return port
+
+
+def json_dumps(module: Module) -> str:
+    return _json_dumps(module._module)
+
+
+def json_loads(input: str) -> Module:
+    module = _json_loads(input)
+    return Module._wrap(module)
