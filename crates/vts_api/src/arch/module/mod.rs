@@ -20,11 +20,23 @@ pub struct PyModule_ {
 #[pymethods]
 impl PyModule_ {
     #[new]
-    pub fn new(py: Python<'_>, name: &str) -> Self {
+    pub fn new(py: Python<'_>, name: Py<PyString>) -> Self {
         Self {
-            name: PyString::new(py, name).into_py(py),
+            name,
             components: PyDict::new(py).into_py(py),
         }
+    }
+
+    pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
+        let name = PyString::new(py, self.name.as_ref(py).to_str()?);
+        let mut module = PyModule_::new(py, name.into_py(py));
+
+        for item in self.components.as_ref(py).items().iter() {
+            let (name, component) = PyAny::extract::<(&str, Py<PyComponent>)>(item)?;
+            module.add_component(py, name, component)?;
+        }
+
+        Ok(module)
     }
 
     pub fn add_component(
@@ -75,10 +87,14 @@ pub fn json_loads(py: Python<'_>, input: &str) -> PyResult<Py<PyModule_>> {
 }
 
 #[pyfunction]
-pub fn json_dumps(py: Python<'_>, module: Py<PyModule_>) -> PyResult<Py<PyString>> {
+pub fn json_dumps(py: Python<'_>, module: Py<PyModule_>, pretty: bool) -> PyResult<Py<PyString>> {
     let module = module.try_borrow(py)?;
     let module_serializer = ser::PyModuleSerializer::new(py, &module);
-    let json = map_serde_py_err!(serde_json::to_string(&module_serializer))?;
+    let json = if pretty {
+        map_serde_py_err!(serde_json::to_string_pretty(&module_serializer))?
+    } else {
+        map_serde_py_err!(serde_json::to_string(&module_serializer))?
+    };
     let json = PyString::new(py, json.as_str());
     Ok(json.into_py(py))
 }

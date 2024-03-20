@@ -1,6 +1,9 @@
 use std::fmt;
 
-use pyo3::{prelude::*, types::PyDict};
+use pyo3::{
+    prelude::*,
+    types::{PyDict, PyString},
+};
 use serde::{
     de::{self, DeserializeSeed, MapAccess, Visitor},
     Deserialize, Deserializer,
@@ -47,6 +50,8 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
                     Components,
                 }
 
+                let py = self.py;
+
                 let mut name: Option<String> = None;
                 let mut components: Option<Py<PyDict>> = None;
 
@@ -63,26 +68,26 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
                                 return Err(de::Error::duplicate_field("components"));
                             }
                             components =
-                                Some(map.next_value_seed(PyComponentsDeserializer::new(self.py))?);
+                                Some(map.next_value_seed(PyComponentsDeserializer::new(py))?);
                         }
                     }
                 }
 
                 let name = match name {
-                    Some(name) => name,
+                    Some(name) => PyString::new(py, name.as_str()),
                     None => {
                         return Err(de::Error::missing_field("name"));
                     }
                 };
 
-                let mut module = PyModule_::new(self.py, name.as_str());
+                let mut module = PyModule_::new(py, name.into_py(py));
 
                 if let Some(components) = components {
-                    let components = components.as_ref(self.py).as_mapping();
-                    map_py_de_err!(module.add_components(self.py, components))?;
+                    let components = components.as_ref(py).as_mapping();
+                    map_py_de_err!(module.add_components(py, components))?;
                 }
 
-                map_py_de_err!(Py::new(self.py, module))
+                map_py_de_err!(Py::new(py, module))
             }
         }
 

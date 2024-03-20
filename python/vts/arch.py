@@ -140,6 +140,14 @@ class Module:
         m._module = module
         return m
 
+    def copy(self, name: str | None = None) -> Module:
+        module = self._module.copy()
+
+        if name is not None:
+            module.name = name
+
+        return Module._wrap(module)
+
 
 class Component:
     def __init__(
@@ -276,8 +284,8 @@ class Port:
         return port
 
 
-def json_dumps(module: Module) -> str:
-    return _json_dumps(module._module)
+def json_dumps(module: Module, pretty: bool = False) -> str:
+    return _json_dumps(module._module, pretty)
 
 
 def json_loads(input: str) -> Module:
