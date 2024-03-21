@@ -6,13 +6,15 @@ use serde::{
 };
 
 use crate::arch::{
-    component::ComponentData, port::ser::PortsSerializer, Component, Module, StringId,
+    component::{ComponentData, ComponentRef},
+    port::ser::PortsSerializer,
+    Component, Module, StringId,
 };
 use crate::database::Database;
 
 struct ComponentRefsSerializer<'a, 'm> {
     module: &'m Module,
-    references: &'a HashMap<StringId, Component>,
+    references: &'a HashMap<StringId, ComponentRef>,
 }
 
 impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
@@ -22,8 +24,7 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
     {
         let mut serializer = serializer.serialize_seq(Some(self.references.len()))?;
 
-        #[allow(clippy::for_kv_map)]
-        for (name, _component) in self.references {
+        for name in self.references.keys() {
             let name = self.module.strings.lookup(*name);
             serializer.serialize_element(name)?;
         }

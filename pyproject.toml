@@ -21,6 +21,5 @@ line-length = 88
 select = ["F", "E", "W", "N", "I"]
 ignore = ["E501"]
 
-
 [tool.ruff.lint.isort]
 combine-as-imports = true

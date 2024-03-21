@@ -7,16 +7,16 @@ use serde::{
 
 use crate::arch::{component::ComponentData, port::PortData, Module, PortClass, PortKind};
 
-pub struct PortDeserializer<'de, 'm> {
+pub struct PortDeserializer<'m> {
     module: &'m mut Module,
-    name: &'de str,
+    name: String,
     component: &'m mut ComponentData,
 }
 
-impl<'de, 'm> PortDeserializer<'de, 'm> {
+impl<'m> PortDeserializer<'m> {
     pub(crate) fn new(
         module: &'m mut Module,
-        name: &'de str,
+        name: String,
         component: &'m mut ComponentData,
     ) -> Self {
         Self {
@@ -27,22 +27,22 @@ impl<'de, 'm> PortDeserializer<'de, 'm> {
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'de, 'm> {
+impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'m> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct PortVisitor<'de, 'm> {
+        struct PortVisitor<'a, 'm> {
             module: &'m mut Module,
-            name: &'de str,
+            name: &'a str,
             component: &'m mut ComponentData,
         }
 
         const FIELDS: &[&str] = &["name", "kind", "n_pins", "class"];
 
-        impl<'de, 'm> Visitor<'de> for PortVisitor<'de, 'm> {
+        impl<'a, 'de, 'm> Visitor<'de> for PortVisitor<'a, 'm> {
             type Value = ();
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -127,7 +127,7 @@ impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'de, 'm> {
             "Port",
             FIELDS,
             PortVisitor {
-                name: self.name,
+                name: &self.name,
                 component: self.component,
                 module: self.module,
             },

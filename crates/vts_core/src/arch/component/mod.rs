@@ -9,6 +9,15 @@ use crate::arch::{impl_dbkey_wrapper, port::PortData, Module, Port, StringId};
 
 impl_dbkey_wrapper!(Component, u32);
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ComponentRef(Component);
+
+impl Component {
+    pub fn reference(self) -> ComponentRef {
+        ComponentRef(self)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ComponentClass {
@@ -20,7 +29,7 @@ pub enum ComponentClass {
 pub struct ComponentData {
     pub(crate) name: StringId,
     pub(crate) ports: HashMap<StringId, Port>,
-    references: HashMap<StringId, Component>,
+    pub(crate) references: HashMap<StringId, ComponentRef>,
     pub class: Option<ComponentClass>,
 }
 

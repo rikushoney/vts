@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt;
 
 use serde::{
@@ -35,7 +36,7 @@ impl<'de> Deserialize<'de> for Module {
                 let mut module = Module::new("");
 
                 let mut name = false;
-                let mut components = false;
+                let mut components = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -47,17 +48,48 @@ impl<'de> Deserialize<'de> for Module {
                             name = true;
                         }
                         Field::Components => {
-                            if components {
+                            if components.is_some() {
                                 return Err(de::Error::duplicate_field("components"));
                             }
-                            map.next_value_seed(ComponentsDeserializer::new(&mut module))?;
-                            components = true;
+                            components = Some(
+                                map.next_value_seed(ComponentsDeserializer::new(&mut module))?,
+                            );
                         }
                     }
                 }
 
                 if !name {
                     return Err(de::Error::missing_field("name"));
+                }
+
+                if let Some(components) = components {
+                    for (component, references) in components {
+                        let mut resolved = HashMap::with_capacity(references.len());
+                        for name in references {
+                            if let Some(reference) = module.components.get(&name) {
+                                assert!(
+                                    resolved.insert(name, reference.reference()).is_none(),
+                                    r#"component "{reference}" already referenced in "{component}""#,
+                                    reference = module.strings.lookup(name),
+                                    component = module.component(component).name(&module)
+                                );
+                            } else {
+                                return Err(de::Error::custom(
+                                    format!(
+                                        r#"undefined component "{reference}" referenced in "{component}""#,
+                                        reference = module.strings.lookup(name),
+                                        component = module.component(component).name(&module)
+                                    )
+                                    .as_str(),
+                                ));
+                            }
+                        }
+
+                        module
+                            .component_mut(component)
+                            .references
+                            .extend(resolved.into_iter());
+                    }
                 }
 
                 Ok(module)

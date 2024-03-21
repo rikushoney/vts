@@ -1,39 +1,100 @@
+use std::collections::HashMap;
 use std::fmt;
 
 use serde::{
-    de::{self, DeserializeSeed, MapAccess, Visitor},
+    de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
     Deserialize, Deserializer,
 };
 
-use crate::arch::{component::ComponentData, port::de::PortsDeserializer, Module};
+use crate::arch::{
+    component::ComponentData, port::de::PortsDeserializer, Component, Module, StringId,
+};
 
-pub struct ComponentDeserializer<'m, 'de> {
+pub(crate) struct ComponentRefsDeserializer<'m> {
     module: &'m mut Module,
-    name: &'de str,
 }
 
-impl<'m, 'de> ComponentDeserializer<'m, 'de> {
-    pub fn new(module: &'m mut Module, name: &'de str) -> Self {
-        Self { module, name }
+impl<'m> ComponentRefsDeserializer<'m> {
+    pub(crate) fn new(module: &'m mut Module) -> Self {
+        Self { module }
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
-    type Value = ();
+impl<'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'m> {
+    type Value = Vec<StringId>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct ComponentVisitor<'m, 'de> {
+        struct ComponentRefsVisitor<'m> {
             module: &'m mut Module,
-            name: &'de str,
+        }
+
+        impl<'de, 'm> Visitor<'de> for ComponentRefsVisitor<'m> {
+            type Value = Vec<StringId>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list of component references")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut references = match seq.size_hint() {
+                    Some(size) => Vec::with_capacity(size),
+                    None => Vec::new(),
+                };
+
+                while let Some(reference) = seq.next_element()? {
+                    let name = self.module.strings.entry(reference);
+                    if references.contains(&name) {
+                        return Err(de::Error::custom(
+                            format!(r#"duplicate component reference "{reference}""#).as_str(),
+                        ));
+                    }
+
+                    references.push(name);
+                }
+
+                Ok(references)
+            }
+        }
+
+        deserializer.deserialize_seq(ComponentRefsVisitor {
+            module: self.module,
+        })
+    }
+}
+
+pub struct ComponentDeserializer<'m> {
+    module: &'m mut Module,
+    name: String,
+}
+
+impl<'m> ComponentDeserializer<'m> {
+    pub fn new(module: &'m mut Module, name: String) -> Self {
+        Self { module, name }
+    }
+}
+
+impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
+    type Value = (Component, Vec<StringId>);
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ComponentVisitor<'a, 'm> {
+            module: &'m mut Module,
+            name: &'a str,
         }
 
         const FIELDS: &[&str] = &["ports", "references", "class"];
 
-        impl<'de, 'm> Visitor<'de> for ComponentVisitor<'m, 'de> {
-            type Value = ();
+        impl<'a, 'de, 'm> Visitor<'de> for ComponentVisitor<'a, 'm> {
+            type Value = (Component, Vec<StringId>);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a component description")
@@ -52,7 +113,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
                 }
 
                 let mut ports = false;
-                let mut references = false;
+                let mut references: Option<Vec<StringId>> = None;
                 let mut class = false;
 
                 let mut component = ComponentData::new(self.module, self.name, None);
@@ -70,13 +131,12 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
                             ports = true;
                         }
                         Field::References => {
-                            if references {
+                            if references.is_some() {
                                 return Err(de::Error::duplicate_field("references"));
                             }
-                            // TODO: deserialize references
-                            #[allow(clippy::let_unit_value)]
-                            let _ = map.next_value()?;
-                            references = true;
+                            references = Some(
+                                map.next_value_seed(ComponentRefsDeserializer::new(self.module))?,
+                            );
                         }
                         Field::Class => {
                             if class {
@@ -108,7 +168,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
                     self.module.components.contains_key(&name)
                 });
 
-                Ok(())
+                Ok((component, references.unwrap_or_default()))
             }
         }
 
@@ -117,7 +177,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m, 'de> {
             FIELDS,
             ComponentVisitor {
                 module: self.module,
-                name: self.name,
+                name: &self.name,
             },
         )
     }
@@ -134,7 +194,7 @@ impl<'m> ComponentsDeserializer<'m> {
 }
 
 impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
-    type Value = ();
+    type Value = HashMap<Component, Vec<StringId>>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -145,7 +205,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
         }
 
         impl<'de, 'm> Visitor<'de> for ComponentsVisitor<'m> {
-            type Value = ();
+            type Value = HashMap<Component, Vec<StringId>>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a map of component descriptions")
@@ -155,11 +215,18 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
             where
                 A: MapAccess<'de>,
             {
+                let mut component_refs = match map.size_hint() {
+                    Some(count) => HashMap::with_capacity(count),
+                    None => HashMap::default(),
+                };
+
                 while let Some(name) = map.next_key()? {
-                    map.next_value_seed(ComponentDeserializer::new(self.module, name))?;
+                    let (component, references) =
+                        map.next_value_seed(ComponentDeserializer::new(self.module, name))?;
+                    component_refs.insert(component, references);
                 }
 
-                Ok(())
+                Ok(component_refs)
             }
         }
 
