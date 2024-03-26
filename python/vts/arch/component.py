@@ -20,9 +20,9 @@ from vts.arch.port import (
 
 def _component_class_from_str(class_: str) -> ComponentClass:
     match class_.lower():
-        case "lut" | "ff":
+        case "lut":
             return ComponentClass.LUT
-        case "latch":
+        case "latch" | "ff":
             return ComponentClass.LATCH
         case _:
             raise ValueError(f'unknown component class "{class_}"')
