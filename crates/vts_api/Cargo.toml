@@ -8,7 +8,7 @@ fnv.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 vts_core.workspace = true
-pyo3 = { version = "0.20.3", features = ["abi3-py310"] }
+pyo3 = { version = "0.21.0", features = ["abi3-py310"] }
 
 [lib]
 name = "_vts_api_rs"

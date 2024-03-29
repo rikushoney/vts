@@ -22,7 +22,7 @@ impl<'py> ModuleDeserializer<'py> {
 }
 
 impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
-    type Value = Py<PyModule_>;
+    type Value = Bound<'py, PyModule_>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -33,7 +33,7 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
         }
 
         impl<'de, 'py> Visitor<'de> for ModuleVisitor<'py> {
-            type Value = Py<PyModule_>;
+            type Value = Bound<'py, PyModule_>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a module definition")
@@ -53,7 +53,7 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
                 let py = self.py;
 
                 let mut name: Option<String> = None;
-                let mut components: Option<Py<PyDict>> = None;
+                let mut components: Option<Bound<'py, PyDict>> = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -74,20 +74,20 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
                 }
 
                 let name = match name {
-                    Some(name) => PyString::new(py, name.as_str()),
+                    Some(name) => PyString::new_bound(py, name.as_str()),
                     None => {
                         return Err(de::Error::missing_field("name"));
                     }
                 };
 
-                let mut module = PyModule_::new(py, name.into_py(py));
+                let mut module = PyModule_::new(py, &name);
 
                 if let Some(components) = components {
-                    let components = components.as_ref(py).as_mapping();
+                    let components = components.as_mapping();
                     map_py_de_err!(module.add_components(py, components))?;
                 }
 
-                map_py_de_err!(Py::new(py, module))
+                map_py_de_err!(Bound::new(py, module))
             }
         }
 

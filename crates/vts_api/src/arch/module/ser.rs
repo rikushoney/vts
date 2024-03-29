@@ -7,13 +7,12 @@ use serde::{
 use crate::arch::{component::ser::PyComponentsSerializer, map_py_ser_err, PyModule as PyModule_};
 
 pub struct PyModuleSerializer<'py> {
-    py: Python<'py>,
-    module: &'py PyModule_,
+    module: Bound<'py, PyModule_>,
 }
 
 impl<'py> PyModuleSerializer<'py> {
-    pub fn new(py: Python<'py>, module: &'py PyModule_) -> Self {
-        Self { py, module }
+    pub fn new(module: Bound<'py, PyModule_>) -> Self {
+        Self { module }
     }
 }
 
@@ -22,14 +21,15 @@ impl<'py> Serialize for PyModuleSerializer<'py> {
     where
         S: Serializer,
     {
-        let py = self.py;
+        let py = self.module.py();
         let mut module_serializer = serializer.serialize_struct("Module", 2)?;
 
-        let name = map_py_ser_err!(self.module.name.as_ref(py).to_str())?;
+        let module = self.module.borrow();
+        let name = map_py_ser_err!(module.name.to_str(py))?;
         module_serializer.serialize_field("name", name)?;
 
-        let components = self.module.components.as_ref(py);
-        let components_serializer = PyComponentsSerializer::new(py, components.as_mapping());
+        let components = module.components.bind(py);
+        let components_serializer = PyComponentsSerializer::new(components.clone());
         module_serializer.serialize_field("components", &components_serializer)?;
 
         module_serializer.end()

@@ -36,27 +36,25 @@ impl PyPort {
     #[new]
     pub fn new(
         _py: Python<'_>,
-        name: Py<PyString>,
+        name: &Bound<'_, PyString>,
         kind: PyPortKind,
         n_pins: Option<usize>,
         class_: Option<PyPortClass>,
     ) -> PyResult<Self> {
+        let name = name.clone().unbind();
+        let n_pins = n_pins.unwrap_or(1);
+
         Ok(Self {
             name,
             kind,
-            n_pins: n_pins.unwrap_or(1),
+            n_pins,
             class_,
         })
     }
 
     pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
-        let name = PyString::new(py, self.name.as_ref(py).to_str()?);
-        Self::new(
-            py,
-            name.into_py(py),
-            self.kind,
-            Some(self.n_pins),
-            self.class_,
-        )
+        let name = PyString::new_bound(py, self.name.bind(py).to_str()?);
+
+        Self::new(py, &name, self.kind, Some(self.n_pins), self.class_)
     }
 }

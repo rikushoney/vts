@@ -24,19 +24,18 @@ impl<'a, 'py> PyComponentDeserializer<'a, 'py> {
 }
 
 impl<'a, 'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'a, 'py> {
-    type Value = Py<PyComponent>;
+    type Value = Bound<'py, PyComponent>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,
     {
         struct ComponentVisitor<'py> {
-            py: Python<'py>,
-            name: Py<PyString>,
+            name: Bound<'py, PyString>,
         }
 
         impl<'de, 'py> Visitor<'de> for ComponentVisitor<'py> {
-            type Value = Py<PyComponent>;
+            type Value = Bound<'py, PyComponent>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a component description")
@@ -54,9 +53,11 @@ impl<'a, 'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'a, 'py> {
                     Class,
                 }
 
-                let mut ports: Option<Py<PyDict>> = None;
+                let mut ports: Option<Bound<'py, PyDict>> = None;
                 let mut references: Option<()> = None;
                 let mut class: Option<ComponentClass> = None;
+
+                let py = self.name.py();
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -64,7 +65,7 @@ impl<'a, 'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'a, 'py> {
                             if ports.is_some() {
                                 return Err(de::Error::duplicate_field("ports"));
                             }
-                            ports = Some(map.next_value_seed(PyPortsDeserializer::new(self.py))?);
+                            ports = Some(map.next_value_seed(PyPortsDeserializer::new(py))?);
                         }
                         Field::References => {
                             if references.is_some() {
@@ -85,29 +86,26 @@ impl<'a, 'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'a, 'py> {
                 }
 
                 let class = class.map(PyComponentClass::from);
-                let mut component = map_py_de_err!(PyComponent::new(self.py, self.name, class))?;
+                let mut component = map_py_de_err!(PyComponent::new(py, &self.name, class))?;
 
                 if let Some(ports) = ports {
-                    let ports = ports.as_ref(self.py).as_mapping();
-                    map_py_de_err!(component.add_ports(self.py, ports))?;
+                    let ports = ports.as_mapping();
+                    map_py_de_err!(component.add_ports(py, ports))?;
                 }
 
                 if let Some(_references) = references {
                     // TODO: add references
                 }
 
-                map_py_de_err!(Py::new(self.py, component))
+                map_py_de_err!(Bound::new(py, component))
             }
         }
 
-        let name = PyString::new(self.py, self.name.as_str());
+        let name = PyString::new_bound(self.py, self.name.as_str());
         deserializer.deserialize_struct(
             "Component",
             &["ports", "references", "class"],
-            ComponentVisitor {
-                py: self.py,
-                name: name.into_py(self.py),
-            },
+            ComponentVisitor { name },
         )
     }
 }
@@ -123,7 +121,7 @@ impl<'py> PyComponentsDeserializer<'py> {
 }
 
 impl<'de, 'py> DeserializeSeed<'de> for PyComponentsDeserializer<'py> {
-    type Value = Py<PyDict>;
+    type Value = Bound<'py, PyDict>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -134,7 +132,7 @@ impl<'de, 'py> DeserializeSeed<'de> for PyComponentsDeserializer<'py> {
         }
 
         impl<'de, 'py> Visitor<'de> for ComponentsVisitor<'py> {
-            type Value = Py<PyDict>;
+            type Value = Bound<'py, PyDict>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a map of component names to components")
@@ -146,7 +144,7 @@ impl<'de, 'py> DeserializeSeed<'de> for PyComponentsDeserializer<'py> {
             {
                 let py = self.py;
 
-                let components = PyDict::new(py);
+                let components = PyDict::new_bound(py);
                 while let Some(name) = map.next_key::<String>()? {
                     if map_py_de_err!(components.contains(name.as_str()))? {
                         return Err(de::Error::custom(format!(
@@ -158,7 +156,6 @@ impl<'de, 'py> DeserializeSeed<'de> for PyComponentsDeserializer<'py> {
                     map_py_de_err!(components.set_item(name, component))?;
                 }
 
-                let components: Py<PyDict> = components.into_py(py);
                 Ok(components)
             }
         }

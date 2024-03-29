@@ -1,12 +1,14 @@
 pub mod de;
 pub mod ser;
 
+use std::ops::Deref;
+
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
 use vts_core::arch::ComponentClass;
 
-use crate::arch::PyPort;
+use crate::arch::{iter_dict_items, iter_mapping_items, PyPort};
 
 wrap_enum!(PyComponentClass => ComponentClass:
     LUT = Lut,
@@ -31,87 +33,124 @@ impl PyComponent {
     #[new]
     pub fn new(
         py: Python<'_>,
-        name: Py<PyString>,
+        name: &Bound<'_, PyString>,
         class_: Option<PyComponentClass>,
     ) -> PyResult<Self> {
+        let name = name.clone().unbind();
+        let ports = PyDict::new_bound(py).into();
+        let references = PyDict::new_bound(py).into();
+
         Ok(Self {
             name,
-            ports: PyDict::new(py).into(),
-            references: PyDict::new(py).into(),
+            ports,
+            references,
             class_,
         })
     }
 
     pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
-        let name = PyString::new(py, self.name.as_ref(py).to_str()?);
-        let mut component = PyComponent::new(py, name.into_py(py), self.class_)?;
+        let name = PyString::new_bound(py, self.name.bind(py).to_str()?);
+        let mut component = PyComponent::new(py, &name, self.class_)?;
 
-        for item in self.ports.as_ref(py).items().iter() {
-            let (name, port) = PyAny::extract::<(&str, Py<PyPort>)>(item)?;
+        let ports = self.ports.bind(py);
+        iter_dict_items!(for (name: &str [extract], port: PyPort [downcast]) in ports => {
             component.add_port(py, name, port)?;
-        }
+        });
 
-        for item in self.references.as_ref(py).items().iter() {
-            let (name, reference) = PyAny::extract::<(&str, Py<PyComponent>)>(item)?;
-            component.add_ref(py, name, reference)?;
-        }
+        let references = self.references.bind(py);
+        iter_dict_items!(for (alias: &str [extract], reference: PyComponentRef [downcast]) in references => {
+            let reference = reference.borrow();
+            let reference = Bound::new(py, reference.component.clone())?;
+            component.add_reference(py, &reference, Some(alias))?;
+        });
 
         Ok(component)
     }
 
-    pub fn add_ref(
+    pub fn add_reference(
         &mut self,
         py: Python<'_>,
-        name: &str,
-        component: Py<PyComponent>,
-    ) -> PyResult<Py<PyComponent>> {
-        let references = self.references.as_ref(py);
-        let name = PyString::new(py, name);
+        component: &Bound<'_, PyComponent>,
+        alias: Option<&str>,
+    ) -> PyResult<Py<PyComponentRef>> {
+        let alias = match alias {
+            Some(alias) => PyString::new_bound(py, alias),
+            None => {
+                let component = component.borrow();
+                let alias = component.name.bind(py);
+                PyString::new_bound(py, alias.to_str()?)
+            }
+        };
 
-        if references.contains(name)? {
-            let reference_name = name.to_str()?;
-            let component_name = self.name.as_ref(py).to_str()?;
+        let references = self.references.bind(py);
+        if references.deref().contains(alias.clone())? {
             return Err(PyValueError::new_err(format!(
-                r#"component with name "{reference_name}" already referenced in "{component_name}""#
+                r#"component or alias "{alias}" already referenced in "{component}""#,
+                alias = alias.to_str()?,
+                component = self.name.bind(py).to_str()?
             )));
         }
 
-        let component = component.as_ref(py).try_borrow()?;
-        let component = Py::new(py, component.copy(py)?)?;
+        let reference = PyComponentRef::new(py, component, Some(&alias))?;
+        let reference = Bound::new(py, reference)?;
 
-        references.set_item(name, component.clone_ref(py))?;
-        Ok(component)
+        references.deref().set_item(alias, reference.clone())?;
+
+        Ok(reference.unbind())
     }
 
     pub fn add_port(
         &mut self,
         py: Python<'_>,
         name: &str,
-        port: Py<PyPort>,
+        port: &Bound<'_, PyPort>,
     ) -> PyResult<Py<PyPort>> {
-        let ports = self.ports.as_ref(py);
-        let name = PyString::new(py, name);
+        let ports = self.ports.bind(py);
+        let name = PyString::new_bound(py, name);
 
-        if ports.contains(name)? {
-            let port_name = name.to_str()?;
-            let module_name = self.name.as_ref(py).to_str()?;
+        if ports.contains(name.clone())? {
             return Err(PyValueError::new_err(format!(
-                r#"port with name "{port_name}" already in "{module_name}""#
+                r#"port "{port}" already in "{component}""#,
+                port = name.to_str()?,
+                component = self.name.bind(py).to_str()?,
             )));
         }
 
-        let port = port.as_ref(py).try_borrow()?;
+        let port = port.borrow();
         let port = Py::new(py, port.copy(py)?)?;
 
         ports.set_item(name, port.clone_ref(py))?;
+
         Ok(port)
     }
 
-    pub fn add_ports(&mut self, py: Python<'_>, ports: &PyMapping) -> PyResult<()> {
-        for item in ports.items()?.iter()? {
-            let (name, port) = PyAny::extract::<(&str, Py<PyPort>)>(item?)?;
+    pub fn add_ports(&mut self, py: Python<'_>, ports: &Bound<'_, PyMapping>) -> PyResult<()> {
+        iter_mapping_items!(for (name: &str [extract], port: PyPort [downcast]) in ports => {
             self.add_port(py, name, port)?;
-        }
+        });
+
         Ok(())
+    }
+}
+
+#[pyclass]
+pub struct PyComponentRef {
+    #[pyo3(get, set)]
+    pub component: Py<PyComponent>,
+    #[pyo3(get, set)]
+    pub alias: Option<Py<PyString>>,
+}
+
+#[pymethods]
+impl PyComponentRef {
+    #[new]
+    pub fn new(
+        _py: Python<'_>,
+        component: &Bound<'_, PyComponent>,
+        alias: Option<&Bound<PyString>>,
+    ) -> PyResult<Self> {
+        let component = component.clone().unbind();
+        let alias = alias.map(|alias| alias.clone().unbind());
+        Ok(Self { component, alias })
     }
 }

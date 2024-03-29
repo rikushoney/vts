@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use pyo3::prelude::*;
-use pyo3::types::PyMapping;
+use pyo3::types::PyDict;
 use serde::{
     ser::{self, SerializeMap, SerializeStruct},
     Serialize, Serializer,
@@ -29,11 +29,11 @@ impl Serialize for PyPort {
 }
 
 pub struct PyPortsSerializer<'py> {
-    ports: &'py PyMapping,
+    ports: Bound<'py, PyDict>,
 }
 
 impl<'py> PyPortsSerializer<'py> {
-    pub fn new(ports: &'py PyMapping) -> Self {
+    pub fn new(ports: Bound<'py, PyDict>) -> Self {
         Self { ports }
     }
 }
@@ -43,15 +43,12 @@ impl<'py> Serialize for PyPortsSerializer<'py> {
     where
         S: Serializer,
     {
-        let py = self.ports.py();
-        let n_ports = map_py_ser_err!(self.ports.len())?;
+        let n_ports = self.ports.len();
         let mut ports_serializer = map_py_ser_err!(serializer.serialize_map(Some(n_ports)))?;
 
-        let ports = map_py_ser_err!(self.ports.items())?;
-        let mut iter = map_py_ser_err!(ports.iter())?;
-        while let Some(item) = map_py_ser_err!(iter.next().transpose())? {
-            let (name, port) = map_py_ser_err!(PyAny::extract::<(&str, Py<PyPort>)>(item))?;
-            let port = map_py_ser_err!(port.try_borrow(py))?;
+        for (name, port) in self.ports.iter() {
+            let name = map_py_ser_err!(name.extract::<&str>())?;
+            let port = map_py_ser_err!(port.downcast::<PyPort>())?.borrow();
             ports_serializer.serialize_entry(name, port.deref())?;
         }
 
