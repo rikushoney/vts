@@ -80,11 +80,11 @@ impl<'de, 'py> DeserializeSeed<'de> for ModuleDeserializer<'py> {
                     }
                 };
 
-                let mut module = PyModule_::new(py, &name);
+                let mut module = PyModule_::new(&name);
 
                 if let Some(components) = components {
                     let components = components.as_mapping();
-                    map_py_de_err!(module.add_components(py, components))?;
+                    map_py_de_err!(module.add_components(components))?;
                 }
 
                 map_py_de_err!(Bound::new(py, module))

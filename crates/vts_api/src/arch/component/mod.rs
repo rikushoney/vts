@@ -31,11 +31,9 @@ pub struct PyComponent {
 #[pymethods]
 impl PyComponent {
     #[new]
-    pub fn new(
-        py: Python<'_>,
-        name: &Bound<'_, PyString>,
-        class_: Option<PyComponentClass>,
-    ) -> PyResult<Self> {
+    pub fn new(name: &Bound<'_, PyString>, class_: Option<PyComponentClass>) -> PyResult<Self> {
+        let py = name.py();
+
         let name = name.clone().unbind();
         let ports = PyDict::new_bound(py).into();
         let references = PyDict::new_bound(py).into();
@@ -50,18 +48,18 @@ impl PyComponent {
 
     pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
         let name = PyString::new_bound(py, self.name.bind(py).to_str()?);
-        let mut component = PyComponent::new(py, &name, self.class_)?;
+        let mut component = PyComponent::new(&name, self.class_)?;
 
         let ports = self.ports.bind(py);
-        iter_dict_items!(for (name: &str [extract], port: PyPort [downcast]) in ports => {
-            component.add_port(py, name, port)?;
+        iter_dict_items!(for (name: PyString, port: PyPort) in ports => {
+            component.add_port(name, port)?;
         });
 
         let references = self.references.bind(py);
-        iter_dict_items!(for (alias: &str [extract], reference: PyComponentRef [downcast]) in references => {
+        iter_dict_items!(for (alias: PyString, reference: PyComponentRef) in references => {
             let reference = reference.borrow();
             let reference = Bound::new(py, reference.component.clone())?;
-            component.add_reference(py, &reference, Some(alias))?;
+            component.add_reference(&reference, Some(alias))?;
         });
 
         Ok(component)
@@ -69,12 +67,13 @@ impl PyComponent {
 
     pub fn add_reference(
         &mut self,
-        py: Python<'_>,
         component: &Bound<'_, PyComponent>,
-        alias: Option<&str>,
+        alias: Option<&Bound<'_, PyString>>,
     ) -> PyResult<Py<PyComponentRef>> {
+        let py = component.py();
+
         let alias = match alias {
-            Some(alias) => PyString::new_bound(py, alias),
+            Some(alias) => alias.clone(),
             None => {
                 let component = component.borrow();
                 let alias = component.name.bind(py);
@@ -91,7 +90,7 @@ impl PyComponent {
             )));
         }
 
-        let reference = PyComponentRef::new(py, component, Some(&alias))?;
+        let reference = PyComponentRef::new(component, Some(&alias))?;
         let reference = Bound::new(py, reference)?;
 
         references.deref().set_item(alias, reference.clone())?;
@@ -101,12 +100,12 @@ impl PyComponent {
 
     pub fn add_port(
         &mut self,
-        py: Python<'_>,
-        name: &str,
+        name: &Bound<'_, PyString>,
         port: &Bound<'_, PyPort>,
     ) -> PyResult<Py<PyPort>> {
+        let py = name.py();
+
         let ports = self.ports.bind(py);
-        let name = PyString::new_bound(py, name);
 
         if ports.contains(name.clone())? {
             return Err(PyValueError::new_err(format!(
@@ -124,9 +123,9 @@ impl PyComponent {
         Ok(port)
     }
 
-    pub fn add_ports(&mut self, py: Python<'_>, ports: &Bound<'_, PyMapping>) -> PyResult<()> {
-        iter_mapping_items!(for (name: &str [extract], port: PyPort [downcast]) in ports => {
-            self.add_port(py, name, port)?;
+    pub fn add_ports(&mut self, ports: &Bound<'_, PyMapping>) -> PyResult<()> {
+        iter_mapping_items!(for (name: PyString, port: PyPort) in ports => {
+            self.add_port(name, port)?;
         });
 
         Ok(())
@@ -145,7 +144,6 @@ pub struct PyComponentRef {
 impl PyComponentRef {
     #[new]
     pub fn new(
-        _py: Python<'_>,
         component: &Bound<'_, PyComponent>,
         alias: Option<&Bound<PyString>>,
     ) -> PyResult<Self> {

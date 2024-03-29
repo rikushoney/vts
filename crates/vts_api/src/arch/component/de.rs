@@ -86,11 +86,11 @@ impl<'a, 'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'a, 'py> {
                 }
 
                 let class = class.map(PyComponentClass::from);
-                let mut component = map_py_de_err!(PyComponent::new(py, &self.name, class))?;
+                let mut component = map_py_de_err!(PyComponent::new(&self.name, class))?;
 
                 if let Some(ports) = ports {
                     let ports = ports.as_mapping();
-                    map_py_de_err!(component.add_ports(py, ports))?;
+                    map_py_de_err!(component.add_ports(ports))?;
                 }
 
                 if let Some(_references) = references {

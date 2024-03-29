@@ -35,7 +35,6 @@ pub struct PyPort {
 impl PyPort {
     #[new]
     pub fn new(
-        _py: Python<'_>,
         name: &Bound<'_, PyString>,
         kind: PyPortKind,
         n_pins: Option<usize>,
@@ -55,6 +54,6 @@ impl PyPort {
     pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
         let name = PyString::new_bound(py, self.name.bind(py).to_str()?);
 
-        Self::new(py, &name, self.kind, Some(self.n_pins), self.class_)
+        Self::new(&name, self.kind, Some(self.n_pins), self.class_)
     }
 }

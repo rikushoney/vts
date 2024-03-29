@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 use serde::{
     ser::{self, SerializeMap, SerializeStruct},
     Serialize, Serializer,
@@ -47,8 +47,10 @@ impl<'py> Serialize for PyPortsSerializer<'py> {
         let mut ports_serializer = map_py_ser_err!(serializer.serialize_map(Some(n_ports)))?;
 
         for (name, port) in self.ports.iter() {
-            let name = map_py_ser_err!(name.extract::<&str>())?;
+            let name = map_py_ser_err!(name.downcast::<PyString>())?;
+            let name = map_py_ser_err!(name.to_str())?;
             let port = map_py_ser_err!(port.downcast::<PyPort>())?.borrow();
+
             ports_serializer.serialize_entry(name, port.deref())?;
         }
 

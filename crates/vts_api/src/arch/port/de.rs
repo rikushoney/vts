@@ -92,7 +92,7 @@ impl<'a, 'de, 'py> DeserializeSeed<'de> for PyPortDeserializer<'a, 'py> {
 
                 let py = self.name.py();
                 let name = PyString::new_bound(py, map_py_de_err!(self.name.to_str())?);
-                let port = map_py_de_err!(PyPort::new(py, &name, kind, n_pins, class))?;
+                let port = map_py_de_err!(PyPort::new(&name, kind, n_pins, class))?;
                 map_py_de_err!(Bound::new(py, port))
             }
         }

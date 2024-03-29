@@ -20,7 +20,8 @@ pub struct PyModule_ {
 #[pymethods]
 impl PyModule_ {
     #[new]
-    pub fn new(py: Python<'_>, name: &Bound<PyString>) -> Self {
+    pub fn new(name: &Bound<PyString>) -> Self {
+        let py = name.py();
         let name = name.clone().unbind();
         let components = PyDict::new_bound(py).unbind();
 
@@ -29,13 +30,13 @@ impl PyModule_ {
 
     pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
         let name = PyString::new_bound(py, self.name.bind(py).to_str()?);
-        let mut module = PyModule_::new(py, &name);
+        let mut module = PyModule_::new(&name);
 
         let components = self.components.bind(py);
         for (name, component) in components.iter() {
-            let name = name.extract::<&str>()?;
+            let name = name.downcast::<PyString>()?;
             let component = component.downcast::<PyComponent>()?;
-            module.add_component(py, name, component)?;
+            module.add_component(name, component)?;
         }
 
         Ok(module)
@@ -43,12 +44,11 @@ impl PyModule_ {
 
     pub fn add_component(
         &mut self,
-        py: Python<'_>,
-        name: &str,
+        name: &Bound<'_, PyString>,
         component: &Bound<'_, PyComponent>,
     ) -> PyResult<Py<PyComponent>> {
+        let py = name.py();
         let components = self.components.bind(py);
-        let name = PyString::new_bound(py, name);
 
         if components.contains(name.clone())? {
             let component_name = name.to_str()?;
@@ -66,13 +66,9 @@ impl PyModule_ {
         Ok(component)
     }
 
-    pub fn add_components(
-        &mut self,
-        py: Python<'_>,
-        components: &Bound<'_, PyMapping>,
-    ) -> PyResult<()> {
-        iter_mapping_items!(for (name: &str [extract], component: PyComponent [downcast]) in components => {
-            self.add_component(py, name, component)?;
+    pub fn add_components(&mut self, components: &Bound<'_, PyMapping>) -> PyResult<()> {
+        iter_mapping_items!(for (name: PyString, component: PyComponent) in components => {
+            self.add_component(name, component)?;
         });
 
         Ok(())
@@ -86,8 +82,11 @@ macro_rules! map_serde_py_err {
 }
 
 #[pyfunction]
-pub fn json_loads(py: Python<'_>, input: &str) -> PyResult<Py<PyModule_>> {
-    let json: serde_json::Value = map_serde_py_err!(serde_json::from_str(input))?;
+pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
+    let py = input.py();
+
+    let input = input.downcast::<PyString>()?;
+    let json: serde_json::Value = map_serde_py_err!(serde_json::from_str(input.to_str()?))?;
     let module_deserializer = de::ModuleDeserializer::new(py);
     let module: Bound<'_, PyModule_> = map_serde_py_err!(module_deserializer.deserialize(json))?;
 

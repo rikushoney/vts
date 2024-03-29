@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 use serde::{
     ser::{self, SerializeMap, SerializeStruct},
     Serialize, Serializer,
@@ -24,10 +24,12 @@ impl<'py> Serialize for PyComponentSerializer<'py> {
         S: Serializer,
     {
         let py = self.component.py();
-        let mut component_serializer = serializer.serialize_struct("Component", 4)?;
 
         let component = self.component.borrow();
         let ports = component.ports.bind(py);
+
+        let mut component_serializer = serializer.serialize_struct("Component", 4)?;
+
         let ports_serializer = PyPortsSerializer::new(ports.clone());
         component_serializer.serialize_field("ports", &ports_serializer)?;
 
@@ -61,7 +63,8 @@ impl<'py> Serialize for PyComponentsSerializer<'py> {
         let mut components_serializer = map_py_ser_err!(serializer.serialize_map(Some(n_comps)))?;
 
         for (name, component) in self.components.iter() {
-            let name = map_py_ser_err!(name.extract::<&str>())?;
+            let name = map_py_ser_err!(name.downcast::<PyString>())?;
+            let name = map_py_ser_err!(name.to_str())?;
             let component = map_py_ser_err!(component.downcast::<PyComponent>())?;
             let component_serializer = PyComponentSerializer::new(component.clone());
 
