@@ -5,7 +5,7 @@ use serde::{
     Serialize, Serializer,
 };
 
-use crate::arch::{port::PortData, Module, Port, StringId};
+use crate::arch::{port::PortData, Module, PortId, StringId};
 
 pub struct PortSerializer<'m> {
     // TODO: is this needed?
@@ -39,11 +39,11 @@ impl<'m> Serialize for PortSerializer<'m> {
 
 pub struct PortsSerializer<'m> {
     module: &'m Module,
-    ports: &'m HashMap<StringId, Port>,
+    ports: &'m HashMap<StringId, PortId>,
 }
 
 impl<'m> PortsSerializer<'m> {
-    pub fn new(module: &'m Module, ports: &'m HashMap<StringId, Port>) -> Self {
+    pub fn new(module: &'m Module, ports: &'m HashMap<StringId, PortId>) -> Self {
         Self { module, ports }
     }
 }

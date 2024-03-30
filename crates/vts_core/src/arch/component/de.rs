@@ -7,7 +7,7 @@ use serde::{
 };
 
 use crate::arch::{
-    component::ComponentData, port::de::PortsDeserializer, Component, Module, StringId,
+    component::ComponentData, port::de::PortsDeserializer, ComponentId, Module, StringId,
 };
 
 pub(crate) struct ComponentRefsDeserializer<'m> {
@@ -80,7 +80,7 @@ impl<'m> ComponentDeserializer<'m> {
 }
 
 impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
-    type Value = (Component, Vec<StringId>);
+    type Value = (ComponentId, Vec<StringId>);
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -94,7 +94,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
         const FIELDS: &[&str] = &["ports", "references", "class"];
 
         impl<'a, 'de, 'm> Visitor<'de> for ComponentVisitor<'a, 'm> {
-            type Value = (Component, Vec<StringId>);
+            type Value = (ComponentId, Vec<StringId>);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a component description")
@@ -194,7 +194,7 @@ impl<'m> ComponentsDeserializer<'m> {
 }
 
 impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
-    type Value = HashMap<Component, Vec<StringId>>;
+    type Value = HashMap<ComponentId, Vec<StringId>>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -205,7 +205,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
         }
 
         impl<'de, 'm> Visitor<'de> for ComponentsVisitor<'m> {
-            type Value = HashMap<Component, Vec<StringId>>;
+            type Value = HashMap<ComponentId, Vec<StringId>>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a map of component descriptions")

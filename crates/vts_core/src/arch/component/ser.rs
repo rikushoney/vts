@@ -8,7 +8,7 @@ use serde::{
 use crate::arch::{
     component::{ComponentData, ComponentRef},
     port::ser::PortsSerializer,
-    Component, Module, StringId,
+    ComponentId, Module, StringId,
 };
 use crate::database::Database;
 
@@ -68,11 +68,11 @@ impl<'m> Serialize for ComponentSerializer<'m> {
 
 pub struct ComponentsSerializer<'m> {
     module: &'m Module,
-    components: &'m Database<ComponentData, Component>,
+    components: &'m Database<ComponentData, ComponentId>,
 }
 
 impl<'m> ComponentsSerializer<'m> {
-    pub fn new(module: &'m Module, components: &'m Database<ComponentData, Component>) -> Self {
+    pub fn new(module: &'m Module, components: &'m Database<ComponentData, ComponentId>) -> Self {
         Self { module, components }
     }
 }

@@ -16,7 +16,7 @@ wrap_enum!(PyComponentClass => ComponentClass:
 );
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PyComponent {
     #[pyo3(get, set)]
     pub name: Py<PyString>,

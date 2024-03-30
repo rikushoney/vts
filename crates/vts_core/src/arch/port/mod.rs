@@ -1,11 +1,19 @@
 pub mod de;
 pub mod ser;
 
+use std::ops::Range;
+
 use serde::{Deserialize, Serialize};
 
-use crate::arch::{component::ComponentData, impl_dbkey_wrapper, Component, Module, StringId};
+use crate::arch::{component::ComponentData, impl_dbkey_wrapper, ComponentId, Module, StringId};
 
-impl_dbkey_wrapper!(Port, u32);
+impl_dbkey_wrapper!(PortId, u32);
+
+impl PortId {
+    pub fn to_port(self, module: &Module) -> Port<'_> {
+        Port::new(module, self)
+    }
+}
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -31,7 +39,7 @@ pub enum PortClass {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PortData {
     name: StringId,
-    parent: Component,
+    parent: ComponentId,
     pub kind: PortKind,
     pub n_pins: usize,
     pub class: Option<PortClass>,
@@ -72,7 +80,7 @@ impl PortData {
         module.strings.lookup(self.name)
     }
 
-    pub fn set_name<'m>(&'m mut self, module: &'m mut Module, name: &str) {
+    pub fn rename<'m>(&'m mut self, module: &'m mut Module, name: &str) {
         let name = module.strings.entry(name);
         let parent = module.component_mut(self.parent);
         assert!(
@@ -90,7 +98,38 @@ impl PortData {
         self.name = name;
     }
 
-    pub fn parent(&self) -> Component {
+    pub fn parent(&self) -> ComponentId {
         self.parent
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Port<'m> {
+    module: &'m Module,
+    id: PortId,
+    data: &'m PortData,
+}
+
+impl<'m> Port<'m> {
+    fn new(module: &'m Module, id: PortId) -> Self {
+        let data = module.port_db.lookup(id);
+
+        Self { module, id, data }
+    }
+
+    pub fn select(&self, range: Range<u32>) -> PinRange {
+        PinRange::new(self.id, range)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PinRange {
+    port: PortId,
+    range: Range<u32>,
+}
+
+impl PinRange {
+    fn new(port: PortId, range: Range<u32>) -> Self {
+        Self { port, range }
     }
 }

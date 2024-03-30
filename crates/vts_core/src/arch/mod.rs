@@ -1,8 +1,8 @@
 use crate::stringtable::TableKey;
 
-pub use component::{Component, ComponentClass};
+pub use component::{ComponentClass, ComponentId};
 pub use module::Module;
-pub use port::{Port, PortClass, PortKind};
+pub use port::{PortClass, PortId, PortKind};
 
 macro_rules! impl_opaquekey_wrapper {
     ($name:ident, $base:path) => {
@@ -32,12 +32,6 @@ macro_rules! impl_dbkey_wrapper {
         impl crate::database::DbKey for $name {}
     };
 }
-
-// macro_rules! assert_ptr_eq {
-//     ($left:expr, $right:expr) => {
-//         assert!(std::ptr::eq($left as *const _, $right as *const _))
-//     };
-// }
 
 pub(crate) use impl_dbkey_wrapper;
 
