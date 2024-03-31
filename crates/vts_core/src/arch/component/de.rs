@@ -132,7 +132,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                             map.next_value_seed(PortsDeserializer::new(&mut builder))?;
                         }
                         Field::References => {
-                            if builder.has_references() {
+                            if builder.has_unresolved_references() {
                                 return Err(de::Error::duplicate_field("references"));
                             }
                             map.next_value_seed(ComponentRefsDeserializer::new(&mut builder))?;

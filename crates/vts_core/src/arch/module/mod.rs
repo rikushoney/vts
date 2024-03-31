@@ -126,6 +126,12 @@ pub struct ModuleBuilder {
     name_is_set: bool,
 }
 
+impl Default for ModuleBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub enum ModuleBuildError {
     DuplicateReference {
         component: String,
@@ -170,7 +176,7 @@ impl ModuleBuilder {
             if let Some(reference) = module.components.get(&name) {
                 if resolved.insert(name, reference.reference()).is_some() {
                     let reference = module.strings.lookup(name).to_string();
-                    let component = module.component(component).name(&module).to_string();
+                    let component = module.component(component).name(module).to_string();
                     return Err(ModuleBuildError::DuplicateReference {
                         component,
                         reference,
@@ -178,7 +184,7 @@ impl ModuleBuilder {
                 }
             } else {
                 let reference = module.strings.lookup(name).to_string();
-                let component = module.component(component).name(&module).to_string();
+                let component = module.component(component).name(module).to_string();
                 return Err(ModuleBuildError::UndefinedReference {
                     component,
                     reference,
@@ -186,10 +192,7 @@ impl ModuleBuilder {
             }
         }
 
-        module
-            .component_mut(component)
-            .references
-            .extend(resolved.into_iter());
+        module.component_mut(component).references.extend(resolved);
 
         Ok(self)
     }

@@ -204,10 +204,10 @@ impl<'m> ComponentBuilder<'m> {
                 .lookup(self.module[component].name)
                 .to_string();
             let reference = self.module.strings.lookup(alias).to_string();
-            return Err(ComponentBuildError::DuplicateReference {
+            Err(ComponentBuildError::DuplicateReference {
                 component,
                 reference,
-            });
+            })
         } else {
             Ok(self)
         }
