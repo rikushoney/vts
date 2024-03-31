@@ -8,7 +8,7 @@ use serde::{
 };
 use vts_core::arch::{PortClass, PortKind};
 
-use crate::arch::{map_py_ser_err, PyPort};
+use crate::arch::PyPort;
 
 impl Serialize for PyPort {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

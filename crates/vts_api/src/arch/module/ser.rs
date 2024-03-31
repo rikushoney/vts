@@ -4,7 +4,7 @@ use serde::{
     Serialize, Serializer,
 };
 
-use crate::arch::{component::ser::PyComponentsSerializer, map_py_ser_err, PyModule as PyModule_};
+use crate::arch::{component::ser::PyComponentsSerializer, PyModule as PyModule_};
 
 pub struct PyModuleSerializer<'py> {
     module: Bound<'py, PyModule_>,

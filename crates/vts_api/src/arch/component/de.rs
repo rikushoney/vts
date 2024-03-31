@@ -10,7 +10,7 @@ use serde::{
 };
 use vts_core::arch::ComponentClass;
 
-use crate::arch::{map_py_de_err, port::de::PyPortsDeserializer, PyComponent, PyComponentClass};
+use crate::arch::{port::de::PyPortsDeserializer, PyComponent, PyComponentClass};
 
 pub struct PyComponentDeserializer<'a, 'py> {
     py: Python<'py>,
@@ -86,7 +86,7 @@ impl<'a, 'de, 'py> DeserializeSeed<'de> for PyComponentDeserializer<'a, 'py> {
                 }
 
                 let class = class.map(PyComponentClass::from);
-                let mut component = map_py_de_err!(PyComponent::new(&self.name, class))?;
+                let mut component = PyComponent::new(&self.name, class);
 
                 if let Some(ports) = ports {
                     let ports = ports.as_mapping();

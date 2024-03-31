@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from vts._vts_api_rs import (
+    PyPinRange as _PinRange,
     PyPort as _Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
@@ -106,3 +107,16 @@ class Port:
     def __str__(self) -> str:
         class_ = str(self.class_) if self.class_ is not None else "None"
         return f'Port(name="{self.name}", kind={self.kind}, class={class_})'
+
+
+class PinRange:
+    def __init__(
+        self, port: Port, start: int | None = None, end: int | None = None
+    ) -> None:
+        self._range = _PinRange(port._port, start, end)
+
+    @classmethod
+    def _wrap(cls, range: _PinRange) -> PinRange:
+        r = cls.__new__(cls)
+        r._range = range
+        return r

@@ -6,7 +6,7 @@ use serde::{
 };
 use vts_core::arch::ComponentClass;
 
-use crate::arch::{map_py_ser_err, port::ser::PyPortsSerializer, PyComponent};
+use crate::arch::{port::ser::PyPortsSerializer, PyComponent};
 
 pub struct PyComponentSerializer<'py> {
     component: Bound<'py, PyComponent>,

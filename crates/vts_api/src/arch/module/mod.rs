@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
 use serde::de::DeserializeSeed;
 
-use crate::arch::{iter_mapping_items, PyComponent};
+use crate::arch::PyComponent;
 
 #[pyclass]
 #[pyo3(name = "PyModule")]
@@ -73,12 +73,6 @@ impl PyModule_ {
 
         Ok(())
     }
-}
-
-macro_rules! map_serde_py_err {
-    ($expr:expr) => {
-        ($expr).map_err(|err| PyValueError::new_err(format!("{err}")))
-    };
 }
 
 #[pyfunction]

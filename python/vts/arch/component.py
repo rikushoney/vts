@@ -6,10 +6,13 @@ from typing import Iterable, Literal
 from vts._vts_api_rs import (
     PyComponent as _Component,
     PyComponentClass as ComponentClass,
+    PyComponentRef as _ComponentRef,
+    PyConnection as _Connection,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
 )
 from vts.arch.port import (
+    PinRange,
     Port,
     _port_class_from_str,
     _port_kind_from_str,
@@ -104,6 +107,18 @@ class Component:
             for port in ports:
                 self.add_port(port)
 
+    def add_reference(
+        self, component: Component, *, alias: str | None = None
+    ) -> ComponentRef:
+        return ComponentRef._wrap(
+            self._component.add_reference(component._component, alias)
+        )
+
+    def add_connection(self, source: PinRange, sink: PinRange) -> Connection:
+        return Connection._wrap(
+            self._component.add_connection(source._range, sink._range)
+        )
+
     @classmethod
     def _wrap(cls, component: _Component) -> Component:
         c = cls.__new__(cls)
@@ -121,3 +136,25 @@ class Component:
     def __str__(self) -> str:
         class_ = str(self.class_) if self.class_ is not None else "None"
         return f'Component(name="{self.name}", ports={{...}}, class={class_})'
+
+
+class ComponentRef:
+    def __init__(self, component: Component, alias: str | None = None) -> None:
+        self._reference = _ComponentRef(component._component, alias)
+
+    @classmethod
+    def _wrap(cls, reference: _ComponentRef) -> ComponentRef:
+        ref = cls.__new__(cls)
+        ref._reference = reference
+        return ref
+
+
+class Connection:
+    def __init__(self, source: PinRange, sink: PinRange) -> None:
+        self._connection = _Connection(source._range, sink._range)
+
+    @classmethod
+    def _wrap(cls, connection: _Connection) -> Connection:
+        c = cls.__new__(cls)
+        c._connection = connection
+        return c

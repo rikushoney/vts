@@ -9,7 +9,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 
-use crate::arch::{component::de::PyComponentsDeserializer, map_py_de_err, PyModule as PyModule_};
+use crate::arch::{component::de::PyComponentsDeserializer, PyModule as PyModule_};
 
 pub struct ModuleDeserializer<'py> {
     py: Python<'py>,
