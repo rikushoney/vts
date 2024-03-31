@@ -24,9 +24,16 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
     {
         let mut serializer = serializer.serialize_seq(Some(self.references.len()))?;
 
-        for name in self.references.keys() {
-            let name = self.module.strings.lookup(*name);
-            serializer.serialize_element(name)?;
+        for (alias, component) in self.references.iter() {
+            let alias = *alias;
+            let name = self.module.component(component.0).name;
+            if name == alias {
+                serializer.serialize_element(self.module.strings.lookup(name))?;
+            } else {
+                let alias = self.module.strings.lookup(alias);
+                let name = self.module.strings.lookup(name);
+                serializer.serialize_element(&(alias, name))?;
+            }
         }
 
         serializer.end()

@@ -1,10 +1,6 @@
-pub mod de;
-pub mod ser;
-
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
-use serde::de::DeserializeSeed;
 
 use crate::arch::PyComponent;
 
@@ -75,30 +71,34 @@ impl PyModule_ {
     }
 }
 
+#[allow(unused_variables)]
 #[pyfunction]
 pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
 
     let input = input.downcast::<PyString>()?;
     let json: serde_json::Value = map_serde_py_err!(serde_json::from_str(input.to_str()?))?;
-    let module_deserializer = de::ModuleDeserializer::new(py);
-    let module: Bound<'_, PyModule_> = map_serde_py_err!(module_deserializer.deserialize(json))?;
+    todo!()
+    // let module_deserializer = de::ModuleDeserializer::new(py);
+    // let module: Bound<'_, PyModule_> = map_serde_py_err!(module_deserializer.deserialize(json))?;
 
-    Ok(module.unbind())
+    // Ok(module.unbind())
 }
 
+#[allow(unused_variables)]
 #[pyfunction]
 pub fn json_dumps(
     py: Python<'_>,
     module: &Bound<'_, PyModule_>,
     pretty: bool,
 ) -> PyResult<Py<PyString>> {
-    let module_serializer = ser::PyModuleSerializer::new(module.clone());
-    let json = if pretty {
-        map_serde_py_err!(serde_json::to_string_pretty(&module_serializer))?
-    } else {
-        map_serde_py_err!(serde_json::to_string(&module_serializer))?
-    };
-    let json = PyString::new_bound(py, json.as_str());
-    Ok(json.into_py(py))
+    todo!()
+    // let module_serializer = ser::PyModuleSerializer::new(module.clone());
+    // let json = if pretty {
+    //     map_serde_py_err!(serde_json::to_string_pretty(&module_serializer))?
+    // } else {
+    //     map_serde_py_err!(serde_json::to_string(&module_serializer))?
+    // };
+    // let json = PyString::new_bound(py, json.as_str());
+    // Ok(json.into_py(py))
 }

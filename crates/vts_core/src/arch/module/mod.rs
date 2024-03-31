@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
 use crate::arch::{
-    component::{ComponentBuilder, ComponentData},
+    component::{ComponentBuilder, ComponentData, ComponentRef},
     port::PortData,
     port::PortId,
     ComponentId, StringId,
@@ -144,6 +144,53 @@ pub enum ModuleBuildError {
     },
 }
 
+pub trait Resolve {
+    fn resolve(
+        &self,
+        module: &Module,
+        component: ComponentId,
+    ) -> Result<(StringId, ComponentRef), ModuleBuildError>;
+}
+
+impl Resolve for StringId {
+    fn resolve(
+        &self,
+        module: &Module,
+        component: ComponentId,
+    ) -> Result<(StringId, ComponentRef), ModuleBuildError> {
+        if let Some(component) = module.components.get(self) {
+            let alias = module.component_db.lookup(*component).name;
+            Ok((alias, component.reference()))
+        } else {
+            let reference = module.strings.lookup(*self).to_string();
+            let component = module.component(component).name(module).to_string();
+            Err(ModuleBuildError::UndefinedReference {
+                component,
+                reference,
+            })
+        }
+    }
+}
+
+impl Resolve for (StringId, StringId) {
+    fn resolve(
+        &self,
+        module: &Module,
+        component: ComponentId,
+    ) -> Result<(StringId, ComponentRef), ModuleBuildError> {
+        if let Some(component) = module.components.get(&self.1) {
+            Ok((self.0, component.reference()))
+        } else {
+            let reference = module.strings.lookup(self.1).to_string();
+            let component = module.component(component).name(module).to_string();
+            Err(ModuleBuildError::UndefinedReference {
+                component,
+                reference,
+            })
+        }
+    }
+}
+
 impl ModuleBuilder {
     pub fn new() -> Self {
         let module = Module::new("");
@@ -154,59 +201,61 @@ impl ModuleBuilder {
         }
     }
 
-    pub fn name(&mut self, name: &str) -> &mut Self {
+    pub fn set_name(&mut self, name: &str) -> &mut Self {
         self.module.rename(name);
         self.name_is_set = true;
         self
     }
 
-    pub fn component(&mut self) -> ComponentBuilder<'_> {
+    pub fn add_component(&mut self) -> ComponentBuilder<'_> {
         ComponentBuilder::new(&mut self.module)
     }
 
-    pub fn resolve_references<I: Iterator<Item = StringId>>(
+    pub fn resolve_references<I, R>(
         &mut self,
         component: ComponentId,
         references: I,
-    ) -> Result<&mut Self, ModuleBuildError> {
-        let mut resolved = HashMap::with_capacity(references.size_hint().0);
-
+    ) -> Result<&mut Self, ModuleBuildError>
+    where
+        I: Iterator<Item = R>,
+        R: Resolve,
+    {
         let module = &mut self.module;
-        for name in references {
-            if let Some(reference) = module.components.get(&name) {
-                if resolved.insert(name, reference.reference()).is_some() {
-                    let reference = module.strings.lookup(name).to_string();
-                    let component = module.component(component).name(module).to_string();
-                    return Err(ModuleBuildError::DuplicateReference {
-                        component,
-                        reference,
-                    });
-                }
-            } else {
-                let reference = module.strings.lookup(name).to_string();
-                let component = module.component(component).name(module).to_string();
-                return Err(ModuleBuildError::UndefinedReference {
+
+        for reference in references {
+            let (alias, reference) = reference.resolve(module, component)?;
+            if module
+                .component_mut(component)
+                .references
+                .insert(alias, reference)
+                .is_some()
+            {
+                let component = module
+                    .component_db
+                    .lookup(component)
+                    .name(module)
+                    .to_string();
+                let reference = module.strings.lookup(alias).to_string();
+                return Err(ModuleBuildError::DuplicateReference {
                     component,
                     reference,
                 });
             }
         }
 
-        module.component_mut(component).references.extend(resolved);
-
         Ok(self)
     }
 
-    pub fn has_name(&self) -> bool {
+    pub fn is_name_set(&self) -> bool {
         self.name_is_set
     }
 
-    pub fn has_components(&self) -> bool {
-        !self.module.components.is_empty()
+    pub fn is_components_empty(&self) -> bool {
+        self.module.components.is_empty()
     }
 
     pub fn finish(self) -> Result<Module, ModuleBuildError> {
-        if !self.has_name() {
+        if !self.is_name_set() {
             return Err(ModuleBuildError::MissingField("name"));
         }
 

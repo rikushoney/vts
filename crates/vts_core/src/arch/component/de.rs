@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use serde::{
@@ -23,7 +23,7 @@ impl<'a, 'm> ComponentRefsDeserializer<'a, 'm> {
 }
 
 impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'a, 'm> {
-    type Value = ();
+    type Value = Vec<StringId>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -50,29 +50,94 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'a, 'm> {
                 };
 
                 while let Some(reference) = seq.next_element()? {
-                    let name = self.module.strings.entry(reference);
-                    if references.contains(&name) {
+                    let reference = self.module.strings.entry(reference);
+                    if references.contains(&reference) {
+                        let alias = self.module.strings.lookup(reference);
                         return Err(de::Error::custom(format!(
-                            r#"duplicate component reference "{reference}""#
+                            r#"duplicate component reference "{alias}""#
                         )));
                     }
 
-                    references.push(name);
+                    references.push(reference);
                 }
 
                 Ok(references)
             }
         }
 
-        let unresolved = deserializer.deserialize_seq(ComponentRefsVisitor {
-            module: self.builder.module,
-        })?;
+        // let unresolved = deserializer.deserialize_seq(ComponentRefsVisitor {
+        //     module: self.builder.module,
+        // })?;
 
-        for reference in unresolved {
-            self.builder.weak_reference(reference);
+        // for reference in unresolved {
+        //     let component = *reference.item_or_second();
+        //     let alias = reference.get_first().copied();
+        //     self.builder.weak_reference(component, alias);
+        // }
+
+        // Ok(())
+
+        deserializer.deserialize_seq(ComponentRefsVisitor {
+            module: self.builder.module,
+        })
+    }
+}
+
+pub(crate) struct ComponentNamedRefsDeserializer<'a, 'm> {
+    builder: &'a mut ComponentBuilder<'m>,
+}
+
+impl<'a, 'm> ComponentNamedRefsDeserializer<'a, 'm> {
+    pub(crate) fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
+        Self { builder }
+    }
+}
+
+impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentNamedRefsDeserializer<'a, 'm> {
+    type Value = HashMap<StringId, StringId>;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ComponentNamedRefsVisitor<'m> {
+            module: &'m mut Module,
         }
 
-        Ok(())
+        impl<'de, 'm> Visitor<'de> for ComponentNamedRefsVisitor<'m> {
+            type Value = HashMap<StringId, StringId>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list of component references")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut references = match seq.size_hint() {
+                    Some(size) => HashMap::with_capacity(size),
+                    None => HashMap::default(),
+                };
+
+                while let Some((alias, component)) = seq.next_element()? {
+                    let reference = self.module.strings.entry(alias);
+                    let component = self.module.strings.entry(component);
+
+                    if references.insert(reference, component).is_some() {
+                        return Err(de::Error::custom(format!(
+                            r#"duplicate component reference "{alias}""#
+                        )));
+                    }
+                }
+
+                Ok(references)
+            }
+        }
+
+        deserializer.deserialize_seq(ComponentNamedRefsVisitor {
+            module: self.builder.module,
+        })
     }
 }
 
@@ -88,7 +153,7 @@ impl<'m> ComponentDeserializer<'m> {
 }
 
 impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
-    type Value = (ComponentId, Vec<StringId>);
+    type Value = (ComponentId, HashSet<StringId>, HashMap<StringId, StringId>);
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -99,10 +164,10 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
             name: &'a str,
         }
 
-        const FIELDS: &[&str] = &["ports", "references", "class"];
+        const FIELDS: &[&str] = &["ports", "references", "named_references", "class"];
 
         impl<'a, 'de, 'm> Visitor<'de> for ComponentVisitor<'a, 'm> {
-            type Value = (ComponentId, Vec<StringId>);
+            type Value = (ComponentId, HashSet<StringId>, HashMap<StringId, StringId>);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a component description")
@@ -117,37 +182,64 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                 enum Field {
                     Ports,
                     References,
+                    #[serde(rename = "named_references")]
+                    NamedReferences,
                     Class,
                 }
 
                 let mut builder = ComponentBuilder::new(self.module);
-                builder.name(self.name);
+                builder.set_name(self.name);
 
-                while let Some(key) = map.next_key()? {
+                let mut ok = Ok(());
+                'outer: while let Some(key) = map.next_key()? {
                     match key {
                         Field::Ports => {
-                            if builder.has_ports() {
+                            if !builder.is_ports_empty() {
                                 return Err(de::Error::duplicate_field("ports"));
                             }
                             map.next_value_seed(PortsDeserializer::new(&mut builder))?;
                         }
                         Field::References => {
-                            if builder.has_unresolved_references() {
+                            if !builder.is_unresolved_references_empty() {
                                 return Err(de::Error::duplicate_field("references"));
                             }
-                            map.next_value_seed(ComponentRefsDeserializer::new(&mut builder))?;
+                            for reference in
+                                map.next_value_seed(ComponentRefsDeserializer::new(&mut builder))?
+                            {
+                                ok = builder.add_weak_reference(reference, None).map(|_| ());
+                                if ok.is_err() {
+                                    break 'outer;
+                                }
+                            }
+                        }
+                        Field::NamedReferences => {
+                            if !builder.is_unresolved_named_references_empty() {
+                                return Err(de::Error::duplicate_field("named references"));
+                            }
+                            for (alias, component) in map.next_value_seed(
+                                ComponentNamedRefsDeserializer::new(&mut builder),
+                            )? {
+                                ok = builder
+                                    .add_weak_reference(component, Some(alias))
+                                    .map(|_| ());
+                                if ok.is_err() {
+                                    break 'outer;
+                                }
+                            }
                         }
                         Field::Class => {
-                            if builder.has_class() {
+                            if builder.is_class_set() {
                                 return Err(de::Error::duplicate_field("class"));
                             }
-                            builder.class(map.next_value()?);
+                            builder.set_class(map.next_value()?);
                         }
                     }
                 }
 
-                let (component, references) = match builder.finish() {
-                    Ok((component, references)) => (component, references),
+                let (component, references, named_references) = match ok.and(builder.finish()) {
+                    Ok((component, references, named_references)) => {
+                        (component, references, named_references)
+                    }
                     Err(err) => match err {
                         ComponentBuildError::DuplicateComponent { module, component } => {
                             return Err(de::Error::custom(format!(
@@ -155,7 +247,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                             )))
                         }
                         ComponentBuildError::DuplicateReference { .. } => {
-                            unreachable!("duplicate references should be handled by ComponentRefsDeserializer")
+                            unreachable!("duplicate references should be handled by ComponentRefsDeserializer/ComponentNamedRefsDeserializer")
                         }
                         ComponentBuildError::MissingField(name) => {
                             return Err(de::Error::missing_field(name));
@@ -163,7 +255,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                     },
                 };
 
-                Ok((component, references))
+                Ok((component, references, named_references))
             }
         }
 
@@ -189,7 +281,7 @@ impl<'m> ComponentsDeserializer<'m> {
 }
 
 impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
-    type Value = HashMap<ComponentId, Vec<StringId>>;
+    type Value = HashMap<ComponentId, (HashSet<StringId>, HashMap<StringId, StringId>)>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -200,7 +292,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
         }
 
         impl<'de, 'm> Visitor<'de> for ComponentsVisitor<'m> {
-            type Value = HashMap<ComponentId, Vec<StringId>>;
+            type Value = HashMap<ComponentId, (HashSet<StringId>, HashMap<StringId, StringId>)>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a map of component descriptions")
@@ -216,9 +308,9 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
                 };
 
                 while let Some(name) = map.next_key()? {
-                    let (component, references) =
+                    let (component, references, named_references) =
                         map.next_value_seed(ComponentDeserializer::new(self.module, name))?;
-                    component_refs.insert(component, references);
+                    component_refs.insert(component, (references, named_references));
                 }
 
                 Ok(component_refs)

@@ -1,6 +1,3 @@
-pub mod de;
-pub mod ser;
-
 use std::ops::Range;
 
 use pyo3::prelude::*;

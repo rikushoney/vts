@@ -43,13 +43,13 @@ impl<'de> Deserialize<'de> for Module {
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Name => {
-                            if builder.has_name() {
+                            if builder.is_name_set() {
                                 return Err(de::Error::duplicate_field("name"));
                             }
-                            builder.name(map.next_value()?);
+                            builder.set_name(map.next_value()?);
                         }
                         Field::Components => {
-                            if builder.has_components() {
+                            if !builder.is_components_empty() {
                                 return Err(de::Error::duplicate_field("components"));
                             }
                             unresolved = map.next_value_seed(ComponentsDeserializer::new(
@@ -61,8 +61,13 @@ impl<'de> Deserialize<'de> for Module {
 
                 let mut ok = Ok(());
                 for (component, references) in unresolved {
-                    let references = references.into_iter();
+                    let (references, named_references) =
+                        (references.0.into_iter(), references.1.into_iter());
                     if let Err(err) = builder.resolve_references(component, references) {
+                        ok = Err(err);
+                        break;
+                    }
+                    if let Err(err) = builder.resolve_references(component, named_references) {
                         ok = Err(err);
                         break;
                     }

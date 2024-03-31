@@ -67,27 +67,27 @@ impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'m> {
                 }
 
                 let mut builder = PortBuilder::new(self.module, self.component);
-                builder.name(self.name);
+                builder.set_name(self.name);
 
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Kind => {
-                            if builder.has_kind() {
+                            if builder.is_kind_set() {
                                 return Err(de::Error::duplicate_field("kind"));
                             }
-                            builder.kind(map.next_value()?);
+                            builder.set_kind(map.next_value()?);
                         }
                         Field::Npins => {
-                            if builder.has_n_pins() {
+                            if builder.is_n_pins_set() {
                                 return Err(de::Error::duplicate_field("n_pins"));
                             }
-                            builder.n_pins(map.next_value()?);
+                            builder.set_n_pins(map.next_value()?);
                         }
                         Field::Class => {
-                            if builder.has_class() {
+                            if builder.is_class_set() {
                                 return Err(de::Error::duplicate_field("class"));
                             }
-                            builder.class(map.next_value()?);
+                            builder.set_class(map.next_value()?);
                         }
                     }
                 }

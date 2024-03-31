@@ -1,7 +1,7 @@
 pub mod de;
 pub mod ser;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 
 use serde::{Deserialize, Serialize};
@@ -88,6 +88,7 @@ impl ComponentData {
         self.name = name;
     }
 
+    #[deprecated]
     pub fn port<'m>(&self, module: &'m Module, port: PortId) -> &'m PortData {
         assert!(
             self.ports.values().any(|p| p == &port),
@@ -98,6 +99,7 @@ impl ComponentData {
         module.get_data(port)
     }
 
+    #[deprecated]
     pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: PortId) -> &'m mut PortData {
         assert!(
             self.ports.values().any(|p| p == &port),
@@ -147,7 +149,8 @@ impl Connection {
 pub struct ComponentBuilder<'m> {
     pub(crate) module: &'m mut Module,
     pub(crate) data: ComponentData,
-    unresolved_references: Vec<StringId>,
+    unresolved_references: HashSet<StringId>,
+    unresolved_named_references: HashMap<StringId, StringId>,
     name_is_set: bool,
 }
 
@@ -163,30 +166,35 @@ pub enum ComponentBuildError {
     MissingField(&'static str),
 }
 
+pub type ComponentBuildResult =
+    Result<(ComponentId, HashSet<StringId>, HashMap<StringId, StringId>), ComponentBuildError>;
+
 impl<'m> ComponentBuilder<'m> {
     pub fn new(module: &'m mut Module) -> Self {
         let data = ComponentData::new(module, "", None);
-        let unresolved_references = Vec::new();
+        let unresolved_references = HashSet::new();
+        let unresolved_named_references = HashMap::new();
 
         Self {
             module,
             data,
             unresolved_references,
+            unresolved_named_references,
             name_is_set: false,
         }
     }
 
-    pub fn name(&mut self, name: &str) -> &mut Self {
+    pub fn set_name(&mut self, name: &str) -> &mut Self {
         self.data.rename(self.module, name);
         self.name_is_set = true;
         self
     }
 
-    pub fn port(&mut self) -> PortBuilder<'_> {
+    pub fn add_port(&mut self) -> PortBuilder<'_> {
         PortBuilder::new(self.module, &mut self.data)
     }
 
-    pub fn reference(
+    pub fn add_reference(
         &mut self,
         component: ComponentId,
         alias: Option<&str>,
@@ -213,38 +221,67 @@ impl<'m> ComponentBuilder<'m> {
         }
     }
 
-    pub fn weak_reference(&mut self, component: StringId) -> &mut Self {
-        self.unresolved_references.push(component);
-        self
+    pub fn add_weak_reference(
+        &mut self,
+        component: StringId,
+        alias: Option<StringId>,
+    ) -> Result<&mut Self, ComponentBuildError> {
+        if let Some(alias) = alias {
+            if self
+                .unresolved_named_references
+                .insert(alias, component)
+                .is_some()
+            {
+                let parent = self.module.strings.lookup(self.data.name).to_string();
+                let reference = self.module.strings.lookup(alias).to_string();
+                return Err(ComponentBuildError::DuplicateReference {
+                    component: parent,
+                    reference,
+                });
+            }
+        } else if !self.unresolved_references.insert(component) {
+            let parent = self.module.strings.lookup(self.data.name).to_string();
+            let reference = self.module.strings.lookup(component).to_string();
+            return Err(ComponentBuildError::DuplicateReference {
+                component: parent,
+                reference,
+            });
+        }
+
+        Ok(self)
     }
 
-    pub fn class(&mut self, class: ComponentClass) -> &mut Self {
+    pub fn set_class(&mut self, class: ComponentClass) -> &mut Self {
         self.data.class = Some(class);
         self
     }
 
-    pub fn has_name(&self) -> bool {
+    pub fn is_name_set(&self) -> bool {
         self.name_is_set
     }
 
-    pub fn has_ports(&self) -> bool {
-        !self.data.ports.is_empty()
+    pub fn is_ports_empty(&self) -> bool {
+        self.data.ports.is_empty()
     }
 
-    pub fn has_references(&self) -> bool {
-        !self.data.references.is_empty()
+    pub fn is_references_empty(&self) -> bool {
+        self.data.references.is_empty()
     }
 
-    pub fn has_unresolved_references(&self) -> bool {
-        !self.unresolved_references.is_empty()
+    pub fn is_unresolved_references_empty(&self) -> bool {
+        self.unresolved_references.is_empty()
     }
 
-    pub fn has_class(&self) -> bool {
+    pub fn is_unresolved_named_references_empty(&self) -> bool {
+        self.unresolved_named_references.is_empty()
+    }
+
+    pub fn is_class_set(&self) -> bool {
         self.data.class.is_some()
     }
 
-    pub fn finish(self) -> Result<(ComponentId, Vec<StringId>), ComponentBuildError> {
-        if !self.has_name() {
+    pub fn finish(self) -> ComponentBuildResult {
+        if !self.is_name_set() {
             return Err(ComponentBuildError::MissingField("name"));
         }
 
@@ -266,6 +303,10 @@ impl<'m> ComponentBuilder<'m> {
             self.module.components.contains_key(&name)
         });
 
-        Ok((component, self.unresolved_references))
+        Ok((
+            component,
+            self.unresolved_references,
+            self.unresolved_named_references,
+        ))
     }
 }

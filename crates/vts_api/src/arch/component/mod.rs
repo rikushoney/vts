@@ -1,6 +1,3 @@
-pub mod de;
-pub mod ser;
-
 use std::ops::Deref;
 
 use pyo3::exceptions::PyValueError;

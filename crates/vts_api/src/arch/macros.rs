@@ -31,17 +31,17 @@ macro_rules! iter_mapping_items {
     };
 }
 
-macro_rules! map_py_de_err {
-    ($expr:expr) => {
-        ($expr).map_err(|err| de::Error::custom(err.to_string()))
-    };
-}
+// macro_rules! map_py_de_err {
+//     ($expr:expr) => {
+//         ($expr).map_err(|err| de::Error::custom(err.to_string()))
+//     };
+// }
 
-macro_rules! map_py_ser_err {
-    ($expr:expr) => {
-        ($expr).map_err(|err| ser::Error::custom(err.to_string()))
-    };
-}
+// macro_rules! map_py_ser_err {
+//     ($expr:expr) => {
+//         ($expr).map_err(|err| ser::Error::custom(err.to_string()))
+//     };
+// }
 
 macro_rules! map_serde_py_err {
     ($expr:expr) => {

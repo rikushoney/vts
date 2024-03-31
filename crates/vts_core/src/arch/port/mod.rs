@@ -138,9 +138,9 @@ pub struct PortBuilder<'m> {
     module: &'m mut Module,
     parent: &'m mut ComponentData,
     data: PortData,
-    is_name_set: bool,
-    is_kind_set: bool,
-    is_n_pins_set: bool,
+    name_is_set: bool,
+    kind_is_set: bool,
+    n_pins_is_set: bool,
 }
 
 pub enum PortBuildError {
@@ -156,57 +156,57 @@ impl<'m> PortBuilder<'m> {
             module,
             parent,
             data,
-            is_name_set: false,
-            is_kind_set: false,
-            is_n_pins_set: false,
+            name_is_set: false,
+            kind_is_set: false,
+            n_pins_is_set: false,
         }
     }
 
-    pub fn name(&mut self, name: &str) -> &mut Self {
+    pub fn set_name(&mut self, name: &str) -> &mut Self {
         self.data.rename(self.module, name);
-        self.is_name_set = true;
+        self.name_is_set = true;
         self
     }
 
-    pub fn kind(&mut self, kind: PortKind) -> &mut Self {
+    pub fn set_kind(&mut self, kind: PortKind) -> &mut Self {
         self.data.kind = kind;
-        self.is_kind_set = true;
+        self.kind_is_set = true;
         self
     }
 
-    pub fn n_pins(&mut self, n_pins: usize) -> &mut Self {
+    pub fn set_n_pins(&mut self, n_pins: usize) -> &mut Self {
         self.data.n_pins = n_pins;
-        self.is_n_pins_set = true;
+        self.n_pins_is_set = true;
         self
     }
 
-    pub fn class(&mut self, class: PortClass) -> &mut Self {
+    pub fn set_class(&mut self, class: PortClass) -> &mut Self {
         self.data.class = Some(class);
         self
     }
 
-    pub fn has_name(&self) -> bool {
-        self.is_name_set
+    pub fn is_name_set(&self) -> bool {
+        self.name_is_set
     }
 
-    pub fn has_kind(&self) -> bool {
-        self.is_kind_set
+    pub fn is_kind_set(&self) -> bool {
+        self.kind_is_set
     }
 
-    pub fn has_n_pins(&self) -> bool {
-        self.is_n_pins_set
+    pub fn is_n_pins_set(&self) -> bool {
+        self.n_pins_is_set
     }
 
-    pub fn has_class(&self) -> bool {
+    pub fn is_class_set(&self) -> bool {
         self.data.class.is_some()
     }
 
     pub fn finish(self) -> Result<PortId, PortBuildError> {
-        if !self.has_name() {
+        if !self.is_name_set() {
             return Err(PortBuildError::MissingField("name"));
         }
 
-        if !self.has_kind() {
+        if !self.is_kind_set() {
             return Err(PortBuildError::MissingField("kind"));
         }
 
