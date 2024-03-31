@@ -4,7 +4,12 @@ pub mod ser;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
-use crate::arch::{component::ComponentData, port::PortData, port::PortId, ComponentId, StringId};
+use crate::arch::{
+    component::{ComponentBuilder, ComponentData},
+    port::PortData,
+    port::PortId,
+    ComponentId, StringId,
+};
 use crate::{database::Database, stringtable::StringTable, OpaqueKey};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -37,7 +42,7 @@ impl Module {
         self.strings.lookup(self.name)
     }
 
-    pub fn set_name(&mut self, name: &str) {
+    pub fn rename(&mut self, name: &str) {
         self.name = self.strings.entry(name);
     }
 
@@ -113,6 +118,96 @@ impl<I: DataId> Index<I> for Module {
 impl<I: DataId> IndexMut<I> for Module {
     fn index_mut(&mut self, id: I) -> &mut Self::Output {
         I::get_data_mut(self, id)
+    }
+}
+
+pub struct ModuleBuilder {
+    module: Module,
+    name_is_set: bool,
+}
+
+pub enum ModuleBuildError {
+    DuplicateReference {
+        component: String,
+        reference: String,
+    },
+    MissingField(&'static str),
+    UndefinedReference {
+        component: String,
+        reference: String,
+    },
+}
+
+impl ModuleBuilder {
+    pub fn new() -> Self {
+        let module = Module::new("");
+
+        Self {
+            module,
+            name_is_set: false,
+        }
+    }
+
+    pub fn name(&mut self, name: &str) -> &mut Self {
+        self.module.rename(name);
+        self.name_is_set = true;
+        self
+    }
+
+    pub fn component(&mut self) -> ComponentBuilder<'_> {
+        ComponentBuilder::new(&mut self.module)
+    }
+
+    pub fn resolve_references<I: Iterator<Item = StringId>>(
+        &mut self,
+        component: ComponentId,
+        references: I,
+    ) -> Result<&mut Self, ModuleBuildError> {
+        let mut resolved = HashMap::with_capacity(references.size_hint().0);
+
+        let module = &mut self.module;
+        for name in references {
+            if let Some(reference) = module.components.get(&name) {
+                if resolved.insert(name, reference.reference()).is_some() {
+                    let reference = module.strings.lookup(name).to_string();
+                    let component = module.component(component).name(&module).to_string();
+                    return Err(ModuleBuildError::DuplicateReference {
+                        component,
+                        reference,
+                    });
+                }
+            } else {
+                let reference = module.strings.lookup(name).to_string();
+                let component = module.component(component).name(&module).to_string();
+                return Err(ModuleBuildError::UndefinedReference {
+                    component,
+                    reference,
+                });
+            }
+        }
+
+        module
+            .component_mut(component)
+            .references
+            .extend(resolved.into_iter());
+
+        Ok(self)
+    }
+
+    pub fn has_name(&self) -> bool {
+        self.name_is_set
+    }
+
+    pub fn has_components(&self) -> bool {
+        !self.module.components.is_empty()
+    }
+
+    pub fn finish(self) -> Result<Module, ModuleBuildError> {
+        if !self.has_name() {
+            return Err(ModuleBuildError::MissingField("name"));
+        }
+
+        Ok(self.module)
     }
 }
 

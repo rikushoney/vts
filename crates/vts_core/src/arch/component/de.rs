@@ -7,21 +7,23 @@ use serde::{
 };
 
 use crate::arch::{
-    component::ComponentData, port::de::PortsDeserializer, ComponentId, Module, StringId,
+    component::{ComponentBuildError, ComponentBuilder},
+    port::de::PortsDeserializer,
+    ComponentId, Module, StringId,
 };
 
-pub(crate) struct ComponentRefsDeserializer<'m> {
-    module: &'m mut Module,
+pub(crate) struct ComponentRefsDeserializer<'a, 'm> {
+    builder: &'a mut ComponentBuilder<'m>,
 }
 
-impl<'m> ComponentRefsDeserializer<'m> {
-    pub(crate) fn new(module: &'m mut Module) -> Self {
-        Self { module }
+impl<'a, 'm> ComponentRefsDeserializer<'a, 'm> {
+    pub(crate) fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
+        Self { builder }
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'m> {
-    type Value = Vec<StringId>;
+impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'a, 'm> {
+    type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -50,9 +52,9 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'m> {
                 while let Some(reference) = seq.next_element()? {
                     let name = self.module.strings.entry(reference);
                     if references.contains(&name) {
-                        return Err(de::Error::custom(
-                            format!(r#"duplicate component reference "{reference}""#).as_str(),
-                        ));
+                        return Err(de::Error::custom(format!(
+                            r#"duplicate component reference "{reference}""#
+                        )));
                     }
 
                     references.push(name);
@@ -62,9 +64,15 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'m> {
             }
         }
 
-        deserializer.deserialize_seq(ComponentRefsVisitor {
-            module: self.module,
-        })
+        let unresolved = deserializer.deserialize_seq(ComponentRefsVisitor {
+            module: self.builder.module,
+        })?;
+
+        for reference in unresolved {
+            self.builder.weak_reference(reference);
+        }
+
+        Ok(())
     }
 }
 
@@ -112,63 +120,50 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                     Class,
                 }
 
-                let mut ports = false;
-                let mut references: Option<Vec<StringId>> = None;
-                let mut class = false;
-
-                let mut component = ComponentData::new(self.module, self.name, None);
+                let mut builder = ComponentBuilder::new(self.module);
+                builder.name(self.name);
 
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Ports => {
-                            if ports {
+                            if builder.has_ports() {
                                 return Err(de::Error::duplicate_field("ports"));
                             }
-                            map.next_value_seed(PortsDeserializer::new(
-                                self.module,
-                                &mut component,
-                            ))?;
-                            ports = true;
+                            map.next_value_seed(PortsDeserializer::new(&mut builder))?;
                         }
                         Field::References => {
-                            if references.is_some() {
+                            if builder.has_references() {
                                 return Err(de::Error::duplicate_field("references"));
                             }
-                            references = Some(
-                                map.next_value_seed(ComponentRefsDeserializer::new(self.module))?,
-                            );
+                            map.next_value_seed(ComponentRefsDeserializer::new(&mut builder))?;
                         }
                         Field::Class => {
-                            if class {
+                            if builder.has_class() {
                                 return Err(de::Error::duplicate_field("class"));
                             }
-                            component.class = Some(map.next_value()?);
-                            class = true;
+                            builder.class(map.next_value()?);
                         }
                     }
                 }
 
-                let name = component.name;
-                let component = self.module.component_db.entry(component);
+                let (component, references) = match builder.finish() {
+                    Ok((component, references)) => (component, references),
+                    Err(err) => match err {
+                        ComponentBuildError::DuplicateComponent { module, component } => {
+                            return Err(de::Error::custom(format!(
+                                r#"component "{component}" already in module "{module}""#,
+                            )))
+                        }
+                        ComponentBuildError::DuplicateReference { .. } => {
+                            unreachable!("duplicate references should be handled by ComponentRefsDeserializer")
+                        }
+                        ComponentBuildError::MissingField(name) => {
+                            return Err(de::Error::missing_field(name));
+                        }
+                    },
+                };
 
-                assert!(
-                    self.module.components.insert(name, component).is_none(),
-                    r#"component "{component}" already in module "{module}""#,
-                    component = self.module.strings.lookup(name),
-                    module = self.module.strings.lookup(name),
-                );
-
-                debug_assert!(self.module.components.values().any(|c| c == &component));
-                debug_assert!({
-                    let name = self
-                        .module
-                        .strings
-                        .rlookup(self.module.component(component).name(self.module))
-                        .expect("component name should be in module strings");
-                    self.module.components.contains_key(&name)
-                });
-
-                Ok((component, references.unwrap_or_default()))
+                Ok((component, references))
             }
         }
 

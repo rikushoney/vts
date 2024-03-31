@@ -6,7 +6,11 @@ use serde::{
     Deserialize, Deserializer,
 };
 
-use crate::arch::{component::de::ComponentsDeserializer, Module};
+use crate::arch::{
+    component::de::ComponentsDeserializer,
+    module::{ModuleBuildError, ModuleBuilder},
+    Module,
+};
 
 impl<'de> Deserialize<'de> for Module {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -33,66 +37,52 @@ impl<'de> Deserialize<'de> for Module {
                     Components,
                 }
 
-                let mut module = Module::new("");
-
-                let mut name = false;
-                let mut components = None;
+                let mut builder = ModuleBuilder::new();
+                let mut unresolved = HashMap::default();
 
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Name => {
-                            if name {
+                            if builder.has_name() {
                                 return Err(de::Error::duplicate_field("name"));
                             }
-                            module.set_name(map.next_value()?);
-                            name = true;
+                            builder.name(map.next_value()?);
                         }
                         Field::Components => {
-                            if components.is_some() {
+                            if builder.has_components() {
                                 return Err(de::Error::duplicate_field("components"));
                             }
-                            components = Some(
-                                map.next_value_seed(ComponentsDeserializer::new(&mut module))?,
-                            );
+                            unresolved = map.next_value_seed(ComponentsDeserializer::new(
+                                &mut builder.module,
+                            ))?;
                         }
                     }
                 }
 
-                if !name {
-                    return Err(de::Error::missing_field("name"));
-                }
-
-                if let Some(components) = components {
-                    for (component, references) in components {
-                        let mut resolved = HashMap::with_capacity(references.len());
-                        for name in references {
-                            if let Some(reference) = module.components.get(&name) {
-                                assert!(
-                                    resolved.insert(name, reference.reference()).is_none(),
-                                    r#"component "{reference}" already referenced in "{component}""#,
-                                    reference = module.strings.lookup(name),
-                                    component = module.component(component).name(&module)
-                                );
-                            } else {
-                                return Err(de::Error::custom(
-                                    format!(
-                                        r#"undefined component "{reference}" referenced in "{component}""#,
-                                        reference = module.strings.lookup(name),
-                                        component = module.component(component).name(&module)
-                                    )
-                                    .as_str(),
-                                ));
-                            }
-                        }
-
-                        module
-                            .component_mut(component)
-                            .references
-                            .extend(resolved.into_iter());
+                let mut ok = Ok(());
+                for (component, references) in unresolved {
+                    let references = references.into_iter();
+                    if let Err(err) = builder.resolve_references(component, references) {
+                        ok = Err(err);
+                        break;
                     }
                 }
 
-                Ok(module)
+                ok.and(builder.finish()).map_err(|err| match err {
+                    ModuleBuildError::MissingField(name) => de::Error::missing_field(name),
+                    ModuleBuildError::DuplicateReference {
+                        component,
+                        reference,
+                    } => de::Error::custom(format!(
+                        r#"component "{reference}" already referenced in "{component}""#,
+                    )),
+                    ModuleBuildError::UndefinedReference {
+                        component,
+                        reference,
+                    } => de::Error::custom(format!(
+                        r#"undefined component "{reference}" referenced in "{component}""#,
+                    )),
+                })
             }
         }
 

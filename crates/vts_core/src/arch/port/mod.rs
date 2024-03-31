@@ -133,3 +133,102 @@ impl PinRange {
         Self { port, range }
     }
 }
+
+pub struct PortBuilder<'m> {
+    module: &'m mut Module,
+    parent: &'m mut ComponentData,
+    data: PortData,
+    is_name_set: bool,
+    is_kind_set: bool,
+    is_n_pins_set: bool,
+}
+
+pub enum PortBuildError {
+    DuplicatePort { module: String, port: String },
+    MissingField(&'static str),
+}
+
+impl<'m> PortBuilder<'m> {
+    pub fn new(module: &'m mut Module, parent: &'m mut ComponentData) -> Self {
+        let data = PortData::new(module, parent, "", PortKind::Input, 1, None);
+
+        Self {
+            module,
+            parent,
+            data,
+            is_name_set: false,
+            is_kind_set: false,
+            is_n_pins_set: false,
+        }
+    }
+
+    pub fn name(&mut self, name: &str) -> &mut Self {
+        self.data.rename(self.module, name);
+        self.is_name_set = true;
+        self
+    }
+
+    pub fn kind(&mut self, kind: PortKind) -> &mut Self {
+        self.data.kind = kind;
+        self.is_kind_set = true;
+        self
+    }
+
+    pub fn n_pins(&mut self, n_pins: usize) -> &mut Self {
+        self.data.n_pins = n_pins;
+        self.is_n_pins_set = true;
+        self
+    }
+
+    pub fn class(&mut self, class: PortClass) -> &mut Self {
+        self.data.class = Some(class);
+        self
+    }
+
+    pub fn has_name(&self) -> bool {
+        self.is_name_set
+    }
+
+    pub fn has_kind(&self) -> bool {
+        self.is_kind_set
+    }
+
+    pub fn has_n_pins(&self) -> bool {
+        self.is_n_pins_set
+    }
+
+    pub fn has_class(&self) -> bool {
+        self.data.class.is_some()
+    }
+
+    pub fn finish(self) -> Result<PortId, PortBuildError> {
+        if !self.has_name() {
+            return Err(PortBuildError::MissingField("name"));
+        }
+
+        if !self.has_kind() {
+            return Err(PortBuildError::MissingField("kind"));
+        }
+
+        let name = self.data.name;
+        let port = self.module.port_db.entry(self.data);
+
+        if self.parent.ports.insert(name, port).is_some() {
+            let port = self.module.strings.lookup(name).to_string();
+            let module = self.module.strings.lookup(self.module.name).to_string();
+
+            return Err(PortBuildError::DuplicatePort { module, port });
+        }
+
+        debug_assert!({
+            let name = self
+                .module
+                .strings
+                .rlookup(self.parent.port(self.module, port).name(self.module))
+                .expect("port name should be in module strings");
+            self.parent.ports.contains_key(&name)
+        });
+
+        Ok(port)
+    }
+}
