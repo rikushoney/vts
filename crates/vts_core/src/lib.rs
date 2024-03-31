@@ -5,7 +5,7 @@ mod database;
 mod stringtable;
 pub mod yosys;
 
-pub trait OpaqueKey {
+pub trait OpaqueKey: Copy {
     fn as_index(&self) -> usize;
 
     fn from_index(idx: usize) -> Self;

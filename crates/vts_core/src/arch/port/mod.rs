@@ -58,8 +58,8 @@ impl PortData {
         assert!(
             parent.ports.get(&name).is_none(),
             r#"port "{port}" already in component "{component}""#,
-            port = module.strings.lookup(name),
-            component = module.strings.lookup(parent.name),
+            port = &module.strings[name],
+            component = &module.strings[parent.name],
         );
 
         let parent = *module
@@ -77,17 +77,17 @@ impl PortData {
     }
 
     pub fn name<'m>(&'m self, module: &'m Module) -> &str {
-        module.strings.lookup(self.name)
+        &module.strings[self.name]
     }
 
     pub fn rename<'m>(&'m mut self, module: &'m mut Module, name: &str) {
         let name = module.strings.entry(name);
-        let parent = module.component_mut(self.parent);
+        let parent = &mut module[self.parent];
         assert!(
             parent.ports.get(&name).is_none(),
             r#"component "{component}" already in module "{module}""#,
-            component = module.strings.lookup(name),
-            module = module.strings.lookup(module.name),
+            component = &module.strings[name],
+            module = &module.strings[module.name],
         );
 
         let port = parent
@@ -112,7 +112,7 @@ pub struct Port<'m> {
 
 impl<'m> Port<'m> {
     fn new(module: &'m Module, id: PortId) -> Self {
-        let data = module.port_db.lookup(id);
+        let data = &module.port_db[id];
 
         Self { module, id, data }
     }
@@ -214,8 +214,8 @@ impl<'m> PortBuilder<'m> {
         let port = self.module.port_db.entry(self.data);
 
         if self.parent.ports.insert(name, port).is_some() {
-            let port = self.module.strings.lookup(name).to_string();
-            let module = self.module.strings.lookup(self.module.name).to_string();
+            let port = self.module.strings[name].to_string();
+            let module = self.module.strings[self.module.name].to_string();
 
             return Err(PortBuildError::DuplicatePort { module, port });
         }
@@ -224,7 +224,7 @@ impl<'m> PortBuilder<'m> {
             let name = self
                 .module
                 .strings
-                .rlookup(self.parent.port(self.module, port).name(self.module))
+                .rlookup(self.module[port].name(self.module))
                 .expect("port name should be in module strings");
             self.parent.ports.contains_key(&name)
         });

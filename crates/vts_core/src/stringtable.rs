@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use fnv::FnvHashMap as HashMap;
 
 use crate::OpaqueKey;
@@ -22,13 +24,13 @@ pub struct StringTable<I = u32> {
 
 const DEFAULT_TABLE_CAPACITY: usize = 16;
 
-impl<I: Clone + TableKey> Default for StringTable<I> {
+impl<I: TableKey> Default for StringTable<I> {
     fn default() -> Self {
         Self::with_capacity(DEFAULT_TABLE_CAPACITY)
     }
 }
 
-impl<I: Clone + TableKey> StringTable<I> {
+impl<I: TableKey> StringTable<I> {
     pub fn with_capacity(capacity: usize) -> Self {
         let str_key_map = HashMap::default();
         let lookup_table = Vec::new();
@@ -44,8 +46,8 @@ impl<I: Clone + TableKey> StringTable<I> {
     }
 
     pub fn entry(&mut self, string: &str) -> I {
-        if let Some(interned) = self.str_key_map.get(string) {
-            return interned.clone();
+        if let Some(&interned) = self.str_key_map.get(string) {
+            return interned;
         }
 
         assert!(self.lookup_table.len() < I::max_index());
@@ -53,14 +55,13 @@ impl<I: Clone + TableKey> StringTable<I> {
         // SAFETY: `interned` is not shared outside of `self` as 'static
         let interned = unsafe { self.alloc(string) };
         let key = I::from_index(self.lookup_table.len());
-        self.str_key_map.insert(interned, key.clone());
+        self.str_key_map.insert(interned, key);
         self.lookup_table.push(interned);
 
         key
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    pub fn lookup<'a>(&'a self, key: I) -> &'a str {
+    fn lookup(&self, key: I) -> &str {
         let key = key.as_index();
         assert!(key <= self.lookup_table.len());
 
@@ -93,6 +94,14 @@ impl<I: Clone + TableKey> StringTable<I> {
     }
 }
 
+impl<I: TableKey> Index<I> for StringTable<I> {
+    type Output = str;
+
+    fn index(&self, index: I) -> &Self::Output {
+        self.lookup(index)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,16 +111,16 @@ mod tests {
         let mut table = StringTable::<u32>::with_capacity(1);
         let id1 = table.entry("test");
         let id2 = table.entry("test2");
-        assert_eq!(table.lookup(id1), "test");
-        assert_eq!(table.lookup(id2), "test2");
+        assert_eq!(&table[id1], "test");
+        assert_eq!(&table[id2], "test2");
 
         let id1_copy = table.entry("test");
         assert_eq!(id1, id1_copy);
         assert_ne!(id1, id2);
 
         let id3 = table.entry("test3");
-        assert_eq!(table.lookup(id3), "test3");
-        assert_eq!(table.lookup(id1), "test");
-        assert_eq!(table.lookup(id2), "test2");
+        assert_eq!(&table[id3], "test3");
+        assert_eq!(&table[id1], "test");
+        assert_eq!(&table[id2], "test2");
     }
 }

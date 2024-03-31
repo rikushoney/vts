@@ -56,8 +56,8 @@ impl<'m> Serialize for PortsSerializer<'m> {
         let mut serializer = serializer.serialize_map(Some(self.ports.len()))?;
 
         for (name, port) in self.ports {
-            let name = self.module.strings.lookup(*name);
-            let port = self.module.port_db.lookup(*port);
+            let name = &self.module.strings[*name];
+            let port = &self.module.port_db[*port];
             serializer.serialize_entry(
                 name,
                 &PortSerializer {

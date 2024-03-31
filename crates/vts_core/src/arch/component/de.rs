@@ -52,7 +52,7 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'a, 'm> {
                 while let Some(reference) = seq.next_element()? {
                     let reference = self.module.strings.entry(reference);
                     if references.contains(&reference) {
-                        let alias = self.module.strings.lookup(reference);
+                        let alias = &self.module.strings[reference];
                         return Err(de::Error::custom(format!(
                             r#"duplicate component reference "{alias}""#
                         )));

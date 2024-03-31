@@ -10,7 +10,7 @@ use crate::arch::{
     port::PortId,
     ComponentId, StringId,
 };
-use crate::{database::Database, stringtable::StringTable, OpaqueKey};
+use crate::{database::Database, stringtable::StringTable};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Module {
@@ -39,85 +39,55 @@ impl Module {
     }
 
     pub fn name(&self) -> &str {
-        self.strings.lookup(self.name)
+        &self.strings[self.name]
     }
 
     pub fn rename(&mut self, name: &str) {
         self.name = self.strings.entry(name);
     }
 
-    pub fn component(&self, component: ComponentId) -> &ComponentData {
-        assert!(
-            self.components.values().any(|c| c == &component),
-            r#"component with id "{id}" not in module "{module}""#,
-            id = component.as_index(),
-            module = self.name()
-        );
-        self.get_data(component)
+    pub fn get_component(&self, component: ComponentId) -> Option<&ComponentData> {
+        if self.components.values().any(|c| c == &component) {
+            Some(&self[component])
+        } else {
+            None
+        }
     }
 
-    pub fn component_mut(&mut self, component: ComponentId) -> &mut ComponentData {
-        assert!(
-            self.components.values().any(|c| c == &component),
-            r#"component with id "{id}" not in module "{module}""#,
-            id = component.as_index(),
-            module = self.name()
-        );
-        self.get_data_mut(component)
-    }
-
-    pub fn get_data<T: DataId>(&self, id: T) -> &T::Data {
-        T::get_data(self, id)
-    }
-
-    pub fn get_data_mut<T: DataId>(&mut self, id: T) -> &mut T::Data {
-        T::get_data_mut(self, id)
+    pub fn get_component_mut(&mut self, component: ComponentId) -> Option<&mut ComponentData> {
+        if self.components.values().any(|c| c == &component) {
+            Some(&mut self[component])
+        } else {
+            None
+        }
     }
 }
 
-pub trait DataId {
-    type Data;
+impl Index<ComponentId> for Module {
+    type Output = ComponentData;
 
-    fn get_data(module: &Module, id: Self) -> &Self::Data;
-
-    fn get_data_mut(module: &mut Module, id: Self) -> &mut Self::Data;
-}
-
-impl DataId for PortId {
-    type Data = PortData;
-
-    fn get_data(module: &Module, id: Self) -> &Self::Data {
-        module.port_db.lookup(id)
-    }
-
-    fn get_data_mut(module: &mut Module, id: Self) -> &mut Self::Data {
-        module.port_db.lookup_mut(id)
+    fn index(&self, index: ComponentId) -> &Self::Output {
+        &self.component_db[index]
     }
 }
 
-impl DataId for ComponentId {
-    type Data = ComponentData;
-
-    fn get_data(module: &Module, id: Self) -> &Self::Data {
-        module.component_db.lookup(id)
-    }
-
-    fn get_data_mut(module: &mut Module, id: Self) -> &mut Self::Data {
-        module.component_db.lookup_mut(id)
+impl IndexMut<ComponentId> for Module {
+    fn index_mut(&mut self, index: ComponentId) -> &mut Self::Output {
+        &mut self.component_db[index]
     }
 }
 
-impl<I: DataId> Index<I> for Module {
-    type Output = I::Data;
+impl Index<PortId> for Module {
+    type Output = PortData;
 
-    fn index(&self, id: I) -> &Self::Output {
-        I::get_data(self, id)
+    fn index(&self, index: PortId) -> &Self::Output {
+        &self.port_db[index]
     }
 }
 
-impl<I: DataId> IndexMut<I> for Module {
-    fn index_mut(&mut self, id: I) -> &mut Self::Output {
-        I::get_data_mut(self, id)
+impl IndexMut<PortId> for Module {
+    fn index_mut(&mut self, index: PortId) -> &mut Self::Output {
+        &mut self.port_db[index]
     }
 }
 
@@ -159,11 +129,11 @@ impl Resolve for StringId {
         component: ComponentId,
     ) -> Result<(StringId, ComponentRef), ModuleBuildError> {
         if let Some(component) = module.components.get(self) {
-            let alias = module.component_db.lookup(*component).name;
+            let alias = module.component_db[*component].name;
             Ok((alias, component.reference()))
         } else {
-            let reference = module.strings.lookup(*self).to_string();
-            let component = module.component(component).name(module).to_string();
+            let reference = module.strings[*self].to_string();
+            let component = module[component].name(module).to_string();
             Err(ModuleBuildError::UndefinedReference {
                 component,
                 reference,
@@ -181,8 +151,8 @@ impl Resolve for (StringId, StringId) {
         if let Some(component) = module.components.get(&self.1) {
             Ok((self.0, component.reference()))
         } else {
-            let reference = module.strings.lookup(self.1).to_string();
-            let component = module.component(component).name(module).to_string();
+            let reference = module.strings[self.1].to_string();
+            let component = module[component].name(module).to_string();
             Err(ModuleBuildError::UndefinedReference {
                 component,
                 reference,
@@ -224,18 +194,13 @@ impl ModuleBuilder {
 
         for reference in references {
             let (alias, reference) = reference.resolve(module, component)?;
-            if module
-                .component_mut(component)
+            if module[component]
                 .references
                 .insert(alias, reference)
                 .is_some()
             {
-                let component = module
-                    .component_db
-                    .lookup(component)
-                    .name(module)
-                    .to_string();
-                let reference = module.strings.lookup(alias).to_string();
+                let component = module.component_db[component].name(module).to_string();
+                let reference = module.strings[alias].to_string();
                 return Err(ModuleBuildError::DuplicateReference {
                     component,
                     reference,

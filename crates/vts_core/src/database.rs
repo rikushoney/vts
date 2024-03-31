@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
+use std::slice;
 
 use crate::OpaqueKey;
 
-pub trait DbKey: Copy + Clone + OpaqueKey {}
+pub trait DbKey: OpaqueKey {}
 
 impl DbKey for u8 {}
 impl DbKey for u16 {}
@@ -22,27 +24,6 @@ const DEFAULT_DATABASE_CAPACITY: usize = 16;
 impl<T, I: DbKey> Default for Database<T, I> {
     fn default() -> Self {
         Self::with_capacity(DEFAULT_DATABASE_CAPACITY)
-    }
-}
-
-pub struct DatabaseIter<'a, T, I> {
-    iter: std::slice::Iter<'a, *const T>,
-    index: I,
-}
-
-impl<'a, T, I: DbKey> Iterator for DatabaseIter<'a, T, I> {
-    type Item = (I, &'a T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(&ptr) = self.iter.next() {
-            let index = self.index;
-            self.index = I::from_index(index.as_index() + 1);
-
-            // SAFETY: pointers in the database are valid for the lifetime of the database
-            Some((index, unsafe { &*ptr }))
-        } else {
-            None
-        }
     }
 }
 
@@ -84,7 +65,7 @@ impl<T, I: DbKey> Database<T, I> {
         id
     }
 
-    pub fn lookup(&self, id: I) -> &T {
+    fn lookup(&self, id: I) -> &T {
         let index = id.as_index();
         assert!(index < self.lookup_table.len());
         let ptr = self.lookup_table[index];
@@ -116,6 +97,73 @@ impl<T, I: DbKey> Database<T, I> {
     }
 }
 
+impl<T, I: DbKey> Index<I> for Database<T, I> {
+    type Output = T;
+
+    fn index(&self, index: I) -> &Self::Output {
+        self.lookup(index)
+    }
+}
+
+impl<T, I: DbKey> IndexMut<I> for Database<T, I> {
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        self.lookup_mut(index)
+    }
+}
+
+pub struct DatabaseIter<'a, T, I> {
+    iter: slice::Iter<'a, *const T>,
+    index: I,
+}
+
+impl<'a, T, I: DbKey> Iterator for DatabaseIter<'a, T, I> {
+    type Item = (I, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(&ptr) = self.iter.next() {
+            let index = self.index;
+            self.index = I::from_index(index.as_index() + 1);
+
+            // SAFETY: pointers in the database are valid for the lifetime of the database
+            Some((index, unsafe { &*ptr }))
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+pub struct DatabaseIterMut<'a, T, I> {
+    iter: slice::Iter<'a, *mut T>,
+    index: I,
+    _database: &'a mut Database<T, I>,
+}
+
+impl<'a, T, I: DbKey> Iterator for DatabaseIterMut<'a, T, I> {
+    type Item = (I, &'a mut T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(&ptr) = self.iter.next() {
+            let index = self.index;
+            self.index = I::from_index(index.as_index() + 1);
+
+            // SAFETY: pointers in the database are valid for the lifetime of the database
+            // we also have an exclusive reference to the database (via `_database`) which
+            // means is it safe to mutate values
+            Some((index, unsafe { &mut *ptr }))
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,12 +178,12 @@ mod tests {
         let mut db = Database::<Foo>::with_capacity(1);
         let test1 = db.entry(Foo { bar: 1 });
         let test2 = db.entry(Foo { bar: 2 });
-        assert_eq!(db.lookup(test1), &Foo { bar: 1 });
-        assert_eq!(db.lookup(test2), &Foo { bar: 2 });
+        assert_eq!(db[test1], Foo { bar: 1 });
+        assert_eq!(db[test2], Foo { bar: 2 });
 
         let test3 = db.entry(Foo { bar: 3 });
-        assert_eq!(db.lookup(test1), &Foo { bar: 1 });
-        assert_eq!(db.lookup(test2), &Foo { bar: 2 });
-        assert_eq!(db.lookup(test3), &Foo { bar: 3 });
+        assert_eq!(db[test1], Foo { bar: 1 });
+        assert_eq!(db[test2], Foo { bar: 2 });
+        assert_eq!(db[test3], Foo { bar: 3 });
     }
 }

@@ -26,9 +26,9 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
 
         for (alias, component) in self.references.iter() {
             let alias = *alias;
-            let name = self.module.component(component.0).name;
+            let name = self.module[component.0].name;
             if name == alias {
-                serializer.serialize_element(self.module.strings.lookup(name))?;
+                serializer.serialize_element(&self.module.strings[name])?;
             }
         }
 
@@ -50,10 +50,10 @@ impl<'a, 'm> Serialize for ComponentNamedRefsSerializer<'a, 'm> {
 
         for (alias, component) in self.references.iter() {
             let alias = *alias;
-            let name = self.module.component(component.0).name;
+            let name = self.module[component.0].name;
             if name != alias {
-                let alias = self.module.strings.lookup(alias);
-                let name = self.module.strings.lookup(name);
+                let alias = &self.module.strings[alias];
+                let name = &self.module.strings[name];
                 serializer.serialize_element(&(alias, name))?;
             }
         }
@@ -120,7 +120,7 @@ impl<'m> Serialize for ComponentsSerializer<'m> {
         let mut serializer = serializer.serialize_map(Some(self.components.len()))?;
 
         for (_id, component) in self.components.iter() {
-            let name = self.module.strings.lookup(component.name);
+            let name = &self.module.strings[component.name];
             serializer.serialize_entry(
                 name,
                 &ComponentSerializer {

@@ -49,8 +49,8 @@ impl ComponentData {
         assert!(
             module.components.get(&name).is_none(),
             r#"component "{component}" already in module "{module}""#,
-            component = module.strings.lookup(name),
-            module = module.strings.lookup(module.name)
+            component = &module.strings[name],
+            module = &module.strings[module.name]
         );
 
         let ports = HashMap::default();
@@ -67,7 +67,7 @@ impl ComponentData {
     }
 
     pub fn name<'m>(&'m self, module: &'m Module) -> &str {
-        module.strings.lookup(self.name)
+        &module.strings[self.name]
     }
 
     pub fn rename<'m>(&'m mut self, module: &'m mut Module, name: &str) {
@@ -75,8 +75,8 @@ impl ComponentData {
         assert!(
             module.components.get(&name).is_none(),
             r#"component "{component}" already in module "{module}""#,
-            component = module.strings.lookup(name),
-            module = module.strings.lookup(module.name)
+            component = &module.strings[name],
+            module = &module.strings[module.name]
         );
 
         let component = module
@@ -88,26 +88,24 @@ impl ComponentData {
         self.name = name;
     }
 
-    #[deprecated]
-    pub fn port<'m>(&self, module: &'m Module, port: PortId) -> &'m PortData {
-        assert!(
-            self.ports.values().any(|p| p == &port),
-            r#"port "{port}" not in component "{component}""#,
-            port = module.port_db.lookup(port).name(module),
-            component = self.name(module),
-        );
-        module.get_data(port)
+    pub fn get_port<'m>(&self, module: &'m Module, port: PortId) -> Option<&'m PortData> {
+        if self.ports.values().any(|p| p == &port) {
+            Some(&module[port])
+        } else {
+            None
+        }
     }
 
-    #[deprecated]
-    pub fn port_mut<'m>(&'m self, module: &'m mut Module, port: PortId) -> &'m mut PortData {
-        assert!(
-            self.ports.values().any(|p| p == &port),
-            r#"port "{port}" not in component "{component}""#,
-            port = module.port_db.lookup(port).name(module),
-            component = self.name(module),
-        );
-        module.get_data_mut(port)
+    pub fn get_port_mut<'m>(
+        &'m self,
+        module: &'m mut Module,
+        port: PortId,
+    ) -> Option<&'m mut PortData> {
+        if self.ports.values().any(|p| p == &port) {
+            Some(&mut module[port])
+        } else {
+            None
+        }
     }
 }
 
@@ -120,7 +118,7 @@ pub struct Component<'m> {
 
 impl<'m> Component<'m> {
     fn new(module: &'m Module, id: ComponentId) -> Self {
-        let data = module.component_db.lookup(id);
+        let data = &module.component_db[id];
 
         Self { module, id, data }
     }
@@ -130,7 +128,7 @@ impl<'m> Index<PortId> for Component<'m> {
     type Output = PortData;
 
     fn index(&self, port: PortId) -> &Self::Output {
-        self.data.port(self.module, port)
+        &self.module[port]
     }
 }
 
@@ -206,12 +204,8 @@ impl<'m> ComponentBuilder<'m> {
 
         let reference = component.reference();
         if self.data.references.insert(alias, reference).is_some() {
-            let component = self
-                .module
-                .strings
-                .lookup(self.module[component].name)
-                .to_string();
-            let reference = self.module.strings.lookup(alias).to_string();
+            let component = self.module.strings[self.module[component].name].to_string();
+            let reference = self.module.strings[alias].to_string();
             Err(ComponentBuildError::DuplicateReference {
                 component,
                 reference,
@@ -232,16 +226,16 @@ impl<'m> ComponentBuilder<'m> {
                 .insert(alias, component)
                 .is_some()
             {
-                let parent = self.module.strings.lookup(self.data.name).to_string();
-                let reference = self.module.strings.lookup(alias).to_string();
+                let parent = self.module.strings[self.data.name].to_string();
+                let reference = self.module.strings[alias].to_string();
                 return Err(ComponentBuildError::DuplicateReference {
                     component: parent,
                     reference,
                 });
             }
         } else if !self.unresolved_references.insert(component) {
-            let parent = self.module.strings.lookup(self.data.name).to_string();
-            let reference = self.module.strings.lookup(component).to_string();
+            let parent = self.module.strings[self.data.name].to_string();
+            let reference = self.module.strings[component].to_string();
             return Err(ComponentBuildError::DuplicateReference {
                 component: parent,
                 reference,
@@ -289,8 +283,8 @@ impl<'m> ComponentBuilder<'m> {
         let component = self.module.component_db.entry(self.data);
 
         if self.module.components.insert(name, component).is_some() {
-            let component = self.module.strings.lookup(name).to_string();
-            let module = self.module.strings.lookup(name).to_string();
+            let component = self.module.strings[name].to_string();
+            let module = self.module.strings[name].to_string();
             return Err(ComponentBuildError::DuplicateComponent { module, component });
         }
 
@@ -298,7 +292,7 @@ impl<'m> ComponentBuilder<'m> {
             let name = self
                 .module
                 .strings
-                .rlookup(self.module.component(component).name(self.module))
+                .rlookup(self.module[component].name(self.module))
                 .expect("component name should be in module strings");
             self.module.components.contains_key(&name)
         });
