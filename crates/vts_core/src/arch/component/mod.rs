@@ -284,7 +284,7 @@ impl<'m> ComponentBuilder<'m> {
 
         if self.module.components.insert(name, component).is_some() {
             let component = self.module.strings[name].to_string();
-            let module = self.module.strings[name].to_string();
+            let module = self.module.strings[self.module.name].to_string();
             return Err(ComponentBuildError::DuplicateComponent { module, component });
         }
 

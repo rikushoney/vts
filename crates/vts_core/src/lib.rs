@@ -11,6 +11,14 @@ pub trait OpaqueKey: Copy {
     fn from_index(idx: usize) -> Self;
 
     fn max_index() -> usize;
+
+    fn increment(self) -> Self {
+        Self::from_index(self.as_index() + 1)
+    }
+
+    fn decrement(self) -> Self {
+        Self::from_index(self.as_index() - 1)
+    }
 }
 
 macro_rules! impl_opaquekey {

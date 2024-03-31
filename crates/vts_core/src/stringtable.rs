@@ -13,7 +13,6 @@ impl TableKey for u64 {}
 
 // Based on https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html
 
-// TODO: optimise empty string
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringTable<I = u32> {
     str_key_map: HashMap<&'static str, I>,
@@ -46,6 +45,10 @@ impl<I: TableKey> StringTable<I> {
     }
 
     pub fn entry(&mut self, string: &str) -> I {
+        if string.is_empty() {
+            return I::from_index(0);
+        }
+
         if let Some(&interned) = self.str_key_map.get(string) {
             return interned;
         }
@@ -54,7 +57,7 @@ impl<I: TableKey> StringTable<I> {
 
         // SAFETY: `interned` is not shared outside of `self` as 'static
         let interned = unsafe { self.alloc(string) };
-        let key = I::from_index(self.lookup_table.len());
+        let key = I::from_index(self.lookup_table.len()).increment();
         self.str_key_map.insert(interned, key);
         self.lookup_table.push(interned);
 
@@ -63,13 +66,22 @@ impl<I: TableKey> StringTable<I> {
 
     fn lookup(&self, key: I) -> &str {
         let key = key.as_index();
+        if key == 0 {
+            return "";
+        }
+
+        let key = key - 1;
         assert!(key <= self.lookup_table.len());
 
         self.lookup_table[key]
     }
 
     pub fn rlookup(&self, string: &str) -> Option<I> {
-        self.str_key_map.get(string).cloned()
+        if string.is_empty() {
+            return Some(I::from_index(0));
+        }
+
+        self.str_key_map.get(string).map(|key| key.increment())
     }
 
     /// # Safety
@@ -77,6 +89,8 @@ impl<I: TableKey> StringTable<I> {
     unsafe fn alloc(&mut self, string: &str) -> &'static str {
         use std::cmp;
         use std::mem;
+
+        assert!(!string.is_empty());
 
         let capacity = self.storage.capacity();
         if capacity < self.storage.len() + string.len() {
@@ -122,5 +136,9 @@ mod tests {
         assert_eq!(&table[id3], "test3");
         assert_eq!(&table[id1], "test");
         assert_eq!(&table[id2], "test2");
+
+        let null = table.entry("");
+        assert_eq!(null, 0);
+        assert!(&table[0].is_empty());
     }
 }
