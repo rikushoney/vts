@@ -65,18 +65,6 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'a, 'm> {
             }
         }
 
-        // let unresolved = deserializer.deserialize_seq(ComponentRefsVisitor {
-        //     module: self.builder.module,
-        // })?;
-
-        // for reference in unresolved {
-        //     let component = *reference.item_or_second();
-        //     let alias = reference.get_first().copied();
-        //     self.builder.weak_reference(component, alias);
-        // }
-
-        // Ok(())
-
         deserializer.deserialize_seq(ComponentRefsVisitor {
             module: self.builder.module,
         })
@@ -108,7 +96,7 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentNamedRefsDeserializer<'a, 'm
             type Value = HashMap<StringId, StringId>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a list of component references")
+                formatter.write_str("a list of named component references")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>

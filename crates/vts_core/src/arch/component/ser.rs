@@ -29,7 +29,29 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
             let name = self.module.component(component.0).name;
             if name == alias {
                 serializer.serialize_element(self.module.strings.lookup(name))?;
-            } else {
+            }
+        }
+
+        serializer.end()
+    }
+}
+
+struct ComponentNamedRefsSerializer<'a, 'm> {
+    module: &'m Module,
+    references: &'a HashMap<StringId, ComponentRef>,
+}
+
+impl<'a, 'm> Serialize for ComponentNamedRefsSerializer<'a, 'm> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut serializer = serializer.serialize_seq(Some(self.references.len()))?;
+
+        for (alias, component) in self.references.iter() {
+            let alias = *alias;
+            let name = self.module.component(component.0).name;
+            if name != alias {
                 let alias = self.module.strings.lookup(alias);
                 let name = self.module.strings.lookup(name);
                 serializer.serialize_element(&(alias, name))?;
@@ -56,7 +78,7 @@ impl<'m> Serialize for ComponentSerializer<'m> {
     where
         S: Serializer,
     {
-        let mut serializer = serializer.serialize_struct("Component", 4)?;
+        let mut serializer = serializer.serialize_struct("Component", 5)?;
 
         let ports_serializer = PortsSerializer::new(self.module, &self.component.ports);
         serializer.serialize_field("ports", &ports_serializer)?;
@@ -66,6 +88,12 @@ impl<'m> Serialize for ComponentSerializer<'m> {
             references: &self.component.references,
         };
         serializer.serialize_field("references", &component_refs_serializer)?;
+
+        let component_named_refs_serializer = ComponentNamedRefsSerializer {
+            module: self.module,
+            references: &self.component.references,
+        };
+        serializer.serialize_field("named_references", &component_named_refs_serializer)?;
 
         serializer.serialize_field("class", &self.component.class)?;
 
