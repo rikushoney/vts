@@ -90,7 +90,7 @@ impl<I: TableKey> StringTable<I> {
         use std::cmp;
         use std::mem;
 
-        assert!(!string.is_empty());
+        debug_assert!(!string.is_empty());
 
         let capacity = self.storage.capacity();
         if capacity < self.storage.len() + string.len() {
@@ -137,8 +137,7 @@ mod tests {
         assert_eq!(&table[id1], "test");
         assert_eq!(&table[id2], "test2");
 
-        let null = table.entry("");
-        assert_eq!(null, 0);
+        assert_eq!(table.entry(""), 0);
         assert!(&table[0].is_empty());
     }
 }

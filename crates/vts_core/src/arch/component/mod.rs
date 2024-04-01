@@ -1,21 +1,18 @@
 pub mod de;
 pub mod ser;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{hash_map, HashMap, HashSet};
 use std::ops::Index;
 
 use serde::{Deserialize, Serialize};
 
 use crate::arch::{
     impl_dbkey_wrapper,
-    port::{PinRange, PortBuilder, PortData},
+    port::{PinRange, Port, PortBuilder, PortData},
     Module, PortId, StringId,
 };
 
 impl_dbkey_wrapper!(ComponentId, u32);
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ComponentRef(ComponentId);
 
 impl ComponentId {
     pub fn reference(self) -> ComponentRef {
@@ -24,6 +21,15 @@ impl ComponentId {
 
     pub fn to_component(self, module: &Module) -> Component<'_> {
         Component::new(module, self)
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct ComponentRef(ComponentId);
+
+impl ComponentRef {
+    pub fn to_component(self, module: &Module) -> Component<'_> {
+        Component::new(module, self.0)
     }
 }
 
@@ -122,6 +128,34 @@ impl<'m> Component<'m> {
 
         Self { module, id, data }
     }
+
+    pub fn name(&self) -> &str {
+        self.data.name(self.module)
+    }
+
+    pub fn ports(&self) -> PortIter {
+        PortIter {
+            module: self.module,
+            iter: self.data.ports.values(),
+        }
+    }
+
+    pub fn references(&self) -> ComponentRefIter {
+        ComponentRefIter {
+            module: self.module,
+            iter: self.data.references.iter(),
+        }
+    }
+
+    pub fn class(&self) -> Option<ComponentClass> {
+        self.data.class
+    }
+}
+
+impl<'m> PartialEq<ComponentRef> for &Component<'m> {
+    fn eq(&self, other: &ComponentRef) -> bool {
+        self.id == other.0
+    }
 }
 
 impl<'m> Index<PortId> for Component<'m> {
@@ -129,6 +163,35 @@ impl<'m> Index<PortId> for Component<'m> {
 
     fn index(&self, port: PortId) -> &Self::Output {
         &self.module[port]
+    }
+}
+
+pub struct PortIter<'m> {
+    module: &'m Module,
+    iter: hash_map::Values<'m, StringId, PortId>,
+}
+
+impl<'m> Iterator for PortIter<'m> {
+    type Item = Port<'m>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let port = *self.iter.next()?;
+        Some(port.to_port(self.module))
+    }
+}
+
+pub struct ComponentRefIter<'m> {
+    module: &'m Module,
+    iter: hash_map::Iter<'m, StringId, ComponentRef>,
+}
+
+impl<'m> Iterator for ComponentRefIter<'m> {
+    type Item = (&'m str, ComponentRef);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (&alias, &reference) = self.iter.next()?;
+        let alias = &self.module.strings[alias];
+        Some((alias, reference))
     }
 }
 
@@ -166,6 +229,22 @@ pub enum ComponentBuildError {
 
 pub type ComponentBuildResult =
     Result<(ComponentId, HashSet<StringId>, HashMap<StringId, StringId>), ComponentBuildError>;
+
+pub trait GetStringId {
+    fn get_string_id(&self, module: &mut Module) -> StringId;
+}
+
+impl GetStringId for StringId {
+    fn get_string_id(&self, _module: &mut Module) -> StringId {
+        *self
+    }
+}
+
+impl<S: AsRef<str>> GetStringId for S {
+    fn get_string_id(&self, module: &mut Module) -> StringId {
+        module.strings.entry(self.as_ref())
+    }
+}
 
 impl<'m> ComponentBuilder<'m> {
     pub fn new(module: &'m mut Module) -> Self {
@@ -215,12 +294,14 @@ impl<'m> ComponentBuilder<'m> {
         }
     }
 
-    pub fn add_weak_reference(
+    pub fn add_named_reference<S: GetStringId>(
         &mut self,
-        component: StringId,
-        alias: Option<StringId>,
+        component: S,
+        alias: Option<S>,
     ) -> Result<&mut Self, ComponentBuildError> {
+        let component = component.get_string_id(self.module);
         if let Some(alias) = alias {
+            let alias = alias.get_string_id(self.module);
             if self
                 .unresolved_named_references
                 .insert(alias, component)

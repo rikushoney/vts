@@ -1,13 +1,12 @@
 pub mod de;
 pub mod ser;
 
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use std::ops::{Index, IndexMut};
 
 use crate::arch::{
-    component::{ComponentBuilder, ComponentData, ComponentRef},
-    port::PortData,
-    port::PortId,
+    component::{Component, ComponentBuilder, ComponentData, ComponentRef},
+    port::{PortData, PortId},
     ComponentId, StringId,
 };
 use crate::{database::Database, stringtable::StringTable};
@@ -44,6 +43,13 @@ impl Module {
 
     pub fn rename(&mut self, name: &str) {
         self.name = self.strings.entry(name);
+    }
+
+    pub fn components(&self) -> ComponentIter {
+        ComponentIter {
+            module: self,
+            iter: self.components.values(),
+        }
     }
 
     pub fn get_component(&self, component: ComponentId) -> Option<&ComponentData> {
@@ -88,6 +94,20 @@ impl Index<PortId> for Module {
 impl IndexMut<PortId> for Module {
     fn index_mut(&mut self, index: PortId) -> &mut Self::Output {
         &mut self.port_db[index]
+    }
+}
+
+pub struct ComponentIter<'m> {
+    module: &'m Module,
+    iter: hash_map::Values<'m, StringId, ComponentId>,
+}
+
+impl<'m> Iterator for ComponentIter<'m> {
+    type Item = Component<'m>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let component = *self.iter.next()?;
+        Some(component.to_component(self.module))
     }
 }
 

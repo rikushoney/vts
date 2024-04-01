@@ -194,7 +194,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                             for reference in
                                 map.next_value_seed(ComponentRefsDeserializer::new(&mut builder))?
                             {
-                                ok = builder.add_weak_reference(reference, None).map(|_| ());
+                                ok = builder.add_named_reference(reference, None).map(|_| ());
                                 if ok.is_err() {
                                     break 'outer;
                                 }
@@ -208,7 +208,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                                 ComponentNamedRefsDeserializer::new(&mut builder),
                             )? {
                                 ok = builder
-                                    .add_weak_reference(component, Some(alias))
+                                    .add_named_reference(component, Some(alias))
                                     .map(|_| ());
                                 if ok.is_err() {
                                     break 'outer;

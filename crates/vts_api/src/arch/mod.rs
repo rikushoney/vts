@@ -2,6 +2,7 @@
 mod macros;
 
 mod component;
+mod convert;
 mod module;
 mod port;
 

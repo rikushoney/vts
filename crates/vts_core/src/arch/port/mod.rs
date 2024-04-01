@@ -117,6 +117,22 @@ impl<'m> Port<'m> {
         Self { module, id, data }
     }
 
+    pub fn name(&self) -> &str {
+        &self.module.strings[self.data.name]
+    }
+
+    pub fn kind(&self) -> PortKind {
+        self.data.kind
+    }
+
+    pub fn n_pins(&self) -> usize {
+        self.data.n_pins
+    }
+
+    pub fn class(&self) -> Option<PortClass> {
+        self.data.class
+    }
+
     pub fn select(&self, range: Range<u32>) -> PinRange {
         PinRange::new(self.id, range)
     }
