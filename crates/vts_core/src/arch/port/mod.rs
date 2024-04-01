@@ -4,6 +4,7 @@ pub mod ser;
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::arch::{component::ComponentData, impl_dbkey_wrapper, ComponentId, Module, StringId};
 
@@ -90,11 +91,10 @@ impl PortData {
             module = &module.strings[module.name],
         );
 
-        let port = parent
-            .ports
-            .remove(&self.name)
-            .expect("port should be in module");
-        parent.ports.insert(name, port);
+        if let Some(port) = parent.ports.remove(&self.name) {
+            parent.ports.insert(name, port);
+        }
+
         self.name = name;
     }
 
@@ -159,8 +159,11 @@ pub struct PortBuilder<'m> {
     n_pins_is_set: bool,
 }
 
+#[derive(Debug, Error)]
 pub enum PortBuildError {
+    #[error(r#"port "{port}" already in "{module}""#)]
     DuplicatePort { module: String, port: String },
+    #[error("port must have a {0}")]
     MissingField(&'static str),
 }
 

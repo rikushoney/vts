@@ -5,6 +5,7 @@ use std::collections::{hash_map, HashMap, HashSet};
 use std::ops::Index;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::arch::{
     impl_dbkey_wrapper,
@@ -85,12 +86,10 @@ impl ComponentData {
             module = &module.strings[module.name]
         );
 
-        let component = module
-            .components
-            .remove(&self.name)
-            .expect("component should be in module");
+        if let Some(component) = module.components.remove(&self.name) {
+            module.components.insert(name, component);
+        }
 
-        module.components.insert(name, component);
         self.name = name;
     }
 
@@ -215,15 +214,16 @@ pub struct ComponentBuilder<'m> {
     name_is_set: bool,
 }
 
+#[derive(Debug, Error)]
 pub enum ComponentBuildError {
-    DuplicateComponent {
-        module: String,
-        component: String,
-    },
+    #[error(r#"component "{component}" already in "{module}""#)]
+    DuplicateComponent { module: String, component: String },
+    #[error(r#"component "{reference}" already referenced in "{component}""#)]
     DuplicateReference {
         component: String,
         reference: String,
     },
+    #[error("component must have a {0}")]
     MissingField(&'static str),
 }
 
@@ -369,14 +369,18 @@ impl<'m> ComponentBuilder<'m> {
             return Err(ComponentBuildError::DuplicateComponent { module, component });
         }
 
-        debug_assert!({
-            let name = self
+        #[cfg(debug_assertions)]
+        {
+            let component = &self.module[component];
+            let component = component.name(self.module);
+            let component = self
                 .module
                 .strings
-                .rlookup(self.module[component].name(self.module))
+                .rlookup(component)
                 .expect("component name should be in module strings");
-            self.module.components.contains_key(&name)
-        });
+            debug_assert_eq!(component, name);
+            debug_assert!(self.module.components.contains_key(&component));
+        }
 
         Ok((
             component,

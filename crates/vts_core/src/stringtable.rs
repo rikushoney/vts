@@ -81,7 +81,7 @@ impl<I: TableKey> StringTable<I> {
             return Some(I::from_index(0));
         }
 
-        self.str_key_map.get(string).map(|key| key.increment())
+        self.str_key_map.get(string).map(|&key| key)
     }
 
     /// # Safety

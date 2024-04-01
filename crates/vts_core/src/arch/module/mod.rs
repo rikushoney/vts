@@ -4,6 +4,8 @@ pub mod ser;
 use std::collections::{hash_map, HashMap};
 use std::ops::{Index, IndexMut};
 
+use thiserror::Error;
+
 use crate::arch::{
     component::{Component, ComponentBuilder, ComponentData, ComponentRef},
     port::{PortData, PortId},
@@ -122,12 +124,16 @@ impl Default for ModuleBuilder {
     }
 }
 
+#[derive(Debug, Error)]
 pub enum ModuleBuildError {
+    #[error(r#"component "{reference}" already referenced in "{component}""#)]
     DuplicateReference {
         component: String,
         reference: String,
     },
+    #[error("module must have a {0}")]
     MissingField(&'static str),
+    #[error(r#"undefined component "{reference}" referenced in "{component}""#)]
     UndefinedReference {
         component: String,
         reference: String,

@@ -16,8 +16,7 @@ macro_rules! iter_dict_items {
 
 macro_rules! get_dict_item {
     ($dict:expr, $item:ident as $item_ty:ty) => {
-        $dict
-            .get_item($item)?
+        Some($dict.get_item($item)?.expect("should get item"))
             .as_ref()
             .map(|item| item.downcast::<$item_ty>())
             .transpose()

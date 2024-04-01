@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyString;
+use thiserror::Error;
 use vts_core::arch::{
     component::ComponentBuildError,
     module::{ModuleBuildError, ModuleBuilder},
@@ -16,33 +17,19 @@ pub trait Converter {
     fn convert(self) -> Result<Self::Output, Self::Error>;
 }
 
-macro_rules! impl_convert_error {
-    ($name:ident: $($variant:ident ( $wrapped:path ) ),+$(,)?) => {
-        pub enum $name {
-            $(
-                $variant($wrapped),
-            )+
-        }
+pub struct PyModuleConverter<'py>(pub(crate) Bound<'py, PyModule_>);
 
-        $(
-            impl From<$wrapped> for $name {
-                fn from(error: $wrapped) -> Self {
-                    Self::$variant(error)
-                }
-            }
-        )+
-    };
+#[derive(Debug, Error)]
+pub enum PyModuleConvertError {
+    #[error("{0}")]
+    Component(#[from] ComponentBuildError),
+    #[error("{0}")]
+    Module(#[from] ModuleBuildError),
+    #[error("{0}")]
+    Port(#[from] PortBuildError),
+    #[error("{0}")]
+    Python(#[from] PyErr),
 }
-
-pub struct PyModuleConverter<'py>(Bound<'py, PyModule_>);
-
-impl_convert_error!(
-    PyModuleConvertError:
-        Component(ComponentBuildError),
-        Module(ModuleBuildError),
-        Port(PortBuildError),
-        Python(PyErr)
-);
 
 impl Converter for PyModuleConverter<'_> {
     type Output = Module;
@@ -111,16 +98,11 @@ impl Converter for PyModuleConverter<'_> {
     }
 }
 
-pub struct ModuleConverter<'py>(Python<'py>, Module);
-
-impl_convert_error!(
-    ModuleConvertError:
-        Python(PyErr)
-);
+pub struct ModuleConverter<'py>(pub(crate) Python<'py>, pub(crate) Module);
 
 impl Converter for ModuleConverter<'_> {
     type Output = Py<PyModule_>;
-    type Error = ModuleConvertError;
+    type Error = PyErr;
 
     fn convert(self) -> Result<Self::Output, Self::Error> {
         let ModuleConverter(py, module) = self;
@@ -146,6 +128,8 @@ impl Converter for ModuleConverter<'_> {
 
             let py_component = Bound::new(py, py_component)?;
             py_module.add_component(&name, &py_component)?;
+            let components = py_module.components.bind(py);
+            assert!(components.contains(name)?);
         }
 
         let components = py_module.components.bind(py);
@@ -163,12 +147,12 @@ impl Converter for ModuleConverter<'_> {
                     PyString::new_bound(py, reference.to_component(&module).name());
 
                 let py_reference = get_dict_item!(components, reference_name as PyComponent)
-                    .expect("component should be in module");
+                    .expect("referenced component should be in module");
 
                 py_component.add_reference(&py_reference, Some(&alias))?;
             }
         }
 
-        Ok(Py::new(py, py_module)?)
+        Py::new(py, py_module)
     }
 }

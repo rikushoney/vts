@@ -1,8 +1,12 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
+use vts_core::arch::Module;
 
-use crate::arch::PyComponent;
+use crate::arch::{
+    convert::{Converter, ModuleConverter, PyModuleConvertError, PyModuleConverter},
+    PyComponent,
+};
 
 #[pyclass]
 #[pyo3(name = "PyModule")]
@@ -71,34 +75,35 @@ impl PyModule_ {
     }
 }
 
-#[allow(unused_variables)]
 #[pyfunction]
 pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
 
     let input = input.downcast::<PyString>()?;
-    let json: serde_json::Value = map_serde_py_err!(serde_json::from_str(input.to_str()?))?;
-    todo!()
-    // let module_deserializer = de::ModuleDeserializer::new(py);
-    // let module: Bound<'_, PyModule_> = map_serde_py_err!(module_deserializer.deserialize(json))?;
+    let module: Module = map_serde_py_err!(serde_json::from_str(input.to_str()?))?;
+    let converter = ModuleConverter(py, module);
 
-    // Ok(module.unbind())
+    converter.convert()
 }
 
-#[allow(unused_variables)]
 #[pyfunction]
 pub fn json_dumps(
     py: Python<'_>,
     module: &Bound<'_, PyModule_>,
     pretty: bool,
 ) -> PyResult<Py<PyString>> {
-    todo!()
-    // let module_serializer = ser::PyModuleSerializer::new(module.clone());
-    // let json = if pretty {
-    //     map_serde_py_err!(serde_json::to_string_pretty(&module_serializer))?
-    // } else {
-    //     map_serde_py_err!(serde_json::to_string(&module_serializer))?
-    // };
-    // let json = PyString::new_bound(py, json.as_str());
-    // Ok(json.into_py(py))
+    let converter = PyModuleConverter(module.clone());
+    let module = converter.convert().map_err(|err| match err {
+        PyModuleConvertError::Python(err) => err,
+        _ => PyValueError::new_err(format!("{err}")),
+    })?;
+
+    let json = if pretty {
+        map_serde_py_err!(serde_json::to_string_pretty(&module))?
+    } else {
+        map_serde_py_err!(serde_json::to_string(&module))?
+    };
+
+    let json = PyString::new_bound(py, json.as_str());
+    Ok(json.into_py(py))
 }
