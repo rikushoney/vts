@@ -45,11 +45,7 @@ impl<I: TableKey> StringTable<I> {
     }
 
     pub fn entry(&mut self, string: &str) -> I {
-        if string.is_empty() {
-            return I::from_index(0);
-        }
-
-        if let Some(&interned) = self.str_key_map.get(string) {
+        if let Some(interned) = self.rlookup(string) {
             return interned;
         }
 
@@ -81,7 +77,7 @@ impl<I: TableKey> StringTable<I> {
             return Some(I::from_index(0));
         }
 
-        self.str_key_map.get(string).map(|&key| key)
+        self.str_key_map.get(string).copied()
     }
 
     /// # Safety

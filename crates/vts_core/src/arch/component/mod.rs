@@ -371,12 +371,10 @@ impl<'m> ComponentBuilder<'m> {
 
         #[cfg(debug_assertions)]
         {
-            let component = &self.module[component];
-            let component = component.name(self.module);
             let component = self
                 .module
                 .strings
-                .rlookup(component)
+                .rlookup(self.module[component].name(self.module))
                 .expect("component name should be in module strings");
             debug_assert_eq!(component, name);
             debug_assert!(self.module.components.contains_key(&component));

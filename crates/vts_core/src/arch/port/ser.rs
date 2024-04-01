@@ -31,7 +31,10 @@ impl<'m> Serialize for PortSerializer<'m> {
 
         port_serializer.serialize_field("kind", &self.port.kind)?;
         port_serializer.serialize_field("n_pins", &self.port.n_pins)?;
-        port_serializer.serialize_field("class", &self.port.class)?;
+
+        if let Some(class) = self.port.class {
+            port_serializer.serialize_field("class", &class)?;
+        }
 
         port_serializer.end()
     }
