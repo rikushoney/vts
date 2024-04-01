@@ -7,7 +7,10 @@ use std::ops::{Index, IndexMut};
 use thiserror::Error;
 
 use crate::arch::{
-    component::{Component, ComponentBuilder, ComponentData, ComponentRef},
+    component::{
+        Component, ComponentBuilder, ComponentData, ComponentRefData, ComponentRefId,
+        ComponentWeakRef,
+    },
     port::{PortData, PortId},
     ComponentId, StringId,
 };
@@ -20,6 +23,7 @@ pub struct Module {
     pub(crate) component_db: Database<ComponentData, ComponentId>,
     pub(crate) components: HashMap<StringId, ComponentId>,
     pub(crate) port_db: Database<PortData, PortId>,
+    pub(crate) reference_db: Database<ComponentRefData, ComponentRefId>,
 }
 
 impl Module {
@@ -29,6 +33,7 @@ impl Module {
         let component_db = Database::default();
         let components = HashMap::default();
         let port_db = Database::default();
+        let reference_db = Database::default();
 
         Self {
             name,
@@ -36,6 +41,7 @@ impl Module {
             component_db,
             components,
             port_db,
+            reference_db,
         }
     }
 
@@ -71,33 +77,31 @@ impl Module {
     }
 }
 
-impl Index<ComponentId> for Module {
-    type Output = ComponentData;
+macro_rules! impl_module_index_ops {
+    ($($id:ident => $data:ident in $db:ident),+ $(,)?) => {
+        $(
+            impl Index<$id> for Module {
+                type Output = $data;
 
-    fn index(&self, index: ComponentId) -> &Self::Output {
-        &self.component_db[index]
+                fn index(&self, id: $id) -> &Self::Output {
+                    &self.$db[id]
+                }
+            }
+
+            impl IndexMut<$id> for Module {
+                fn index_mut(&mut self, id: $id) -> &mut Self::Output {
+                    &mut self.$db[id]
+                }
+            }
+        )+
     }
 }
 
-impl IndexMut<ComponentId> for Module {
-    fn index_mut(&mut self, index: ComponentId) -> &mut Self::Output {
-        &mut self.component_db[index]
-    }
-}
-
-impl Index<PortId> for Module {
-    type Output = PortData;
-
-    fn index(&self, index: PortId) -> &Self::Output {
-        &self.port_db[index]
-    }
-}
-
-impl IndexMut<PortId> for Module {
-    fn index_mut(&mut self, index: PortId) -> &mut Self::Output {
-        &mut self.port_db[index]
-    }
-}
+impl_module_index_ops!(
+    ComponentId => ComponentData in component_db,
+    PortId => PortData in port_db,
+    ComponentRefId => ComponentRefData in reference_db
+);
 
 pub struct ComponentIter<'m> {
     module: &'m Module,
@@ -145,20 +149,21 @@ pub trait Resolve {
         &self,
         module: &Module,
         component: ComponentId,
-    ) -> Result<(StringId, ComponentRef), ModuleBuildError>;
+    ) -> Result<(StringId, ComponentRefData), ModuleBuildError>;
 }
 
-impl Resolve for StringId {
+impl Resolve for ComponentWeakRef {
     fn resolve(
         &self,
         module: &Module,
         component: ComponentId,
-    ) -> Result<(StringId, ComponentRef), ModuleBuildError> {
-        if let Some(component) = module.components.get(self) {
-            let alias = module.component_db[*component].name;
-            Ok((alias, component.reference()))
+    ) -> Result<(StringId, ComponentRefData), ModuleBuildError> {
+        if let Some(&component) = module.components.get(&self.component) {
+            let alias = module.component_db[component].name;
+            let reference = ComponentRefData::new(component, self.n_instances);
+            Ok((alias, reference))
         } else {
-            let reference = module.strings[*self].to_string();
+            let reference = module.strings[self.component].to_string();
             let component = module[component].name(module).to_string();
             Err(ModuleBuildError::UndefinedReference {
                 component,
@@ -168,16 +173,18 @@ impl Resolve for StringId {
     }
 }
 
-impl Resolve for (StringId, StringId) {
+impl Resolve for (StringId, ComponentWeakRef) {
     fn resolve(
         &self,
         module: &Module,
         component: ComponentId,
-    ) -> Result<(StringId, ComponentRef), ModuleBuildError> {
-        if let Some(component) = module.components.get(&self.1) {
-            Ok((self.0, component.reference()))
+    ) -> Result<(StringId, ComponentRefData), ModuleBuildError> {
+        let reference = self.1.component;
+        if let Some(&component) = module.components.get(&reference) {
+            let reference = ComponentRefData::new(component, self.1.n_instances);
+            Ok((self.0, reference))
         } else {
-            let reference = module.strings[self.1].to_string();
+            let reference = module.strings[self.1.component].to_string();
             let component = module[component].name(module).to_string();
             Err(ModuleBuildError::UndefinedReference {
                 component,
@@ -220,6 +227,7 @@ impl ModuleBuilder {
 
         for reference in references {
             let (alias, reference) = reference.resolve(module, component)?;
+            let reference = module.reference_db.entry(reference);
             if module[component]
                 .references
                 .insert(alias, reference)

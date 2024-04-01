@@ -16,21 +16,17 @@ use crate::arch::{
 impl_dbkey_wrapper!(ComponentId, u32);
 
 impl ComponentId {
-    pub fn reference(self) -> ComponentRef {
-        ComponentRef(self)
-    }
-
     pub fn to_component(self, module: &Module) -> Component<'_> {
         Component::new(module, self)
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct ComponentRef(ComponentId);
+impl_dbkey_wrapper!(ComponentRefId, u32);
 
-impl ComponentRef {
+impl ComponentRefId {
     pub fn to_component(self, module: &Module) -> Component<'_> {
-        Component::new(module, self.0)
+        let reference = module[self];
+        Component::new(module, reference.component)
     }
 }
 
@@ -45,7 +41,7 @@ pub enum ComponentClass {
 pub struct ComponentData {
     pub(crate) name: StringId,
     pub(crate) ports: HashMap<StringId, PortId>,
-    pub(crate) references: HashMap<StringId, ComponentRef>,
+    pub(crate) references: HashMap<StringId, ComponentRefId>,
     connections: Vec<Connection>,
     pub class: Option<ComponentClass>,
 }
@@ -115,6 +111,21 @@ impl ComponentData {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ComponentRefData {
+    component: ComponentId,
+    pub n_instances: usize,
+}
+
+impl ComponentRefData {
+    pub(crate) fn new(component: ComponentId, n_instances: usize) -> Self {
+        Self {
+            component,
+            n_instances,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Component<'m> {
     module: &'m Module,
     id: ComponentId,
@@ -151,9 +162,28 @@ impl<'m> Component<'m> {
     }
 }
 
-impl<'m> PartialEq<ComponentRef> for &Component<'m> {
+#[derive(Clone, Debug, PartialEq)]
+pub struct ComponentRef<'m> {
+    module: &'m Module,
+    id: ComponentRefId,
+    data: &'m ComponentRefData,
+}
+
+impl<'m> ComponentRef<'m> {
+    fn new(module: &'m Module, id: ComponentRefId) -> Self {
+        let data = &module[id];
+
+        Self { module, id, data }
+    }
+
+    pub fn component(&self) -> Component<'m> {
+        Component::new(self.module, self.data.component)
+    }
+}
+
+impl<'m> PartialEq<ComponentRef<'m>> for &Component<'m> {
     fn eq(&self, other: &ComponentRef) -> bool {
-        self.id == other.0
+        self.id == other.data.component
     }
 }
 
@@ -181,15 +211,16 @@ impl<'m> Iterator for PortIter<'m> {
 
 pub struct ComponentRefIter<'m> {
     module: &'m Module,
-    iter: hash_map::Iter<'m, StringId, ComponentRef>,
+    iter: hash_map::Iter<'m, StringId, ComponentRefId>,
 }
 
 impl<'m> Iterator for ComponentRefIter<'m> {
-    type Item = (&'m str, ComponentRef);
+    type Item = (&'m str, ComponentRef<'m>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let (&alias, &reference) = self.iter.next()?;
         let alias = &self.module.strings[alias];
+        let reference = ComponentRef::new(self.module, reference);
         Some((alias, reference))
     }
 }
@@ -209,9 +240,15 @@ impl Connection {
 pub struct ComponentBuilder<'m> {
     pub(crate) module: &'m mut Module,
     pub(crate) data: ComponentData,
-    unresolved_references: HashSet<StringId>,
-    unresolved_named_references: HashMap<StringId, StringId>,
+    unresolved_references: HashSet<ComponentWeakRef>,
+    unresolved_named_references: HashMap<StringId, ComponentWeakRef>,
     name_is_set: bool,
+}
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct ComponentWeakRef {
+    pub(crate) component: StringId,
+    pub(crate) n_instances: usize,
 }
 
 #[derive(Debug, Error)]
@@ -227,8 +264,14 @@ pub enum ComponentBuildError {
     MissingField(&'static str),
 }
 
-pub type ComponentBuildResult =
-    Result<(ComponentId, HashSet<StringId>, HashMap<StringId, StringId>), ComponentBuildError>;
+pub type ComponentBuildResult = Result<
+    (
+        ComponentId,
+        HashSet<ComponentWeakRef>,
+        HashMap<StringId, ComponentWeakRef>,
+    ),
+    ComponentBuildError,
+>;
 
 pub trait GetStringId {
     fn get_string_id(&self, module: &mut Module) -> StringId;
@@ -275,13 +318,16 @@ impl<'m> ComponentBuilder<'m> {
         &mut self,
         component: ComponentId,
         alias: Option<&str>,
-    ) -> Result<&mut Self, ComponentBuildError> {
+        n_instances: Option<usize>,
+    ) -> Result<ComponentRefId, ComponentBuildError> {
         let alias = match alias {
             Some(alias) => self.module.strings.entry(alias),
             None => self.module[component].name,
         };
+        let n_instances = n_instances.unwrap_or(1);
 
-        let reference = component.reference();
+        let reference = ComponentRefData::new(component, n_instances);
+        let reference = self.module.reference_db.entry(reference);
         if self.data.references.insert(alias, reference).is_some() {
             let component = self.module.strings[self.module[component].name].to_string();
             let reference = self.module.strings[alias].to_string();
@@ -290,21 +336,27 @@ impl<'m> ComponentBuilder<'m> {
                 reference,
             })
         } else {
-            Ok(self)
+            Ok(reference)
         }
     }
 
-    pub fn add_named_reference<S: GetStringId>(
+    pub fn add_weak_reference<S: GetStringId>(
         &mut self,
         component: S,
         alias: Option<S>,
-    ) -> Result<&mut Self, ComponentBuildError> {
+        n_instances: Option<usize>,
+    ) -> Result<ComponentWeakRef, ComponentBuildError> {
         let component = component.get_string_id(self.module);
+        let reference = ComponentWeakRef {
+            component,
+            n_instances: n_instances.unwrap_or(1),
+        };
+
         if let Some(alias) = alias {
             let alias = alias.get_string_id(self.module);
             if self
                 .unresolved_named_references
-                .insert(alias, component)
+                .insert(alias, reference)
                 .is_some()
             {
                 let parent = self.module.strings[self.data.name].to_string();
@@ -314,7 +366,7 @@ impl<'m> ComponentBuilder<'m> {
                     reference,
                 });
             }
-        } else if !self.unresolved_references.insert(component) {
+        } else if !self.unresolved_references.insert(reference) {
             let parent = self.module.strings[self.data.name].to_string();
             let reference = self.module.strings[component].to_string();
             return Err(ComponentBuildError::DuplicateReference {
@@ -323,7 +375,7 @@ impl<'m> ComponentBuilder<'m> {
             });
         }
 
-        Ok(self)
+        Ok(reference)
     }
 
     pub fn set_class(&mut self, class: ComponentClass) -> &mut Self {
