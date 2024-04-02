@@ -1,3 +1,4 @@
+use std::iter;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::slice;
@@ -91,8 +92,35 @@ impl<T, I: DbKey> Database<T, I> {
 
     pub fn iter(&self) -> DatabaseIter<'_, T, I> {
         DatabaseIter {
-            iter: self.lookup_table.iter(),
+            iter: iter::zip(self.keys(), self.values()),
+            _database: self,
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> DatabaseIterMut<'_, T, I> {
+        DatabaseIterMut {
+            iter: iter::zip(self.keys(), self.values_mut()),
+            _database: self,
+        }
+    }
+
+    pub fn keys(&self) -> DatabaseKeys<I> {
+        DatabaseKeys {
             index: I::from_index(0),
+        }
+    }
+
+    pub fn values(&self) -> DatabaseValues<'_, T, I> {
+        DatabaseValues {
+            iter: self.lookup_table.iter(),
+            _database: self,
+        }
+    }
+
+    pub fn values_mut(&mut self) -> DatabaseValuesMut<'_, T, I> {
+        DatabaseValuesMut {
+            iter: self.lookup_table.iter(),
+            _database: self,
         }
     }
 }
@@ -112,20 +140,68 @@ impl<T, I: DbKey> IndexMut<I> for Database<T, I> {
 }
 
 pub struct DatabaseIter<'a, T, I> {
-    iter: slice::Iter<'a, *const T>,
-    index: I,
+    iter: iter::Zip<DatabaseKeys<I>, DatabaseValues<'a, T, I>>,
+    _database: &'a Database<T, I>,
 }
 
 impl<'a, T, I: DbKey> Iterator for DatabaseIter<'a, T, I> {
     type Item = (I, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(&ptr) = self.iter.next() {
-            let index = self.index;
-            self.index = I::from_index(index.as_index() + 1);
+        self.iter.next()
+    }
 
-            // SAFETY: pointers in the database are valid for the lifetime of the database
-            Some((index, unsafe { &*ptr }))
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+pub struct DatabaseIterMut<'a, T, I> {
+    iter: iter::Zip<DatabaseKeys<I>, DatabaseValuesMut<'a, T, I>>,
+    _database: &'a mut Database<T, I>,
+}
+
+impl<'a, T, I: DbKey> Iterator for DatabaseIterMut<'a, T, I> {
+    type Item = (I, &'a mut T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+pub struct DatabaseKeys<I> {
+    index: I,
+}
+
+impl<I: DbKey> Iterator for DatabaseKeys<I> {
+    type Item = I;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let index = self.index.increment();
+        if index.as_index() <= I::max_index() {
+            Some(index)
+        } else {
+            None
+        }
+    }
+}
+
+pub struct DatabaseValues<'a, T, I> {
+    iter: slice::Iter<'a, *const T>,
+    _database: &'a Database<T, I>,
+}
+
+impl<'a, T, I> Iterator for DatabaseValues<'a, T, I> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(&ptr) = self.iter.next() {
+            // SAFETY: pointers in the database are valid for the lifetime of the database.
+            Some(unsafe { &*ptr })
         } else {
             None
         }
@@ -136,24 +212,20 @@ impl<'a, T, I: DbKey> Iterator for DatabaseIter<'a, T, I> {
     }
 }
 
-pub struct DatabaseIterMut<'a, T, I> {
-    iter: slice::Iter<'a, *mut T>,
-    index: I,
+pub struct DatabaseValuesMut<'a, T, I> {
+    iter: slice::Iter<'a, *const T>,
     _database: &'a mut Database<T, I>,
 }
 
-impl<'a, T, I: DbKey> Iterator for DatabaseIterMut<'a, T, I> {
-    type Item = (I, &'a mut T);
+impl<'a, T, I> Iterator for DatabaseValuesMut<'a, T, I> {
+    type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(&ptr) = self.iter.next() {
-            let index = self.index;
-            self.index = I::from_index(index.as_index() + 1);
-
-            // SAFETY: pointers in the database are valid for the lifetime of the database
+            // SAFETY: same as `DatabaseValues`
             // we also have an exclusive reference to the database (via `_database`) which
-            // means is it safe to mutate values
-            Some((index, unsafe { &mut *ptr }))
+            // means it is safe to mutate values
+            Some(unsafe { &mut *ptr })
         } else {
             None
         }

@@ -12,10 +12,12 @@ pub trait OpaqueKey: Copy {
 
     fn max_index() -> usize;
 
+    #[must_use]
     fn increment(self) -> Self {
         Self::from_index(self.as_index() + 1)
     }
 
+    #[must_use]
     fn decrement(self) -> Self {
         Self::from_index(self.as_index() - 1)
     }
