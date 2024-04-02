@@ -72,8 +72,9 @@ impl Converter for PyModuleConverter<'_> {
             let references = component.references.bind(py);
             iter_dict_items!(for (alias: PyString, reference: PyComponentRef) in references => {
                 let reference = reference.borrow();
+                let n_instances = reference.n_instances;
                 let component = reference.component.borrow(py);
-                builder.add_named_reference(alias.to_str()?, Some(component.name.to_str(py)?))?;
+                builder.add_weak_reference(alias.to_str()?, Some(component.name.to_str(py)?), Some(n_instances))?;
             });
 
             let connections = component.connections.bind(py);
@@ -124,8 +125,6 @@ impl Converter for ModuleConverter<'_> {
                 py_component.add_port(&name, &py_port)?;
             }
 
-            // TODO: support connections
-
             let py_component = Bound::new(py, py_component)?;
             py_module.add_component(&name, &py_component)?;
             let components = py_module.components.bind(py);
@@ -143,15 +142,20 @@ impl Converter for ModuleConverter<'_> {
 
             for (alias, reference) in component.references() {
                 let alias = PyString::new_bound(py, alias);
-                let reference_name =
-                    PyString::new_bound(py, reference.to_component(&module).name());
+                let reference_name = PyString::new_bound(py, reference.component().name());
 
                 let py_reference = get_dict_item!(components, reference_name as PyComponent)
                     .expect("referenced component should be in module");
 
-                py_component.add_reference(&py_reference, Some(&alias))?;
+                py_component.add_reference(
+                    &py_reference,
+                    Some(&alias),
+                    Some(reference.n_instances()),
+                )?;
             }
         }
+
+        // TODO: support connections
 
         Py::new(py, py_module)
     }

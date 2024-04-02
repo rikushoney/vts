@@ -8,17 +8,12 @@ use serde::{
 use crate::arch::{port::PortData, Module, PortId, StringId};
 
 pub struct PortSerializer<'m> {
-    // TODO: is this needed?
-    _module: &'m Module,
     port: &'m PortData,
 }
 
 impl<'m> PortSerializer<'m> {
-    pub fn new(module: &'m Module, port: &'m PortData) -> Self {
-        Self {
-            _module: module,
-            port,
-        }
+    pub fn new(port: &'m PortData) -> Self {
+        Self { port }
     }
 }
 
@@ -61,13 +56,7 @@ impl<'m> Serialize for PortsSerializer<'m> {
         for (name, port) in self.ports {
             let name = &self.module.strings[*name];
             let port = &self.module.port_db[*port];
-            serializer.serialize_entry(
-                name,
-                &PortSerializer {
-                    _module: self.module,
-                    port,
-                },
-            )?;
+            serializer.serialize_entry(name, &PortSerializer { port })?;
         }
 
         serializer.end()

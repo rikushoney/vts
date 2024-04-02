@@ -6,7 +6,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::arch::{component::ComponentData, impl_dbkey_wrapper, ComponentId, Module, StringId};
+use crate::arch::{component::ComponentData, ComponentId, Module, StringId};
 
 impl_dbkey_wrapper!(PortId, u32);
 

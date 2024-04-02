@@ -59,8 +59,9 @@ impl PyComponent {
         let references = self.references.bind(py);
         iter_dict_items!(for (alias: PyString, reference: PyComponentRef) in references => {
             let reference = reference.borrow();
+            let n_instances = reference.n_instances;
             let reference = Bound::new(py, reference.component.clone())?;
-            component.add_reference(&reference, Some(alias))?;
+            component.add_reference(&reference, Some(alias), Some(n_instances))?;
         });
 
         let connections = self.connections.bind(py);
@@ -111,6 +112,7 @@ impl PyComponent {
         &mut self,
         component: &Bound<'_, PyComponent>,
         alias: Option<&Bound<'_, PyString>>,
+        n_instances: Option<usize>,
     ) -> PyResult<Py<PyComponentRef>> {
         let py = component.py();
 
@@ -132,7 +134,7 @@ impl PyComponent {
             )));
         }
 
-        let reference = PyComponentRef::new(component, Some(&alias));
+        let reference = PyComponentRef::new(component, Some(&alias), n_instances);
         let reference = Bound::new(py, reference)?;
 
         references.deref().set_item(alias, reference.clone())?;
@@ -165,16 +167,27 @@ pub struct PyComponentRef {
     pub component: Py<PyComponent>,
     #[pyo3(get, set)]
     pub alias: Option<Py<PyString>>,
+    #[pyo3(get, set)]
+    pub n_instances: usize,
 }
 
 #[pymethods]
 impl PyComponentRef {
     #[new]
-    pub fn new(component: &Bound<'_, PyComponent>, alias: Option<&Bound<PyString>>) -> Self {
+    pub fn new(
+        component: &Bound<'_, PyComponent>,
+        alias: Option<&Bound<PyString>>,
+        n_instances: Option<usize>,
+    ) -> Self {
         let component = component.clone().unbind();
         let alias = alias.map(|alias| alias.clone().unbind());
+        let n_instances = n_instances.unwrap_or(1);
 
-        Self { component, alias }
+        Self {
+            component,
+            alias,
+            n_instances,
+        }
     }
 }
 

@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::arch::{
-    impl_dbkey_wrapper,
     port::{PinRange, Port, PortBuilder, PortData},
     Module, PortId, StringId,
 };
@@ -25,7 +24,7 @@ impl_dbkey_wrapper!(ComponentRefId, u32);
 
 impl ComponentRefId {
     pub fn to_component(self, module: &Module) -> Component<'_> {
-        let reference = module[self];
+        let reference = &module[self];
         Component::new(module, reference.component)
     }
 }
@@ -178,6 +177,10 @@ impl<'m> ComponentRef<'m> {
 
     pub fn component(&self) -> Component<'m> {
         Component::new(self.module, self.data.component)
+    }
+
+    pub fn n_instances(&self) -> usize {
+        self.data.n_instances
     }
 }
 

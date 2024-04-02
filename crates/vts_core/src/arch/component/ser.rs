@@ -6,15 +6,35 @@ use serde::{
 };
 
 use crate::arch::{
-    component::{ComponentData, ComponentRef},
+    component::{ComponentData, ComponentRefData, ComponentRefId},
     port::ser::PortsSerializer,
     ComponentId, Module, StringId,
 };
 use crate::database::Database;
 
+struct ComponentRefSerializer<'m> {
+    module: &'m Module,
+    reference: &'m ComponentRefData,
+}
+
+impl<'m> Serialize for ComponentRefSerializer<'m> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut component_ref_serializer = serializer.serialize_struct("ComponentRef", 1)?;
+        let component = self.reference.component.to_component(self.module);
+
+        component_ref_serializer.serialize_field("component", component.name())?;
+        component_ref_serializer.serialize_field("n_instances", &self.reference.n_instances)?;
+
+        component_ref_serializer.end()
+    }
+}
+
 struct ComponentRefsSerializer<'a, 'm> {
     module: &'m Module,
-    references: &'a HashMap<StringId, ComponentRef>,
+    references: &'a HashMap<StringId, ComponentRefId>,
 }
 
 impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
@@ -24,11 +44,16 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
     {
         let mut serializer = serializer.serialize_seq(Some(self.references.len()))?;
 
-        for (alias, component) in self.references.iter() {
-            let alias = *alias;
-            let name = self.module[component.0].name;
+        for (&alias, &reference) in self.references.iter() {
+            let reference = &self.module[reference];
+            let name = self.module[reference.component].name;
             if name == alias {
-                serializer.serialize_element(&self.module.strings[name])?;
+                let component_ref_serializer = ComponentRefSerializer {
+                    module: self.module,
+                    reference,
+                };
+
+                serializer.serialize_element(&component_ref_serializer)?;
             }
         }
 
@@ -38,7 +63,7 @@ impl<'a, 'm> Serialize for ComponentRefsSerializer<'a, 'm> {
 
 struct ComponentNamedRefsSerializer<'a, 'm> {
     module: &'m Module,
-    references: &'a HashMap<StringId, ComponentRef>,
+    references: &'a HashMap<StringId, ComponentRefId>,
 }
 
 impl<'a, 'm> Serialize for ComponentNamedRefsSerializer<'a, 'm> {
@@ -48,13 +73,17 @@ impl<'a, 'm> Serialize for ComponentNamedRefsSerializer<'a, 'm> {
     {
         let mut serializer = serializer.serialize_map(Some(self.references.len()))?;
 
-        for (alias, component) in self.references.iter() {
-            let alias = *alias;
-            let name = self.module[component.0].name;
+        for (&alias, &reference) in self.references.iter() {
+            let reference = &self.module[reference];
+            let name = self.module[reference.component].name;
             if name != alias {
+                let component_ref_serializer = ComponentRefSerializer {
+                    module: self.module,
+                    reference,
+                };
                 let alias = &self.module.strings[alias];
-                let name = &self.module.strings[name];
-                serializer.serialize_entry(alias, name)?;
+
+                serializer.serialize_entry(alias, &component_ref_serializer)?;
             }
         }
 
@@ -125,7 +154,7 @@ impl<'m> Serialize for ComponentsSerializer<'m> {
     {
         let mut serializer = serializer.serialize_map(Some(self.components.len()))?;
 
-        for (_id, component) in self.components.iter() {
+        for component in self.components.values() {
             let name = &self.module.strings[component.name];
             serializer.serialize_entry(
                 name,

@@ -93,14 +93,12 @@ impl<T, I: DbKey> Database<T, I> {
     pub fn iter(&self) -> DatabaseIter<'_, T, I> {
         DatabaseIter {
             iter: iter::zip(self.keys(), self.values()),
-            _database: self,
         }
     }
 
     pub fn iter_mut(&mut self) -> DatabaseIterMut<'_, T, I> {
         DatabaseIterMut {
             iter: iter::zip(self.keys(), self.values_mut()),
-            _database: self,
         }
     }
 
@@ -110,17 +108,15 @@ impl<T, I: DbKey> Database<T, I> {
         }
     }
 
-    pub fn values(&self) -> DatabaseValues<'_, T, I> {
+    pub fn values(&self) -> DatabaseValues<'_, T> {
         DatabaseValues {
             iter: self.lookup_table.iter(),
-            _database: self,
         }
     }
 
-    pub fn values_mut(&mut self) -> DatabaseValuesMut<'_, T, I> {
+    pub fn values_mut(&mut self) -> DatabaseValuesMut<'_, T> {
         DatabaseValuesMut {
             iter: self.lookup_table.iter(),
-            _database: self,
         }
     }
 }
@@ -140,8 +136,7 @@ impl<T, I: DbKey> IndexMut<I> for Database<T, I> {
 }
 
 pub struct DatabaseIter<'a, T, I> {
-    iter: iter::Zip<DatabaseKeys<I>, DatabaseValues<'a, T, I>>,
-    _database: &'a Database<T, I>,
+    iter: iter::Zip<DatabaseKeys<I>, DatabaseValues<'a, T>>,
 }
 
 impl<'a, T, I: DbKey> Iterator for DatabaseIter<'a, T, I> {
@@ -157,8 +152,7 @@ impl<'a, T, I: DbKey> Iterator for DatabaseIter<'a, T, I> {
 }
 
 pub struct DatabaseIterMut<'a, T, I> {
-    iter: iter::Zip<DatabaseKeys<I>, DatabaseValuesMut<'a, T, I>>,
-    _database: &'a mut Database<T, I>,
+    iter: iter::Zip<DatabaseKeys<I>, DatabaseValuesMut<'a, T>>,
 }
 
 impl<'a, T, I: DbKey> Iterator for DatabaseIterMut<'a, T, I> {
@@ -190,12 +184,11 @@ impl<I: DbKey> Iterator for DatabaseKeys<I> {
     }
 }
 
-pub struct DatabaseValues<'a, T, I> {
+pub struct DatabaseValues<'a, T> {
     iter: slice::Iter<'a, *const T>,
-    _database: &'a Database<T, I>,
 }
 
-impl<'a, T, I> Iterator for DatabaseValues<'a, T, I> {
+impl<'a, T> Iterator for DatabaseValues<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -212,20 +205,22 @@ impl<'a, T, I> Iterator for DatabaseValues<'a, T, I> {
     }
 }
 
-pub struct DatabaseValuesMut<'a, T, I> {
+pub struct DatabaseValuesMut<'a, T> {
     iter: slice::Iter<'a, *const T>,
-    _database: &'a mut Database<T, I>,
 }
 
-impl<'a, T, I> Iterator for DatabaseValuesMut<'a, T, I> {
+impl<'a, T> Iterator for DatabaseValuesMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(&ptr) = self.iter.next() {
             // SAFETY: same as `DatabaseValues`
-            // we also have an exclusive reference to the database (via `_database`) which
-            // means it is safe to mutate values
-            Some(unsafe { &mut *ptr })
+            Some(unsafe {
+                // we also have an exclusive reference to the database (via `_database`) which
+                // means it is safe to mutate values
+                let ptr = ptr as *mut T;
+                &mut *ptr
+            })
         } else {
             None
         }

@@ -108,10 +108,14 @@ class Component:
                 self.add_port(port)
 
     def add_reference(
-        self, component: Component, *, alias: str | None = None
+        self,
+        component: Component,
+        *,
+        alias: str | None = None,
+        n_instances: int | None = None,
     ) -> ComponentRef:
         return ComponentRef._wrap(
-            self._component.add_reference(component._component, alias)
+            self._component.add_reference(component._component, alias, n_instances)
         )
 
     def add_connection(self, source: PinRange, sink: PinRange) -> Connection:

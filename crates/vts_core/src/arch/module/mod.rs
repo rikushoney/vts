@@ -145,25 +145,27 @@ pub enum ModuleBuildError {
 }
 
 pub trait Resolve {
-    fn resolve(
+    fn get_alias(
         &self,
         module: &Module,
         component: ComponentId,
-    ) -> Result<(StringId, ComponentRefData), ModuleBuildError>;
-}
+    ) -> Result<StringId, ModuleBuildError>;
 
-impl Resolve for ComponentWeakRef {
+    fn get_weak_reference(&self) -> &ComponentWeakRef;
+
     fn resolve(
         &self,
         module: &Module,
         component: ComponentId,
     ) -> Result<(StringId, ComponentRefData), ModuleBuildError> {
-        if let Some(&component) = module.components.get(&self.component) {
-            let alias = module.component_db[component].name;
-            let reference = ComponentRefData::new(component, self.n_instances);
+        let reference = self.get_weak_reference();
+        if let Some(&component) = module.components.get(&reference.component) {
+            let alias = self.get_alias(module, component)?;
+            let n_instances = reference.n_instances;
+            let reference = ComponentRefData::new(component, n_instances);
             Ok((alias, reference))
         } else {
-            let reference = module.strings[self.component].to_string();
+            let reference = module.strings[reference.component].to_string();
             let component = module[component].name(module).to_string();
             Err(ModuleBuildError::UndefinedReference {
                 component,
@@ -173,24 +175,42 @@ impl Resolve for ComponentWeakRef {
     }
 }
 
-impl Resolve for (StringId, ComponentWeakRef) {
-    fn resolve(
+impl Resolve for ComponentWeakRef {
+    fn get_alias(
         &self,
         module: &Module,
         component: ComponentId,
-    ) -> Result<(StringId, ComponentRefData), ModuleBuildError> {
-        let reference = self.1.component;
-        if let Some(&component) = module.components.get(&reference) {
-            let reference = ComponentRefData::new(component, self.1.n_instances);
-            Ok((self.0, reference))
-        } else {
-            let reference = module.strings[self.1.component].to_string();
-            let component = module[component].name(module).to_string();
-            Err(ModuleBuildError::UndefinedReference {
-                component,
-                reference,
+    ) -> Result<StringId, ModuleBuildError> {
+        module
+            .components
+            .get(&self.component)
+            .map(|&component| module.component_db[component].name)
+            .ok_or_else(|| {
+                let reference = module.strings[self.component].to_string();
+                let component = module[component].name(module).to_string();
+                ModuleBuildError::UndefinedReference {
+                    component,
+                    reference,
+                }
             })
-        }
+    }
+
+    fn get_weak_reference(&self) -> &ComponentWeakRef {
+        self
+    }
+}
+
+impl Resolve for (StringId, ComponentWeakRef) {
+    fn get_alias(
+        &self,
+        _module: &Module,
+        _component: ComponentId,
+    ) -> Result<StringId, ModuleBuildError> {
+        Ok(self.0)
+    }
+
+    fn get_weak_reference(&self) -> &ComponentWeakRef {
+        &self.1
     }
 }
 
