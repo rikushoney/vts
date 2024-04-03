@@ -133,19 +133,43 @@ impl<'m> Port<'m> {
         self.data.class
     }
 
-    pub fn select(&self, range: Range<u32>) -> PinRange {
-        PinRange::new(self.id, range)
+    pub fn select(&self, range: Range<u32>) -> PortPins {
+        PortPins::new(self.id, range)
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct PinRange {
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct PortPins {
     port: PortId,
     range: Range<u32>,
 }
 
-impl PinRange {
+impl PortPins {
     fn new(port: PortId, range: Range<u32>) -> Self {
+        Self { port, range }
+    }
+
+    pub fn start(&self) -> u32 {
+        self.range.start
+    }
+
+    pub fn end(&self) -> u32 {
+        self.range.end
+    }
+
+    pub fn port<'m>(&self, module: &'m Module) -> Port<'m> {
+        Port::new(module, self.port)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct WeakPortPins {
+    port: StringId,
+    range: Range<u32>,
+}
+
+impl WeakPortPins {
+    pub(crate) fn new(port: StringId, range: Range<u32>) -> Self {
         Self { port, range }
     }
 }

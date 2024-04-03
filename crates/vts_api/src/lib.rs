@@ -57,7 +57,7 @@ fn vts_api_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<arch::PyPort>()?;
     m.add_class::<arch::PyPortClass>()?;
     m.add_class::<arch::PyPortKind>()?;
-    m.add_class::<arch::PyPinRange>()?;
+    m.add_class::<arch::PyPortPins>()?;
 
     m.add_function(wrap_pyfunction!(arch::json_dumps, m)?)?;
     m.add_function(wrap_pyfunction!(arch::json_loads, m)?)?;

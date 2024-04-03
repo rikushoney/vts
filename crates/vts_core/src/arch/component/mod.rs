@@ -2,13 +2,13 @@ pub mod de;
 pub mod ser;
 
 use std::collections::{hash_map, HashMap, HashSet};
-use std::ops::Index;
+use std::ops::{Index, Range};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::arch::{
-    port::{PinRange, Port, PortBuilder, PortData},
+    port::{Port, PortBuilder, PortData, PortPins, WeakPortPins},
     Module, PortId, StringId,
 };
 
@@ -26,6 +26,10 @@ impl ComponentRefId {
     pub fn to_component(self, module: &Module) -> Component<'_> {
         let reference = &module[self];
         Component::new(module, reference.component)
+    }
+
+    pub fn to_reference(self, module: &Module) -> ComponentRef<'_> {
+        ComponentRef::new(module, self)
     }
 }
 
@@ -112,13 +116,15 @@ impl ComponentData {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentRefData {
     component: ComponentId,
+    alias: StringId,
     pub n_instances: usize,
 }
 
 impl ComponentRefData {
-    pub(crate) fn new(component: ComponentId, n_instances: usize) -> Self {
+    pub(crate) fn new(component: ComponentId, alias: StringId, n_instances: usize) -> Self {
         Self {
             component,
+            alias,
             n_instances,
         }
     }
@@ -179,6 +185,10 @@ impl<'m> ComponentRef<'m> {
         Component::new(self.module, self.data.component)
     }
 
+    pub fn alias(&self) -> &'m str {
+        &self.module.strings[self.data.alias]
+    }
+
     pub fn n_instances(&self) -> usize {
         self.data.n_instances
     }
@@ -230,13 +240,25 @@ impl<'m> Iterator for ComponentRefIter<'m> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Connection {
-    source: PinRange,
-    sink: PinRange,
+    source_component: Option<ComponentRefId>,
+    source_pins: PortPins,
+    sink_component: Option<ComponentRefId>,
+    sink_pins: PortPins,
 }
 
 impl Connection {
-    pub fn new(source: PinRange, sink: PinRange) -> Self {
-        Self { source, sink }
+    fn new(
+        source_pins: PortPins,
+        sink_pins: PortPins,
+        source_component: Option<ComponentRefId>,
+        sink_component: Option<ComponentRefId>,
+    ) -> Self {
+        Self {
+            source_component,
+            source_pins,
+            sink_component,
+            sink_pins,
+        }
     }
 }
 
@@ -245,6 +267,7 @@ pub struct ComponentBuilder<'m> {
     pub(crate) data: ComponentData,
     unresolved_references: HashSet<ComponentWeakRef>,
     unresolved_named_references: HashMap<StringId, ComponentWeakRef>,
+    unresolved_connections: Vec<WeakConnection>,
     name_is_set: bool,
 }
 
@@ -252,6 +275,14 @@ pub struct ComponentBuilder<'m> {
 pub struct ComponentWeakRef {
     pub(crate) component: StringId,
     pub(crate) n_instances: usize,
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct WeakConnection {
+    pub(crate) source_pins: WeakPortPins,
+    pub(crate) source_component: Option<StringId>,
+    pub(crate) sink_pins: WeakPortPins,
+    pub(crate) sink_component: Option<StringId>,
 }
 
 #[derive(Debug, Error)]
@@ -297,12 +328,14 @@ impl<'m> ComponentBuilder<'m> {
         let data = ComponentData::new(module, "", None);
         let unresolved_references = HashSet::new();
         let unresolved_named_references = HashMap::new();
+        let unresolved_connections = Vec::new();
 
         Self {
             module,
             data,
             unresolved_references,
             unresolved_named_references,
+            unresolved_connections,
             name_is_set: false,
         }
     }
@@ -329,7 +362,7 @@ impl<'m> ComponentBuilder<'m> {
         };
         let n_instances = n_instances.unwrap_or(1);
 
-        let reference = ComponentRefData::new(component, n_instances);
+        let reference = ComponentRefData::new(component, alias, n_instances);
         let reference = self.module.reference_db.entry(reference);
         if self.data.references.insert(alias, reference).is_some() {
             let component = self.module.strings[self.module[component].name].to_string();
@@ -381,6 +414,14 @@ impl<'m> ComponentBuilder<'m> {
         Ok(reference)
     }
 
+    pub fn add_connection(&mut self) -> ConnectionBuilder<'_> {
+        ConnectionBuilder::new(&mut self.data)
+    }
+
+    pub fn add_weak_connection(&mut self) -> WeakConnectionBuilder<'_, 'm> {
+        WeakConnectionBuilder::new(self)
+    }
+
     pub fn set_class(&mut self, class: ComponentClass) -> &mut Self {
         self.data.class = Some(class);
         self
@@ -404,6 +445,10 @@ impl<'m> ComponentBuilder<'m> {
 
     pub fn is_unresolved_named_references_empty(&self) -> bool {
         self.unresolved_named_references.is_empty()
+    }
+
+    pub fn is_connections_empty(&self) -> bool {
+        self.data.connections.is_empty()
     }
 
     pub fn is_class_set(&self) -> bool {
@@ -440,5 +485,130 @@ impl<'m> ComponentBuilder<'m> {
             self.unresolved_references,
             self.unresolved_named_references,
         ))
+    }
+}
+
+pub struct ConnectionBuilder<'m> {
+    component: &'m mut ComponentData,
+    source: Option<(PortPins, Option<ComponentRefId>)>,
+    sink: Option<(PortPins, Option<ComponentRefId>)>,
+}
+
+#[derive(Debug, Error)]
+pub enum ConnectionBuildError {
+    #[error("connection must have a {0}")]
+    MissingField(&'static str),
+}
+
+impl<'m> ConnectionBuilder<'m> {
+    fn new(component: &'m mut ComponentData) -> Self {
+        Self {
+            component,
+            source: None,
+            sink: None,
+        }
+    }
+
+    pub fn set_source(&mut self, pins: PortPins, component: Option<ComponentRefId>) -> &mut Self {
+        self.source = Some((pins, component));
+        self
+    }
+
+    pub fn set_sink(&mut self, pins: PortPins, component: Option<ComponentRefId>) -> &mut Self {
+        self.sink = Some((pins, component));
+        self
+    }
+
+    pub fn is_source_set(&self) -> bool {
+        self.source.is_some()
+    }
+
+    pub fn is_sink_set(&self) -> bool {
+        self.sink.is_some()
+    }
+
+    pub fn finish(self) -> Result<&'m Connection, ConnectionBuildError> {
+        let source = self
+            .source
+            .ok_or(ConnectionBuildError::MissingField("source"))?;
+        let sink = self
+            .sink
+            .ok_or(ConnectionBuildError::MissingField("sink"))?;
+
+        let connections = &mut self.component.connections;
+        let i = connections.len();
+        connections.push(Connection::new(source.0, sink.0, source.1, sink.1));
+        Ok(&connections[i])
+    }
+}
+
+pub struct WeakConnectionBuilder<'a, 'm> {
+    builder: &'a mut ComponentBuilder<'m>,
+    source: Option<(WeakPortPins, Option<StringId>)>,
+    sink: Option<(WeakPortPins, Option<StringId>)>,
+}
+
+impl<'a, 'm> WeakConnectionBuilder<'a, 'm> {
+    fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
+        Self {
+            builder,
+            source: None,
+            sink: None,
+        }
+    }
+
+    pub fn set_source(
+        &mut self,
+        port: &str,
+        range: Range<u32>,
+        component: Option<&str>,
+    ) -> &mut Self {
+        let module = &mut self.builder.module;
+        let port = module.strings.entry(port);
+        let pins = WeakPortPins::new(port, range);
+        let component = component.map(|component| module.strings.entry(component));
+        self.source = Some((pins, component));
+        self
+    }
+
+    pub fn set_sink(
+        &mut self,
+        port: &str,
+        range: Range<u32>,
+        component: Option<&str>,
+    ) -> &mut Self {
+        let module = &mut self.builder.module;
+        let port = module.strings.entry(port);
+        let pins = WeakPortPins::new(port, range);
+        let component = component.map(|component| self.builder.module.strings.entry(component));
+        self.sink = Some((pins, component));
+        self
+    }
+
+    pub fn is_source_set(&self) -> bool {
+        self.source.is_some()
+    }
+
+    pub fn is_sink_set(&self) -> bool {
+        self.sink.is_some()
+    }
+
+    pub fn finish(self) -> Result<&'a WeakConnection, ConnectionBuildError> {
+        let source = self
+            .source
+            .ok_or(ConnectionBuildError::MissingField("source"))?;
+        let sink = self
+            .sink
+            .ok_or(ConnectionBuildError::MissingField("sink"))?;
+
+        let connections = &mut self.builder.unresolved_connections;
+        let i = connections.len();
+        connections.push(WeakConnection {
+            source_pins: source.0,
+            source_component: source.1,
+            sink_pins: sink.0,
+            sink_component: sink.1,
+        });
+        Ok(&connections[i])
     }
 }

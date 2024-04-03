@@ -6,8 +6,8 @@ use serde::{
 };
 
 use crate::arch::{
-    component::{ComponentData, ComponentRefData, ComponentRefId},
-    port::ser::PortsSerializer,
+    component::{ComponentData, ComponentRefData, ComponentRefId, Connection},
+    port::{ser::PortsSerializer, PortPins},
     ComponentId, Module, StringId,
 };
 use crate::database::Database;
@@ -86,6 +86,73 @@ impl<'a, 'm> Serialize for ComponentNamedRefsSerializer<'a, 'm> {
                 serializer.serialize_entry(alias, &component_ref_serializer)?;
             }
         }
+
+        serializer.end()
+    }
+}
+
+struct InterfaceSerializer<'a, 'm> {
+    module: &'m Module,
+    pins: &'a PortPins,
+    component: Option<ComponentRefId>,
+}
+
+impl<'a, 'm> Serialize for InterfaceSerializer<'a, 'm> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let len = self.component.map(|_| 4).unwrap_or(3);
+        let mut serializer = serializer.serialize_map(Some(len))?;
+
+        let port = self.pins.port(self.module);
+        serializer.serialize_entry("port", port.name())?;
+
+        let start = self.pins.start();
+        let end = self.pins.end();
+        let range = format!("{start}:{end}");
+        serializer.serialize_entry("pins", &range)?;
+
+        if let Some(component) = self.component {
+            let reference = component.to_reference(self.module);
+            serializer.serialize_entry("component", reference.alias())?;
+        }
+
+        serializer.end()
+    }
+}
+
+pub struct ConnectionSerializer<'m> {
+    module: &'m Module,
+    connection: &'m Connection,
+}
+
+impl<'m> ConnectionSerializer<'m> {
+    pub fn new(module: &'m Module, connection: &'m Connection) -> Self {
+        Self { module, connection }
+    }
+}
+
+impl<'m> Serialize for ConnectionSerializer<'m> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut serializer = serializer.serialize_struct("Connection", 2)?;
+
+        let source_serializer = InterfaceSerializer {
+            module: self.module,
+            pins: &self.connection.source_pins,
+            component: self.connection.source_component,
+        };
+        serializer.serialize_field("source", &source_serializer)?;
+
+        let sink_serializer = InterfaceSerializer {
+            module: self.module,
+            pins: &self.connection.sink_pins,
+            component: self.connection.sink_component,
+        };
+        serializer.serialize_field("sink", &sink_serializer)?;
 
         serializer.end()
     }

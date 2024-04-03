@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyString;
 use thiserror::Error;
 use vts_core::arch::{
-    component::ComponentBuildError,
+    component::{ComponentBuildError, ConnectionBuildError},
     module::{ModuleBuildError, ModuleBuilder},
     port::PortBuildError,
     Module,
@@ -24,6 +24,8 @@ pub enum PyModuleConvertError {
     #[error("{0}")]
     Component(#[from] ComponentBuildError),
     #[error("{0}")]
+    Connection(#[from] ConnectionBuildError),
+    #[error("{0}")]
     Module(#[from] ModuleBuildError),
     #[error("{0}")]
     Port(#[from] PortBuildError),
@@ -39,34 +41,34 @@ impl Converter for PyModuleConverter<'_> {
         let PyModuleConverter(module) = self;
         let py = module.py();
 
-        let mut builder = ModuleBuilder::new();
+        let mut module_builder = ModuleBuilder::new();
         let module = module.borrow();
 
-        builder.set_name(module.name.to_str(py)?);
+        module_builder.set_name(module.name.to_str(py)?);
 
         let mut unresolved = Vec::new();
 
         let components = module.components.bind(py);
         iter_dict_items!(for (name: PyString, component: PyComponent) in components => {
-            let mut builder = builder.add_component();
+            let mut component_builder = module_builder.add_component();
             let component = component.borrow();
 
-            builder.set_name(name.to_str()?);
+            component_builder.set_name(name.to_str()?);
 
             let ports = component.ports.bind(py);
             iter_dict_items!(for (name: PyString, port: PyPort) in ports => {
-                let mut builder = builder.add_port();
+                let mut port_builder = component_builder.add_port();
                 let port = port.borrow();
 
-                builder.set_name(name.to_str()?);
-                builder.set_kind(port.kind.into());
-                builder.set_n_pins(port.n_pins);
+                port_builder.set_name(name.to_str()?);
+                port_builder.set_kind(port.kind.into());
+                port_builder.set_n_pins(port.n_pins);
 
                 if let Some(class) = port.class_ {
-                    builder.set_class(class.into());
+                    port_builder.set_class(class.into());
                 }
 
-                builder.finish()?;
+                port_builder.finish()?;
             });
 
             let references = component.references.bind(py);
@@ -74,28 +76,62 @@ impl Converter for PyModuleConverter<'_> {
                 let reference = reference.borrow();
                 let n_instances = reference.n_instances;
                 let component = reference.component.borrow(py);
-                builder.add_weak_reference(alias.to_str()?, Some(component.name.to_str(py)?), Some(n_instances))?;
+                component_builder.add_weak_reference(alias.to_str()?, Some(component.name.to_str(py)?), Some(n_instances))?;
             });
 
             let connections = component.connections.bind(py);
-            iter_list_items!(for (_connection: PyConnection) in connections => {
-                // TODO: support connections
-                todo!()
+            iter_list_items!(for (connection: PyConnection) in connections => {
+                let mut connection_builder = component_builder.add_weak_connection();
+                let connection = connection.borrow();
+
+                let source_pins = connection.source_pins.borrow(py);
+                let source_port = source_pins.port.borrow(py);
+                let source_port = source_port.name.bind(py);
+                let alias = if let Some(ref component) = connection.source_component {
+                    let component = component.borrow(py);
+                    if let Some(ref alias) = component.alias {
+                        Some(alias.to_str(py)?.to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                connection_builder.set_source(source_port.to_str()?, source_pins.range.clone(), alias.as_ref().map(|alias| alias.as_str()));
+
+                let sink_pins = connection.sink_pins.borrow(py);
+                let sink_port = sink_pins.port.borrow(py);
+                let sink_port = sink_port.name.bind(py);
+                let alias = if let Some(ref component) = connection.source_component {
+                    let component = component.borrow(py);
+                    if let Some(ref alias) = component.alias {
+                        Some(alias.to_str(py)?.to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                connection_builder.set_sink(sink_port.to_str()?, sink_pins.range.clone(), alias.as_ref().map(|alias| alias.as_str()));
+
+                connection_builder.finish()?;
             });
 
             if let Some(class) = component.class_ {
-                builder.set_class(class.into());
+                component_builder.set_class(class.into());
             }
 
-            unresolved.push(builder.finish()?);
+            unresolved.push(component_builder.finish()?);
         });
 
         for (component, references, named_references) in unresolved {
-            builder.resolve_references(component, references.into_iter())?;
-            builder.resolve_references(component, named_references.into_iter())?;
+            module_builder.resolve_references(component, references.into_iter())?;
+            module_builder.resolve_references(component, named_references.into_iter())?;
         }
 
-        Ok(builder.finish()?)
+        module_builder.resolve_connections();
+
+        Ok(module_builder.finish()?)
     }
 }
 

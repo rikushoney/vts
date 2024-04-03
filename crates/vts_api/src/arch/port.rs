@@ -59,14 +59,14 @@ impl PyPort {
 
 #[pyclass]
 #[derive(Clone, Debug)]
-pub struct PyPinRange {
+pub struct PyPortPins {
     #[pyo3(get, set)]
     pub port: Py<PyPort>,
-    range: Range<u32>,
+    pub(crate) range: Range<u32>,
 }
 
 #[pymethods]
-impl PyPinRange {
+impl PyPortPins {
     #[new]
     pub fn new(port: Bound<'_, PyPort>, start: Option<u32>, end: Option<u32>) -> Self {
         let start = start.unwrap_or(0);

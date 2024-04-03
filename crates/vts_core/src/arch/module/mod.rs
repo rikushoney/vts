@@ -162,7 +162,7 @@ pub trait Resolve {
         if let Some(&component) = module.components.get(&reference.component) {
             let alias = self.get_alias(module, component)?;
             let n_instances = reference.n_instances;
-            let reference = ComponentRefData::new(component, n_instances);
+            let reference = ComponentRefData::new(component, alias, n_instances);
             Ok((alias, reference))
         } else {
             let reference = module.strings[reference.component].to_string();
@@ -263,6 +263,10 @@ impl ModuleBuilder {
         }
 
         Ok(self)
+    }
+
+    pub fn resolve_connections(&mut self) {
+        todo!()
     }
 
     pub fn is_name_set(&self) -> bool {

@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyMapping, PyString};
 use vts_core::arch::ComponentClass;
 
-use crate::arch::{port::PyPinRange, PyPort};
+use crate::arch::{port::PyPortPins, PyPort};
 
 wrap_enum!(PyComponentClass => ComponentClass:
     LUT = Lut,
@@ -67,9 +67,19 @@ impl PyComponent {
         let connections = self.connections.bind(py);
         iter_list_items!(for (connection: PyConnection) in connections => {
             let connection = connection.borrow();
-            let source = Bound::new(py, connection.source.clone())?;
-            let sink = Bound::new(py, connection.sink.clone())?;
-            component.add_connection(&source, &sink)?;
+            let source_pins = Bound::new(py, connection.source_pins.clone())?;
+            let source_component = if let Some(ref component) = connection.source_component {
+                Some(component.bind(py))
+            } else {
+                None
+            };
+            let sink_pins = Bound::new(py, connection.sink_pins.clone())?;
+            let sink_component = if let Some(ref component) = connection.sink_component {
+                Some(component.bind(py))
+            } else {
+                None
+            };
+            component.add_connection(&source_pins, &sink_pins, source_component, sink_component)?;
         });
 
         Ok(component)
@@ -144,15 +154,22 @@ impl PyComponent {
 
     pub fn add_connection(
         &mut self,
-        source: &Bound<'_, PyPinRange>,
-        sink: &Bound<'_, PyPinRange>,
+        source_pins: &Bound<'_, PyPortPins>,
+        sink_pins: &Bound<'_, PyPortPins>,
+        source_component: Option<&Bound<'_, PyComponentRef>>,
+        sink_component: Option<&Bound<'_, PyComponentRef>>,
     ) -> PyResult<Py<PyConnection>> {
-        let py = source.py();
+        let py = source_pins.py();
 
         // TODO: check for duplicate connections?
 
         let connections = self.connections.bind(py);
-        let connection = PyConnection::new(source.clone(), sink.clone());
+        let connection = PyConnection::new(
+            source_pins.clone(),
+            sink_pins.clone(),
+            source_component.cloned(),
+            sink_component.cloned(),
+        );
         let connection = Bound::new(py, connection)?;
 
         connections.append(connection.clone())?;
@@ -194,18 +211,34 @@ impl PyComponentRef {
 #[pyclass]
 pub struct PyConnection {
     #[pyo3(get, set)]
-    pub source: Py<PyPinRange>,
+    pub source_pins: Py<PyPortPins>,
     #[pyo3(get, set)]
-    pub sink: Py<PyPinRange>,
+    pub source_component: Option<Py<PyComponentRef>>,
+    #[pyo3(get, set)]
+    pub sink_pins: Py<PyPortPins>,
+    #[pyo3(get, set)]
+    pub sink_component: Option<Py<PyComponentRef>>,
 }
 
 #[pymethods]
 impl PyConnection {
     #[new]
-    pub fn new(source: Bound<'_, PyPinRange>, sink: Bound<'_, PyPinRange>) -> Self {
-        let source = source.unbind();
-        let sink = sink.unbind();
+    pub fn new(
+        source_pins: Bound<'_, PyPortPins>,
+        sink_pins: Bound<'_, PyPortPins>,
+        source_component: Option<Bound<'_, PyComponentRef>>,
+        sink_component: Option<Bound<'_, PyComponentRef>>,
+    ) -> Self {
+        let source_pins = source_pins.unbind();
+        let source_component = source_component.map(|c| c.unbind());
+        let sink_pins = sink_pins.unbind();
+        let sink_component = sink_component.map(|c| c.unbind());
 
-        Self { source, sink }
+        Self {
+            source_pins,
+            source_component,
+            sink_pins,
+            sink_component,
+        }
     }
 }
