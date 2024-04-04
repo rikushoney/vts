@@ -68,17 +68,13 @@ impl PyComponent {
         iter_list_items!(for (connection: PyConnection) in connections => {
             let connection = connection.borrow();
             let source_pins = Bound::new(py, connection.source_pins.clone())?;
-            let source_component = if let Some(ref component) = connection.source_component {
-                Some(component.bind(py))
-            } else {
-                None
-            };
+            let source_component = connection.source_component.as_ref().map(|component| {
+                component.bind(py)
+            });
             let sink_pins = Bound::new(py, connection.sink_pins.clone())?;
-            let sink_component = if let Some(ref component) = connection.sink_component {
-                Some(component.bind(py))
-            } else {
-                None
-            };
+            let sink_component = connection.sink_component.as_ref().map(|component| {
+                component.bind(py)
+            });
             component.add_connection(&source_pins, &sink_pins, source_component, sink_component)?;
         });
 

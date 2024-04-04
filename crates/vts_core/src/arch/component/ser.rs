@@ -102,20 +102,20 @@ impl<'a, 'm> Serialize for InterfaceSerializer<'a, 'm> {
     where
         S: Serializer,
     {
-        let len = self.component.map(|_| 4).unwrap_or(3);
-        let mut serializer = serializer.serialize_map(Some(len))?;
+        let len = self.component.map(|_| 5).unwrap_or(4);
+        let mut serializer = serializer.serialize_struct("Interface", len)?;
 
         let port = self.pins.port(self.module);
-        serializer.serialize_entry("port", port.name())?;
+        serializer.serialize_field("port", port.name())?;
 
         let start = self.pins.start();
+        serializer.serialize_field("port_start", &start)?;
         let end = self.pins.end();
-        let range = format!("{start}:{end}");
-        serializer.serialize_entry("pins", &range)?;
+        serializer.serialize_field("port_end", &end)?;
 
         if let Some(component) = self.component {
             let reference = component.to_reference(self.module);
-            serializer.serialize_entry("component", reference.alias())?;
+            serializer.serialize_field("component", reference.alias())?;
         }
 
         serializer.end()
@@ -158,6 +158,27 @@ impl<'m> Serialize for ConnectionSerializer<'m> {
     }
 }
 
+struct ConnectionsSerializer<'m> {
+    module: &'m Module,
+    connections: &'m Vec<Connection>,
+}
+
+impl<'m> Serialize for ConnectionsSerializer<'m> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut serializer = serializer.serialize_seq(Some(self.connections.len()))?;
+
+        for connection in self.connections {
+            let connection_serializer = ConnectionSerializer::new(self.module, connection);
+            serializer.serialize_element(&connection_serializer)?;
+        }
+
+        serializer.end()
+    }
+}
+
 pub struct ComponentSerializer<'m> {
     module: &'m Module,
     component: &'m ComponentData,
@@ -193,6 +214,14 @@ impl<'m> Serialize for ComponentSerializer<'m> {
                 references: &self.component.references,
             };
             serializer.serialize_field("named_references", &component_named_refs_serializer)?;
+        }
+
+        if !self.component.connections.is_empty() {
+            let connections_serializer = ConnectionsSerializer {
+                module: self.module,
+                connections: &self.component.connections,
+            };
+            serializer.serialize_field("connections", &connections_serializer)?;
         }
 
         if let Some(class) = self.component.class {

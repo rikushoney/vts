@@ -8,10 +8,10 @@ use thiserror::Error;
 
 use crate::arch::{
     component::{
-        Component, ComponentBuilder, ComponentData, ComponentRefData, ComponentRefId,
-        ComponentWeakRef,
+        Component, ComponentBuildArtifacts, ComponentBuilder, ComponentData, ComponentRefData,
+        ComponentRefId, ComponentWeakRef, Connection, ConnectionBuildError, WeakConnection,
     },
-    port::{PortData, PortId},
+    port::{PortData, PortId, PortPins, WeakPortPins},
     ComponentId, StringId,
 };
 use crate::{database::Database, stringtable::StringTable};
@@ -120,6 +120,8 @@ impl<'m> Iterator for ComponentIter<'m> {
 pub struct ModuleBuilder {
     module: Module,
     name_is_set: bool,
+    // references_are_resolved: bool,
+    // connections_are_resolved: bool,
 }
 
 impl Default for ModuleBuilder {
@@ -130,6 +132,8 @@ impl Default for ModuleBuilder {
 
 #[derive(Debug, Error)]
 pub enum ModuleBuildError {
+    #[error("{0}")]
+    Connection(#[from] ConnectionBuildError),
     #[error(r#"component "{reference}" already referenced in "{component}""#)]
     DuplicateReference {
         component: String,
@@ -144,7 +148,7 @@ pub enum ModuleBuildError {
     },
 }
 
-pub trait Resolve {
+pub trait ReferenceResolve {
     fn get_alias(
         &self,
         module: &Module,
@@ -175,7 +179,7 @@ pub trait Resolve {
     }
 }
 
-impl Resolve for ComponentWeakRef {
+impl ReferenceResolve for ComponentWeakRef {
     fn get_alias(
         &self,
         module: &Module,
@@ -200,7 +204,7 @@ impl Resolve for ComponentWeakRef {
     }
 }
 
-impl Resolve for (StringId, ComponentWeakRef) {
+impl ReferenceResolve for (StringId, ComponentWeakRef) {
     fn get_alias(
         &self,
         _module: &Module,
@@ -214,6 +218,200 @@ impl Resolve for (StringId, ComponentWeakRef) {
     }
 }
 
+pub trait ConnectionResolve {
+    fn get_source_component(
+        &self,
+        module: &Module,
+        parent: ComponentId,
+    ) -> Result<ComponentId, ConnectionBuildError>;
+
+    fn resolve_source_reference(
+        &self,
+        module: &mut Module,
+        parent: ComponentId,
+    ) -> Result<Option<ComponentRefId>, ConnectionBuildError>;
+
+    fn get_source_pins(&self) -> &WeakPortPins;
+
+    fn get_sink_component(
+        &self,
+        module: &Module,
+        parent: ComponentId,
+    ) -> Result<ComponentId, ConnectionBuildError>;
+
+    fn resolve_sink_reference(
+        &self,
+        module: &mut Module,
+        parent: ComponentId,
+    ) -> Result<Option<ComponentRefId>, ConnectionBuildError>;
+
+    fn get_sink_pins(&self) -> &WeakPortPins;
+
+    fn resolve_source_pins(
+        &self,
+        module: &mut Module,
+        parent: ComponentId,
+    ) -> Result<PortPins, ConnectionBuildError> {
+        let component = self.get_source_component(module, parent)?;
+        let component = &module.component_db[component];
+
+        let source_pins = self.get_source_pins();
+        let port = source_pins.port;
+        let &port = component
+            .ports
+            .get(&port)
+            .ok_or(ConnectionBuildError::UndefinedPort {
+                port: module.strings[port].to_string(),
+            })?;
+        let port = port.to_port(module);
+
+        Ok(port.select(source_pins.range.clone()))
+    }
+
+    fn resolve_sink_pins(
+        &self,
+        module: &mut Module,
+        parent: ComponentId,
+    ) -> Result<PortPins, ConnectionBuildError> {
+        let component = self.get_sink_component(module, parent)?;
+        let component = &module.component_db[component];
+
+        let sink_pins = self.get_sink_pins();
+        let port = sink_pins.port;
+        let &port = component
+            .ports
+            .get(&port)
+            .ok_or(ConnectionBuildError::UndefinedPort {
+                port: module.strings[port].to_string(),
+            })?;
+        let port = port.to_port(module);
+
+        Ok(port.select(sink_pins.range.clone()))
+    }
+}
+
+impl ConnectionResolve for WeakConnection {
+    fn get_source_component(
+        &self,
+        module: &Module,
+        parent: ComponentId,
+    ) -> Result<ComponentId, ConnectionBuildError> {
+        // TODO: is this ever `None`?
+        let component = self
+            .source_component
+            .ok_or(ConnectionBuildError::MissingField("source component"))?;
+
+        let reference = module.component_db[parent]
+            .references
+            .get(&component)
+            .ok_or(ConnectionBuildError::UndefinedReference {
+                reference: module.strings[component].to_string(),
+            })
+            .copied()?;
+
+        Ok(module[reference].component)
+    }
+
+    fn resolve_source_reference(
+        &self,
+        module: &mut Module,
+        parent: ComponentId,
+    ) -> Result<Option<ComponentRefId>, ConnectionBuildError> {
+        let component = self
+            .source_component
+            .ok_or(ConnectionBuildError::MissingField("source component"))?;
+
+        let parent = &module.component_db[parent];
+        Ok(parent.references.get(&component).copied())
+    }
+
+    fn get_source_pins(&self) -> &WeakPortPins {
+        &self.source_pins
+    }
+
+    fn get_sink_component(
+        &self,
+        module: &Module,
+        parent: ComponentId,
+    ) -> Result<ComponentId, ConnectionBuildError> {
+        // TODO: is this ever `None`?
+        let component = self
+            .sink_component
+            .ok_or(ConnectionBuildError::MissingField("sink component"))?;
+
+        let reference = module.component_db[parent]
+            .references
+            .get(&component)
+            .ok_or(ConnectionBuildError::UndefinedReference {
+                reference: module.strings[component].to_string(),
+            })
+            .copied()?;
+
+        Ok(module[reference].component)
+    }
+
+    fn resolve_sink_reference(
+        &self,
+        module: &mut Module,
+        parent: ComponentId,
+    ) -> Result<Option<ComponentRefId>, ConnectionBuildError> {
+        let component = self
+            .sink_component
+            .ok_or(ConnectionBuildError::MissingField("sink component"))?;
+
+        let parent = &module.component_db[parent];
+        Ok(parent.references.get(&component).copied())
+    }
+
+    fn get_sink_pins(&self) -> &WeakPortPins {
+        &self.sink_pins
+    }
+}
+
+impl ConnectionResolve for (&WeakConnection, ComponentId) {
+    fn get_source_component(
+        &self,
+        _module: &Module,
+        parent: ComponentId,
+    ) -> Result<ComponentId, ConnectionBuildError> {
+        debug_assert!(parent == self.1);
+        Ok(self.1)
+    }
+
+    fn resolve_source_reference(
+        &self,
+        _module: &mut Module,
+        _parent: ComponentId,
+    ) -> Result<Option<ComponentRefId>, ConnectionBuildError> {
+        Ok(None)
+    }
+
+    fn get_source_pins(&self) -> &WeakPortPins {
+        &self.0.source_pins
+    }
+
+    fn get_sink_component(
+        &self,
+        _module: &Module,
+        parent: ComponentId,
+    ) -> Result<ComponentId, ConnectionBuildError> {
+        debug_assert!(parent == self.1);
+        Ok(self.1)
+    }
+
+    fn resolve_sink_reference(
+        &self,
+        _module: &mut Module,
+        _parent: ComponentId,
+    ) -> Result<Option<ComponentRefId>, ConnectionBuildError> {
+        Ok(None)
+    }
+
+    fn get_sink_pins(&self) -> &WeakPortPins {
+        &self.0.sink_pins
+    }
+}
+
 impl ModuleBuilder {
     pub fn new() -> Self {
         let module = Module::new("");
@@ -221,6 +419,8 @@ impl ModuleBuilder {
         Self {
             module,
             name_is_set: false,
+            // references_are_resolved: false,
+            // connections_are_resolved: false,
         }
     }
 
@@ -241,8 +441,12 @@ impl ModuleBuilder {
     ) -> Result<&mut Self, ModuleBuildError>
     where
         I: Iterator<Item = R>,
-        R: Resolve,
+        R: ReferenceResolve,
     {
+        // if self.references_are_resolved {
+        //     return Ok(self);
+        // }
+
         let module = &mut self.module;
 
         for reference in references {
@@ -262,11 +466,80 @@ impl ModuleBuilder {
             }
         }
 
+        // self.references_are_resolved = true;
         Ok(self)
     }
 
-    pub fn resolve_connections(&mut self) {
-        todo!()
+    pub fn resolve_connections<I: Iterator<Item = WeakConnection>>(
+        &mut self,
+        component: ComponentId,
+        connections: I,
+    ) -> Result<&mut Self, ModuleBuildError> {
+        // if self.connections_are_resolved {
+        //     return Ok(self);
+        // }
+
+        for connection in connections {
+            let (source_pins, source_reference) = if connection.source_component.is_some() {
+                (
+                    connection.resolve_source_pins(&mut self.module, component)?,
+                    connection.resolve_source_reference(&mut self.module, component)?,
+                )
+            } else {
+                (
+                    (&connection, component).resolve_source_pins(&mut self.module, component)?,
+                    (&connection, component)
+                        .resolve_source_reference(&mut self.module, component)?,
+                )
+            };
+
+            let (sink_pins, sink_reference) = if connection.sink_component.is_some() {
+                (
+                    connection.resolve_sink_pins(&mut self.module, component)?,
+                    connection.resolve_sink_reference(&mut self.module, component)?,
+                )
+            } else {
+                (
+                    (&connection, component).resolve_sink_pins(&mut self.module, component)?,
+                    (&connection, component).resolve_sink_reference(&mut self.module, component)?,
+                )
+            };
+
+            let connection =
+                Connection::new(source_pins, sink_pins, source_reference, sink_reference);
+
+            self.module[component].connections.push(connection);
+        }
+
+        // self.connections_are_resolved = true;
+        Ok(self)
+    }
+
+    pub fn resolve_all<R, Rs, Ns, Cs>(
+        &mut self,
+        component: ComponentId,
+        references: Rs,
+        named_references: Ns,
+        connections: Cs,
+    ) -> Result<(), ModuleBuildError>
+    where
+        R: ReferenceResolve,
+        Rs: IntoIterator<Item = R>,
+        Ns: IntoIterator<Item = (StringId, ComponentWeakRef)>,
+        Cs: IntoIterator<Item = WeakConnection>,
+    {
+        let references = references.into_iter();
+        let named_references = named_references.into_iter();
+        let connections = connections.into_iter();
+
+        // assert_eq!(references.size_hint(), named_references.size_hint());
+        // assert_eq!(references.size_hint(), connections.size_hint());
+
+        self.resolve_references(component, references)?;
+        self.resolve_references(component, named_references)?;
+        self.resolve_connections(component, connections)?;
+
+        Ok(())
     }
 
     pub fn is_name_set(&self) -> bool {
@@ -277,12 +550,36 @@ impl ModuleBuilder {
         self.module.components.is_empty()
     }
 
+    // pub fn are_references_resolved(&self) -> bool {
+    //     self.references_are_resolved
+    // }
+
+    // pub fn are_connections_resolved(&self) -> bool {
+    //     self.connections_are_resolved
+    // }
+
     pub fn finish(self) -> Result<Module, ModuleBuildError> {
         if !self.is_name_set() {
             return Err(ModuleBuildError::MissingField("name"));
         }
 
         Ok(self.module)
+    }
+
+    pub fn resolve_and_finish<I>(mut self, unresolved: I) -> Result<Module, ModuleBuildError>
+    where
+        I: IntoIterator<Item = (ComponentId, ComponentBuildArtifacts)>,
+    {
+        for (component, artifacts) in unresolved.into_iter() {
+            self.resolve_all(
+                component,
+                artifacts.references,
+                artifacts.named_references,
+                artifacts.connections,
+            )?;
+        }
+
+        self.finish()
     }
 }
 

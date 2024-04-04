@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 
 use serde::{
@@ -7,9 +7,9 @@ use serde::{
 };
 
 use crate::arch::{
-    component::{ComponentBuilder, ComponentWeakRef},
+    component::{ComponentBuildArtifacts, ComponentBuilder, WeakConnectionBuilder},
     port::de::PortsDeserializer,
-    ComponentId, Module, StringId,
+    ComponentId, Module,
 };
 
 pub(crate) struct ComponentRefDeserializer<'a, 'm> {
@@ -136,7 +136,7 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentRefsDeserializer<'a, 'm> {
                     let component_ref_deserializer =
                         ComponentRefDeserializer::new(self.builder, None);
 
-                    if !seq.next_element_seed(component_ref_deserializer)?.is_some() {
+                    if seq.next_element_seed(component_ref_deserializer)?.is_none() {
                         break;
                     }
                 }
@@ -199,6 +199,240 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentNamedRefsDeserializer<'a, 'm
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum ConnectionFields {
+    Source,
+    Sink,
+}
+
+struct InterfaceDeserializer<'a, 'b, 'm> {
+    source_or_sink: ConnectionFields,
+    builder: &'a mut WeakConnectionBuilder<'b, 'm>,
+}
+
+impl<'a, 'b, 'de, 'm> DeserializeSeed<'de> for InterfaceDeserializer<'a, 'b, 'm> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct InterfaceVisitor<'a, 'b, 'm> {
+            source_or_sink: ConnectionFields,
+            builder: &'a mut WeakConnectionBuilder<'b, 'm>,
+        }
+
+        impl<'a, 'b, 'de, 'm> Visitor<'de> for InterfaceVisitor<'a, 'b, 'm> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an interface description")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                #[derive(Deserialize)]
+                #[serde(rename_all = "lowercase")]
+                enum Fields {
+                    Port,
+                    #[serde(rename = "port_start")]
+                    PortStart,
+                    #[serde(rename = "port_end")]
+                    PortEnd,
+                    Component,
+                }
+
+                let mut port: Option<String> = None;
+                let mut port_start: Option<u32> = None;
+                let mut port_end: Option<u32> = None;
+                let mut component: Option<String> = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Fields::Port => {
+                            if port.is_some() {
+                                return Err(de::Error::duplicate_field("port"));
+                            }
+                            port = Some(map.next_value()?);
+                        }
+                        Fields::PortStart => {
+                            if port_start.is_some() {
+                                return Err(de::Error::duplicate_field("start"));
+                            }
+                            port_start = Some(map.next_value()?);
+                        }
+                        Fields::PortEnd => {
+                            if port_end.is_some() {
+                                return Err(de::Error::duplicate_field("end"));
+                            }
+                            port_end = Some(map.next_value()?);
+                        }
+                        Fields::Component => {
+                            if component.is_some() {
+                                return Err(de::Error::duplicate_field("component"));
+                            }
+                            component = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let port = port.ok_or(de::Error::missing_field("port"))?;
+                let port_start = port_start.ok_or(de::Error::missing_field("port_start"))?;
+                let port_end = port_end.ok_or(de::Error::missing_field("port_end"))?;
+                let component = component.as_deref();
+
+                match self.source_or_sink {
+                    ConnectionFields::Source => {
+                        self.builder
+                            .set_source(port.as_str(), port_start..port_end, component);
+                    }
+                    ConnectionFields::Sink => {
+                        self.builder
+                            .set_sink(port.as_str(), port_start..port_end, component);
+                    }
+                }
+
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_map(InterfaceVisitor {
+            source_or_sink: self.source_or_sink,
+            builder: self.builder,
+        })
+    }
+}
+
+struct ConnectionDeserializer<'a, 'm> {
+    builder: &'a mut ComponentBuilder<'m>,
+}
+
+impl<'a, 'de, 'm> DeserializeSeed<'de> for ConnectionDeserializer<'a, 'm> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ConnectionVisitor<'a, 'm> {
+            builder: &'a mut ComponentBuilder<'m>,
+        }
+
+        const FIELDS: &[&str] = &["source", "sink"];
+
+        impl<'a, 'de, 'm> Visitor<'de> for ConnectionVisitor<'a, 'm> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a connection description")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut builder = self.builder.add_weak_connection();
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        ConnectionFields::Source => {
+                            if builder.is_source_set() {
+                                return Err(de::Error::duplicate_field("source"));
+                            }
+
+                            let interface_deserializer = InterfaceDeserializer {
+                                source_or_sink: ConnectionFields::Source,
+                                builder: &mut builder,
+                            };
+                            map.next_value_seed(interface_deserializer)?;
+                        }
+                        ConnectionFields::Sink => {
+                            if builder.is_sink_set() {
+                                return Err(de::Error::duplicate_field("sink"));
+                            }
+
+                            let interface_deserializer = InterfaceDeserializer {
+                                source_or_sink: ConnectionFields::Sink,
+                                builder: &mut builder,
+                            };
+                            map.next_value_seed(interface_deserializer)?;
+                        }
+                    }
+                }
+
+                builder
+                    .finish()
+                    .map_err(|err| de::Error::custom(format!("{err}")))?;
+
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_struct(
+            "Connection",
+            FIELDS,
+            ConnectionVisitor {
+                builder: self.builder,
+            },
+        )
+    }
+}
+
+struct ConnectionsDeserializer<'a, 'm> {
+    builder: &'a mut ComponentBuilder<'m>,
+}
+
+impl<'a, 'm> ConnectionsDeserializer<'a, 'm> {
+    fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
+        Self { builder }
+    }
+}
+
+impl<'a, 'de, 'm> DeserializeSeed<'de> for ConnectionsDeserializer<'a, 'm> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ConnectionsVisitor<'a, 'm> {
+            builder: &'a mut ComponentBuilder<'m>,
+        }
+
+        impl<'a, 'de, 'm> Visitor<'de> for ConnectionsVisitor<'a, 'm> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list of connections")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                loop {
+                    let connection_deserializer = ConnectionDeserializer {
+                        builder: self.builder,
+                    };
+
+                    if seq.next_element_seed(connection_deserializer)?.is_none() {
+                        break;
+                    }
+                }
+
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_seq(ConnectionsVisitor {
+            builder: self.builder,
+        })
+    }
+}
+
 pub struct ComponentDeserializer<'m> {
     module: &'m mut Module,
     name: String,
@@ -211,11 +445,7 @@ impl<'m> ComponentDeserializer<'m> {
 }
 
 impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
-    type Value = (
-        ComponentId,
-        HashSet<ComponentWeakRef>,
-        HashMap<StringId, ComponentWeakRef>,
-    );
+    type Value = (ComponentId, ComponentBuildArtifacts);
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -229,11 +459,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
         const FIELDS: &[&str] = &["ports", "references", "named_references", "class"];
 
         impl<'a, 'de, 'm> Visitor<'de> for ComponentVisitor<'a, 'm> {
-            type Value = (
-                ComponentId,
-                HashSet<ComponentWeakRef>,
-                HashMap<StringId, ComponentWeakRef>,
-            );
+            type Value = (ComponentId, ComponentBuildArtifacts);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a component description")
@@ -250,6 +476,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                     References,
                     #[serde(rename = "named_references")]
                     NamedReferences,
+                    Connections,
                     Class,
                 }
 
@@ -275,6 +502,12 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentDeserializer<'m> {
                                 return Err(de::Error::duplicate_field("named references"));
                             }
                             map.next_value_seed(ComponentNamedRefsDeserializer::new(&mut builder))?;
+                        }
+                        Field::Connections => {
+                            if !builder.is_connections_empty() {
+                                return Err(de::Error::duplicate_field("connections"));
+                            }
+                            map.next_value_seed(ConnectionsDeserializer::new(&mut builder))?;
                         }
                         Field::Class => {
                             if builder.is_class_set() {
@@ -313,13 +546,7 @@ impl<'m> ComponentsDeserializer<'m> {
 }
 
 impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
-    type Value = HashMap<
-        ComponentId,
-        (
-            HashSet<ComponentWeakRef>,
-            HashMap<StringId, ComponentWeakRef>,
-        ),
-    >;
+    type Value = HashMap<ComponentId, ComponentBuildArtifacts>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -330,13 +557,7 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
         }
 
         impl<'de, 'm> Visitor<'de> for ComponentsVisitor<'m> {
-            type Value = HashMap<
-                ComponentId,
-                (
-                    HashSet<ComponentWeakRef>,
-                    HashMap<StringId, ComponentWeakRef>,
-                ),
-            >;
+            type Value = HashMap<ComponentId, ComponentBuildArtifacts>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a map of component descriptions")
@@ -346,18 +567,19 @@ impl<'de, 'm> DeserializeSeed<'de> for ComponentsDeserializer<'m> {
             where
                 A: MapAccess<'de>,
             {
-                let mut component_refs = match map.size_hint() {
+                let mut component_artifacts = match map.size_hint() {
                     Some(count) => HashMap::with_capacity(count),
                     None => HashMap::default(),
                 };
 
                 while let Some(name) = map.next_key()? {
-                    let (component, references, named_references) =
+                    let (component, artifacts) =
                         map.next_value_seed(ComponentDeserializer::new(self.module, name))?;
-                    component_refs.insert(component, (references, named_references));
+
+                    component_artifacts.insert(component, artifacts);
                 }
 
-                Ok(component_refs)
+                Ok(component_artifacts)
             }
         }
 

@@ -57,7 +57,11 @@ class PyComponent:
         n_instances: int | None = None,
     ) -> PyComponentRef: ...
     def add_connection(
-        self, source_pins: PyPortPins, sink: PyPortPins
+        self,
+        source_pins: PyPortPins,
+        sink_pins: PyPortPins,
+        source_component: PyComponentRef | None = None,
+        sink_component: PyComponentRef | None = None,
     ) -> PyConnection: ...
 
 class PyComponentRef:

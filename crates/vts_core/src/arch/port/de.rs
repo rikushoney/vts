@@ -6,7 +6,7 @@ use serde::{
 };
 
 use crate::arch::{
-    component::{ComponentBuilder, ComponentData},
+    component::{ComponentBuilder, ComponentId},
     port::{PortBuildError, PortBuilder},
     Module,
 };
@@ -14,15 +14,11 @@ use crate::arch::{
 pub struct PortDeserializer<'m> {
     module: &'m mut Module,
     name: String,
-    component: &'m mut ComponentData,
+    component: ComponentId,
 }
 
 impl<'m> PortDeserializer<'m> {
-    pub(crate) fn new(
-        module: &'m mut Module,
-        name: String,
-        component: &'m mut ComponentData,
-    ) -> Self {
+    pub(crate) fn new(module: &'m mut Module, name: String, component: ComponentId) -> Self {
         Self {
             module,
             name,
@@ -41,7 +37,7 @@ impl<'de, 'm> DeserializeSeed<'de> for PortDeserializer<'m> {
         struct PortVisitor<'a, 'm> {
             module: &'m mut Module,
             name: &'a str,
-            component: &'m mut ComponentData,
+            component: ComponentId,
         }
 
         const FIELDS: &[&str] = &["name", "kind", "n_pins", "class"];
@@ -136,7 +132,7 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for PortsDeserializer<'a, 'm> {
     {
         struct PortsVisitor<'m> {
             module: &'m mut Module,
-            component: &'m mut ComponentData,
+            component: ComponentId,
         }
 
         impl<'de, 'm> Visitor<'de> for PortsVisitor<'m> {
@@ -160,7 +156,7 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for PortsDeserializer<'a, 'm> {
 
         deserializer.deserialize_map(PortsVisitor {
             module: self.builder.module,
-            component: &mut self.builder.data,
+            component: self.builder.placeholder,
         })
     }
 }

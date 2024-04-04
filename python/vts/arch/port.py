@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Literal
 
 from vts._vts_api_rs import (
-    PyPinRange as _PinRange,
     PyPort as _Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
+    PyPortPins as _PortPins,
 )
 
 
@@ -101,6 +101,15 @@ class Port:
 
         return port
 
+    def select(self, range: slice) -> PortPins:
+        start = range.start
+        end = range.stop
+
+        if range.step is not None and range.step != 1:
+            raise ValueError("only single step slicing supported")
+
+        return PortPins(self, start, end)
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -109,14 +118,14 @@ class Port:
         return f'Port(name="{self.name}", kind={self.kind}, class={class_})'
 
 
-class PinRange:
+class PortPins:
     def __init__(
         self, port: Port, start: int | None = None, end: int | None = None
     ) -> None:
-        self._range = _PinRange(port._port, start, end)
+        self._range = _PortPins(port._port, start, end)
 
     @classmethod
-    def _wrap(cls, range: _PinRange) -> PinRange:
+    def _wrap(cls, range: _PortPins) -> PortPins:
         r = cls.__new__(cls)
         r._range = range
         return r

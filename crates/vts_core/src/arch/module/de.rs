@@ -6,11 +6,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 
-use crate::arch::{
-    component::de::ComponentsDeserializer,
-    module::{ModuleBuildError, ModuleBuilder},
-    Module,
-};
+use crate::arch::{component::de::ComponentsDeserializer, module::ModuleBuilder, Module};
 
 impl<'de> Deserialize<'de> for Module {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -59,35 +55,9 @@ impl<'de> Deserialize<'de> for Module {
                     }
                 }
 
-                let mut ok = Ok(());
-                for (component, references) in unresolved {
-                    let (references, named_references) =
-                        (references.0.into_iter(), references.1.into_iter());
-                    if let Err(err) = builder.resolve_references(component, references) {
-                        ok = Err(err);
-                        break;
-                    }
-                    if let Err(err) = builder.resolve_references(component, named_references) {
-                        ok = Err(err);
-                        break;
-                    }
-                }
-
-                ok.and(builder.finish()).map_err(|err| match err {
-                    ModuleBuildError::MissingField(name) => de::Error::missing_field(name),
-                    ModuleBuildError::DuplicateReference {
-                        component,
-                        reference,
-                    } => de::Error::custom(format!(
-                        r#"component "{reference}" already referenced in "{component}""#,
-                    )),
-                    ModuleBuildError::UndefinedReference {
-                        component,
-                        reference,
-                    } => de::Error::custom(format!(
-                        r#"undefined component "{reference}" referenced in "{component}""#,
-                    )),
-                })
+                builder
+                    .resolve_and_finish(unresolved)
+                    .map_err(|err| de::Error::custom(format!("{err}")))
             }
         }
 

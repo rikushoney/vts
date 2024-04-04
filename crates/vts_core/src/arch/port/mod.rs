@@ -6,7 +6,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::arch::{component::ComponentData, ComponentId, Module, StringId};
+use crate::arch::{ComponentId, Module, StringId};
 
 impl_dbkey_wrapper!(PortId, u32);
 
@@ -49,24 +49,20 @@ pub struct PortData {
 impl PortData {
     fn new(
         module: &mut Module,
-        parent: &mut ComponentData,
+        parent: ComponentId,
         name: &str,
         kind: PortKind,
         n_pins: usize,
         class: Option<PortClass>,
     ) -> Self {
         let name = module.strings.entry(name);
+        let component = &module[parent];
         assert!(
-            parent.ports.get(&name).is_none(),
+            component.ports.get(&name).is_none(),
             r#"port "{port}" already in component "{component}""#,
             port = &module.strings[name],
-            component = &module.strings[parent.name],
+            component = &module.strings[component.name],
         );
-
-        let parent = *module
-            .components
-            .get(&parent.name)
-            .expect("parent component not in module");
 
         Self {
             name,
@@ -157,6 +153,10 @@ impl PortPins {
         self.range.end
     }
 
+    pub fn range(&self) -> Range<u32> {
+        self.range.clone()
+    }
+
     pub fn port<'m>(&self, module: &'m Module) -> Port<'m> {
         Port::new(module, self.port)
     }
@@ -164,8 +164,8 @@ impl PortPins {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct WeakPortPins {
-    port: StringId,
-    range: Range<u32>,
+    pub(crate) port: StringId,
+    pub(crate) range: Range<u32>,
 }
 
 impl WeakPortPins {
@@ -176,7 +176,7 @@ impl WeakPortPins {
 
 pub struct PortBuilder<'m> {
     module: &'m mut Module,
-    parent: &'m mut ComponentData,
+    parent: ComponentId,
     data: PortData,
     name_is_set: bool,
     kind_is_set: bool,
@@ -192,7 +192,7 @@ pub enum PortBuildError {
 }
 
 impl<'m> PortBuilder<'m> {
-    pub fn new(module: &'m mut Module, parent: &'m mut ComponentData) -> Self {
+    pub fn new(module: &'m mut Module, parent: ComponentId) -> Self {
         let data = PortData::new(module, parent, "", PortKind::Input, 1, None);
 
         Self {
@@ -256,7 +256,7 @@ impl<'m> PortBuilder<'m> {
         let name = self.data.name;
         let port = self.module.port_db.entry(self.data);
 
-        if self.parent.ports.insert(name, port).is_some() {
+        if self.module[self.parent].ports.insert(name, port).is_some() {
             let port = self.module.strings[name].to_string();
             let module = self.module.strings[self.module.name].to_string();
 
@@ -269,7 +269,7 @@ impl<'m> PortBuilder<'m> {
                 .strings
                 .rlookup(self.module[port].name(self.module))
                 .expect("port name should be in module strings");
-            self.parent.ports.contains_key(&name)
+            self.module[self.parent].ports.contains_key(&name)
         });
 
         Ok(port)

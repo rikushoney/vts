@@ -12,8 +12,8 @@ from vts._vts_api_rs import (
     PyPortKind as PortKind,
 )
 from vts.arch.port import (
-    PinRange,
     Port,
+    PortPins,
     _port_class_from_str,
     _port_kind_from_str,
     _PortClassStr,
@@ -118,9 +118,20 @@ class Component:
             self._component.add_reference(component._component, alias, n_instances)
         )
 
-    def add_connection(self, source: PinRange, sink: PinRange) -> Connection:
+    def add_connection(
+        self,
+        source: PortPins,
+        sink: PortPins,
+        source_component: ComponentRef | None = None,
+        sink_component: ComponentRef | None = None,
+    ) -> Connection:
         return Connection._wrap(
-            self._component.add_connection(source._range, sink._range)
+            self._component.add_connection(
+                source._range,
+                sink._range,
+                source_component._reference if source_component is not None else None,
+                sink_component._reference if sink_component is not None else None,
+            )
         )
 
     @classmethod
@@ -154,7 +165,7 @@ class ComponentRef:
 
 
 class Connection:
-    def __init__(self, source: PinRange, sink: PinRange) -> None:
+    def __init__(self, source: PortPins, sink: PortPins) -> None:
         self._connection = _Connection(source._range, sink._range)
 
     @classmethod
