@@ -40,9 +40,9 @@ impl<'py> FromPyObject<'py> for NameOrComponent<'py> {
             Ok(NameOrComponent::Component(component.clone()))
         } else {
             let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(
+            Err(PyTypeError::new_err(format!(
                 r#"expected string or component, not "{error_ty}""#,
-            ))
+            )))
         }
     }
 }
@@ -88,9 +88,9 @@ impl<'py> FromPyObject<'py> for ComponentClassOrStr<'py> {
             Ok(ComponentClassOrStr::Str(string.clone()))
         } else {
             let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(
+            Err(PyTypeError::new_err(format!(
                 r#"expected component class or string, not "{error_ty}""#,
-            ))
+            )))
         }
     }
 }
