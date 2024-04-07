@@ -1,12 +1,11 @@
+#![allow(unused)] // TODO: remove this!
+
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyMapping, PyString};
 use vts_core::arch::Module;
 
-use crate::arch::{
-    convert::{Converter, ModuleConverter, PyModuleConvertError, PyModuleConverter},
-    PyComponent,
-};
+use crate::arch::PyComponent;
 
 #[pyclass]
 #[pyo3(name = "PyModule")]
@@ -67,9 +66,9 @@ impl PyModule_ {
     }
 
     pub fn add_components(&mut self, components: &Bound<'_, PyMapping>) -> PyResult<()> {
-        iter_mapping_items!(for (name: PyString, component: PyComponent) in components => {
-            self.add_component(name, component)?;
-        });
+        // iter_mapping_items!(for (name: PyString, component: PyComponent) in components => {
+        //     self.add_component(name, component)?;
+        // });
 
         Ok(())
     }
@@ -80,10 +79,11 @@ pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
 
     let input = input.downcast::<PyString>()?;
-    let module: Module = map_serde_py_err!(serde_json::from_str(input.to_str()?))?;
-    let converter = ModuleConverter(py, module);
+    // let module: Module = map_serde_py_err!(serde_json::from_str(input.to_str()?))?;
+    // let converter = ModuleConverter(py, module);
 
-    converter.convert()
+    // converter.convert()
+    todo!()
 }
 
 #[pyfunction]
@@ -92,18 +92,19 @@ pub fn json_dumps(
     module: &Bound<'_, PyModule_>,
     pretty: bool,
 ) -> PyResult<Py<PyString>> {
-    let converter = PyModuleConverter(module.clone());
-    let module = converter.convert().map_err(|err| match err {
-        PyModuleConvertError::Python(err) => err,
-        _ => PyValueError::new_err(format!("{err}")),
-    })?;
+    // let converter = PyModuleConverter(module.clone());
+    // let module = converter.convert().map_err(|err| match err {
+    //     PyModuleConvertError::Python(err) => err,
+    //     _ => PyValueError::new_err(format!("{err}")),
+    // })?;
 
-    let json = if pretty {
-        map_serde_py_err!(serde_json::to_string_pretty(&module))?
-    } else {
-        map_serde_py_err!(serde_json::to_string(&module))?
-    };
+    // let json = if pretty {
+    //     map_serde_py_err!(serde_json::to_string_pretty(&module))?
+    // } else {
+    //     map_serde_py_err!(serde_json::to_string(&module))?
+    // };
 
-    let json = PyString::new_bound(py, json.as_str());
-    Ok(json.into_py(py))
+    // let json = PyString::new_bound(py, json.as_str());
+    // Ok(json.into_py(py))
+    todo!()
 }

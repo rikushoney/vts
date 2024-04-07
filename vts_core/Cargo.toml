@@ -7,4 +7,5 @@ edition = "2021"
 fnv.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+slotmap = "1.0.7"
 thiserror.workspace = true

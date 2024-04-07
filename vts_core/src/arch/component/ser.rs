@@ -10,7 +10,6 @@ use crate::arch::{
     port::{ser::PortsSerializer, PortPins},
     ComponentId, Module, StringId,
 };
-use crate::database::Database;
 
 struct ComponentRefSerializer<'m> {
     module: &'m Module,

@@ -1,3 +1,5 @@
+#![allow(unused)] // TODO: remove this!
+
 use std::ops::Deref;
 
 use pyo3::exceptions::PyValueError;
@@ -52,31 +54,31 @@ impl PyComponent {
         let mut component = PyComponent::new(&name, self.class_);
 
         let ports = self.ports.bind(py);
-        iter_dict_items!(for (name: PyString, port: PyPort) in ports => {
-            component.add_port(name, port)?;
-        });
+        // iter_dict_items!(for (name: PyString, port: PyPort) in ports => {
+        //     component.add_port(name, port)?;
+        // });
 
         let references = self.references.bind(py);
-        iter_dict_items!(for (alias: PyString, reference: PyComponentRef) in references => {
-            let reference = reference.borrow();
-            let n_instances = reference.n_instances;
-            let reference = Bound::new(py, reference.component.clone())?;
-            component.add_reference(&reference, Some(alias), Some(n_instances))?;
-        });
+        // iter_dict_items!(for (alias: PyString, reference: PyComponentRef) in references => {
+        //     let reference = reference.borrow();
+        //     let n_instances = reference.n_instances;
+        //     let reference = Bound::new(py, reference.component.clone())?;
+        //     component.add_reference(&reference, Some(alias), Some(n_instances))?;
+        // });
 
         let connections = self.connections.bind(py);
-        iter_list_items!(for (connection: PyConnection) in connections => {
-            let connection = connection.borrow();
-            let source_pins = Bound::new(py, connection.source_pins.clone())?;
-            let source_component = connection.source_component.as_ref().map(|component| {
-                component.bind(py)
-            });
-            let sink_pins = Bound::new(py, connection.sink_pins.clone())?;
-            let sink_component = connection.sink_component.as_ref().map(|component| {
-                component.bind(py)
-            });
-            component.add_connection(&source_pins, &sink_pins, source_component, sink_component)?;
-        });
+        // iter_list_items!(for (connection: PyConnection) in connections => {
+        //     let connection = connection.borrow();
+        //     let source_pins = Bound::new(py, connection.source_pins.clone())?;
+        //     let source_component = connection.source_component.as_ref().map(|component| {
+        //         component.bind(py)
+        //     });
+        //     let sink_pins = Bound::new(py, connection.sink_pins.clone())?;
+        //     let sink_component = connection.sink_component.as_ref().map(|component| {
+        //         component.bind(py)
+        //     });
+        //     component.add_connection(&source_pins, &sink_pins, source_component, sink_component)?;
+        // });
 
         Ok(component)
     }
@@ -107,9 +109,9 @@ impl PyComponent {
     }
 
     pub fn add_ports(&mut self, ports: &Bound<'_, PyMapping>) -> PyResult<()> {
-        iter_mapping_items!(for (name: PyString, port: PyPort) in ports => {
-            self.add_port(name, port)?;
-        });
+        // iter_mapping_items!(for (name: PyString, port: PyPort) in ports => {
+        //     self.add_port(name, port)?;
+        // });
 
         Ok(())
     }
