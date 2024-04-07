@@ -4,27 +4,28 @@
 // pub mod ser;
 
 use std::collections::hash_map;
+use std::ops::{Index, IndexMut};
 
 use fnv::FnvHashMap;
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 
 use super::component::{
-    ComponentBuildArtifacts, ComponentData, ComponentRefData, ConnectionBuildError, WeakConnection,
+    connection::ConnectionBuildError, ComponentBuildArtifacts, ComponentData, ComponentRefData,
+    WeakConnection,
 };
 use super::port::PortData;
 
 new_key_type! {
-    pub(crate) struct ComponentId;
-    pub(crate) struct ComponentRefId;
-    pub(crate) struct PortId;
+    pub struct ComponentId;
+    pub struct ComponentRefId;
+    pub struct PortId;
 }
 
 #[derive(Clone, Debug)]
 pub struct Module {
     pub(crate) name: String,
     pub(crate) components: SlotMap<ComponentId, ComponentData>,
-    pub(crate) component_names: FnvHashMap<String, ComponentId>,
     pub(crate) ports: SlotMap<PortId, PortData>,
     pub(crate) references: SlotMap<ComponentRefId, ComponentRefData>,
 }
@@ -34,26 +35,25 @@ impl Module {
         Self {
             name: name.to_string(),
             components: SlotMap::default(),
-            component_names: FnvHashMap::default(),
             ports: SlotMap::default(),
             references: SlotMap::default(),
         }
     }
 
-    // pub fn name(&self) -> &str {
-    //     &self.strings[self.name]
-    // }
-
-    // pub fn rename(&mut self, name: &str) {
-    //     self.name = self.strings.entry(name);
-    // }
-
-    pub fn components(&self) -> ComponentIter {
-        ComponentIter {
-            module: self,
-            iter: self.component_names.values(),
-        }
+    pub fn name(&self) -> &str {
+        &self.name
     }
+
+    pub fn rename(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
+    // pub fn components(&self) -> ComponentIter {
+    //     ComponentIter {
+    //         module: self,
+    //         iter: self.component_name_map.values(),
+    //     }
+    // }
 
     // pub fn get_component(&self, component: ComponentId) -> Option<&ComponentData> {
     //     if self.components.values().any(|c| c == &component) {
@@ -92,11 +92,11 @@ macro_rules! impl_module_index_ops {
     }
 }
 
-// impl_module_index_ops!(
-//     ComponentId => ComponentData in component_db,
-//     PortId => PortData in port_db,
-//     ComponentRefId => ComponentRefData in reference_db
-// );
+impl_module_index_ops!(
+    ComponentId => ComponentData in components,
+    PortId => PortData in ports,
+    ComponentRefId => ComponentRefData in references,
+);
 
 pub struct ComponentIter<'m> {
     module: &'m Module,

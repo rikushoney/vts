@@ -6,16 +6,19 @@
 pub mod connection;
 
 use std::collections::{hash_map, HashSet};
+use std::marker::PhantomData;
 use std::slice;
 
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::arch::{
+use super::{
     port::{PortPins, WeakPortPins},
     ComponentId, ComponentRefId, Module, PortId,
 };
+
+use connection::Connection;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -26,15 +29,23 @@ pub enum ComponentClass {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentData {
-    pub(crate) name: String,
-    pub(crate) ports: FnvHashMap<String, PortId>,
-    pub(crate) references: FnvHashMap<String, ComponentRefId>,
+    pub name: String,
+    pub(crate) ports: Vec<PortId>,
+    pub(crate) references: Vec<ComponentRefId>,
     pub(crate) connections: Vec<Connection>,
     pub class: Option<ComponentClass>,
 }
 
 impl ComponentData {
-    // fn new(module: &mut Module, name: &str, class: Option<ComponentClass>) -> Self {}
+    fn new<S: Into<String>>(name: S, class: Option<ComponentClass>) -> Self {
+        Self {
+            name: name.into(),
+            ports: Vec::new(),
+            references: Vec::new(),
+            connections: Vec::new(),
+            class,
+        }
+    }
 
     // pub fn name<'m>(&'m self, module: &'m Module) -> &str {
     //     &module.strings[self.name]
@@ -64,7 +75,7 @@ impl ComponentData {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentRefData {
     pub(crate) component: ComponentId,
-    alias: String,
+    pub alias: String,
     pub n_instances: usize,
 }
 
@@ -79,80 +90,84 @@ impl ComponentRefData {
 }
 
 #[derive(Clone, Debug)]
-pub struct Component<'m> {
-    module: &'m Module,
-    id: ComponentId,
-    data: &'m ComponentData,
-}
+pub struct Component<'m>(pub &'m Module, pub ComponentId);
 
 impl<'m> Component<'m> {
-    // fn new(module: &'m Module, id: ComponentId) -> Self {
-    //     let data = &module.component_db[id];
+    pub(crate) fn new(module: &'m Module, component: ComponentId) -> Self {
+        Self(module, component)
+    }
 
-    //     Self { module, id, data }
+    pub fn module(&self) -> &'m Module {
+        self.0
+    }
+
+    pub(crate) fn data(&self) -> &'m ComponentData {
+        &self.module()[self.1]
+    }
+
+    pub fn name(&self) -> &'m str {
+        &self.data().name
+    }
+
+    // pub fn ports(&self) -> PortIter<'m> {
+    //     PortIter {
+    //         module: self.module,
+    //         iter: self.data.ports.values(),
+    //     }
     // }
 
-    // pub fn name(&self) -> &'m str {
-    //     self.data.name(self.module)
+    // pub fn references(&self) -> ComponentRefIter<'m> {
+    //     ComponentRefIter {
+    //         module: self.module,
+    //         iter: self.data.references.iter(),
+    //     }
     // }
 
-    pub fn ports(&self) -> PortIter<'m> {
-        PortIter {
-            module: self.module,
-            iter: self.data.ports.values(),
-        }
-    }
-
-    pub fn references(&self) -> ComponentRefIter<'m> {
-        ComponentRefIter {
-            module: self.module,
-            iter: self.data.references.iter(),
-        }
-    }
-
-    pub fn connections(&self) -> ConnectionIter<'m> {
-        ConnectionIter {
-            iter: self.data.connections.iter(),
-        }
-    }
+    // pub fn connections(&self) -> ConnectionIter<'m> {
+    //     ConnectionIter {
+    //         iter: self.data.connections.iter(),
+    //     }
+    // }
 
     pub fn class(&self) -> Option<ComponentClass> {
-        self.data.class
+        self.data().class
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct ComponentRef<'m> {
-    module: &'m Module,
-    id: ComponentRefId,
-    data: &'m ComponentRefData,
-}
+pub struct ComponentRef<'m>(&'m Module, ComponentRefId);
 
 impl<'m> ComponentRef<'m> {
-    // fn new(module: &'m Module, id: ComponentRefId) -> Self {
-    //     let data = &module[id];
+    pub(crate) fn new(module: &'m Module, reference: ComponentRefId) -> Self {
+        Self(module, reference)
+    }
 
-    //     Self { module, id, data }
-    // }
+    pub(crate) fn module(&self) -> &'m Module {
+        self.0
+    }
 
-    // pub fn component(&self) -> Component<'m> {
-    //     Component::new(self.module, self.data.component)
-    // }
+    pub(crate) fn data(&self) -> &'m ComponentRefData {
+        &self.module()[self.1]
+    }
 
-    // pub fn alias(&self) -> &'m str {
-    //     &self.module.strings[self.data.alias]
-    // }
+    pub fn component(&self) -> Component<'m> {
+        Component::new(self.module(), self.data().component)
+    }
+
+    pub fn alias(&self) -> &'m str {
+        &self.data().alias
+    }
 
     pub fn n_instances(&self) -> usize {
-        self.data.n_instances
+        self.data().n_instances
     }
 }
 
-impl<'m> PartialEq<ComponentRef<'m>> for &Component<'m> {
-    fn eq(&self, other: &ComponentRef) -> bool {
-        self.id == other.data.component
-    }
-}
+// impl<'m> PartialEq<ComponentRef<'m>> for &Component<'m> {
+//     fn eq(&self, other: &ComponentRef) -> bool {
+//         self.id == other.data.component
+//     }
+// }
 
 // impl<'m> Index<PortId> for Component<'m> {
 //     type Output = PortData;
@@ -208,86 +223,53 @@ impl<'m> Iterator for ConnectionIter<'m> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq)]
-pub struct Connection {
-    source_component: Option<ComponentRefId>,
-    source_pins: PortPins,
-    sink_component: Option<ComponentRefId>,
-    sink_pins: PortPins,
+pub struct NameSet(String);
+pub struct NameUnset;
+
+pub struct ComponentBuilder<'m, N> {
+    pub(crate) module: &'m mut Module,
+    // pub(crate) placeholder: ComponentId,
+    // pub(crate) data: ComponentData,
+    // unresolved_references: HashSet<ComponentWeakRef>,
+    // unresolved_named_references: FnvHashMap<String, ComponentWeakRef>,
+    // unresolved_connections: Vec<WeakConnection>,
+    name: N,
+    class: Option<ComponentClass>,
 }
 
-impl Connection {
-    pub(crate) fn new(
-        source_pins: PortPins,
-        sink_pins: PortPins,
-        source_component: Option<ComponentRefId>,
-        sink_component: Option<ComponentRefId>,
-    ) -> Self {
+impl<'m> ComponentBuilder<'m, NameUnset> {
+    pub fn new(module: &'m mut Module) -> Self {
         Self {
-            source_component,
-            source_pins,
-            sink_component,
-            sink_pins,
+            module,
+            name: NameUnset,
+            class: None,
         }
     }
 
-    pub fn source_pins(&self) -> &PortPins {
-        &self.source_pins
+    pub fn set_name(self, name: &str) -> ComponentBuilder<'m, NameSet> {
+        ComponentBuilder {
+            module: self.module,
+            name: NameSet(name.to_string()),
+            class: self.class,
+        }
     }
-
-    pub fn sink_pins(&self) -> &PortPins {
-        &self.sink_pins
-    }
-
-    // pub fn source_component<'m>(&self, module: &'m Module) -> Option<ComponentRef<'m>> {
-    //     self.source_component
-    //         .map(|source_component| source_component.to_reference(module))
-    // }
-
-    // pub fn sink_component<'m>(&self, module: &'m Module) -> Option<ComponentRef<'m>> {
-    //     self.sink_component
-    //         .map(|sink_component| sink_component.to_reference(module))
-    // }
-
-    // pub fn source_port<'m>(
-    //     &self,
-    //     module: &'m Module,
-    //     component: &Component<'m>,
-    // ) -> Option<Port<'m>> {
-    //     if let Some(source_component) = self.source_component {
-    //         let source_component = source_component.to_component(module);
-    //         source_component
-    //             .ports()
-    //             .find(|port| port.name() == self.source_pins.port(module).name())
-    //     } else {
-    //         component
-    //             .ports()
-    //             .find(|port| port.name() == self.source_pins.port(module).name())
-    //     }
-    // }
-
-    // pub fn sink_port<'m>(&self, module: &'m Module, component: &Component<'m>) -> Option<Port<'m>> {
-    //     if let Some(sink_component) = self.sink_component {
-    //         let sink_component = sink_component.to_component(module);
-    //         sink_component
-    //             .ports()
-    //             .find(|port| port.name() == self.sink_pins.port(module).name())
-    //     } else {
-    //         component
-    //             .ports()
-    //             .find(|port| port.name() == self.sink_pins.port(module).name())
-    //     }
-    // }
 }
 
-pub struct ComponentBuilder<'m> {
-    pub(crate) module: &'m mut Module,
-    pub(crate) placeholder: ComponentId,
-    pub(crate) data: ComponentData,
-    unresolved_references: HashSet<ComponentWeakRef>,
-    unresolved_named_references: FnvHashMap<String, ComponentWeakRef>,
-    unresolved_connections: Vec<WeakConnection>,
-    name_is_set: bool,
+impl<'m, N> ComponentBuilder<'m, N> {
+    pub fn set_class(&mut self, class: ComponentClass) {
+        self.class = Some(class)
+    }
+}
+
+impl<'m> ComponentBuilder<'m, NameSet> {
+    pub fn finish(self) -> Component<'m> {
+        let component = {
+            let component = ComponentData::new(self.name.0, self.class);
+            self.module.components.insert(component)
+        };
+
+        Component::new(self.module, component)
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -328,7 +310,7 @@ pub struct ComponentBuildArtifacts {
 pub(crate) type ComponentBuildResult =
     Result<(ComponentId, ComponentBuildArtifacts), ComponentBuildError>;
 
-impl<'m> ComponentBuilder<'m> {
+impl<'m, N> ComponentBuilder<'m, N> {
     // pub fn new(module: &'m mut Module) -> Self {
     //     let data = ComponentData::new(module, "", None);
     //     let placeholder = module.component_db.entry(data.clone());
@@ -440,46 +422,46 @@ impl<'m> ComponentBuilder<'m> {
     //     Ok(reference)
     // }
 
-    pub fn add_connection(&mut self) -> ConnectionBuilder<'_> {
-        ConnectionBuilder::new(&mut self.data)
-    }
+    // pub fn add_connection(&mut self) -> ConnectionBuilder<'_> {
+    //     ConnectionBuilder::new(&mut self.data)
+    // }
 
-    pub fn add_weak_connection(&mut self) -> WeakConnectionBuilder<'_, 'm> {
-        WeakConnectionBuilder::new(self)
-    }
+    // pub fn add_weak_connection(&mut self) -> WeakConnectionBuilder<'_, 'm> {
+    //     WeakConnectionBuilder::new(self)
+    // }
 
-    pub fn set_class(&mut self, class: ComponentClass) -> &mut Self {
-        self.data.class = Some(class);
-        self
-    }
+    // pub fn set_class(&mut self, class: ComponentClass) -> &mut Self {
+    //     self.data.class = Some(class);
+    //     self
+    // }
 
-    pub fn is_name_set(&self) -> bool {
-        self.name_is_set
-    }
+    // pub fn is_name_set(&self) -> bool {
+    //     self.name_is_set
+    // }
 
-    pub fn is_ports_empty(&self) -> bool {
-        self.data.ports.is_empty()
-    }
+    // pub fn is_ports_empty(&self) -> bool {
+    //     self.data.ports.is_empty()
+    // }
 
-    pub fn is_references_empty(&self) -> bool {
-        self.data.references.is_empty()
-    }
+    // pub fn is_references_empty(&self) -> bool {
+    //     self.data.references.is_empty()
+    // }
 
-    pub fn is_unresolved_references_empty(&self) -> bool {
-        self.unresolved_references.is_empty()
-    }
+    // pub fn is_unresolved_references_empty(&self) -> bool {
+    //     self.unresolved_references.is_empty()
+    // }
 
-    pub fn is_unresolved_named_references_empty(&self) -> bool {
-        self.unresolved_named_references.is_empty()
-    }
+    // pub fn is_unresolved_named_references_empty(&self) -> bool {
+    //     self.unresolved_named_references.is_empty()
+    // }
 
-    pub fn is_connections_empty(&self) -> bool {
-        self.data.connections.is_empty()
-    }
+    // pub fn is_connections_empty(&self) -> bool {
+    //     self.data.connections.is_empty()
+    // }
 
-    pub fn is_class_set(&self) -> bool {
-        self.data.class.is_some()
-    }
+    // pub fn is_class_set(&self) -> bool {
+    //     self.data.class.is_some()
+    // }
 
     // pub fn finish(mut self) -> ComponentBuildResult {
     //     use std::mem;
@@ -532,143 +514,4 @@ impl<'m> ComponentBuilder<'m> {
     //         },
     //     ))
     // }
-}
-
-pub struct ConnectionBuilder<'m> {
-    component: &'m mut ComponentData,
-    source: Option<(PortPins, Option<ComponentRefId>)>,
-    sink: Option<(PortPins, Option<ComponentRefId>)>,
-}
-
-#[derive(Debug, Error)]
-pub enum ConnectionBuildError {
-    #[error("connection must have a {0}")]
-    MissingField(&'static str),
-    #[error(r#"undefined port "{port}" connected"#)]
-    UndefinedPort { port: String },
-    #[error(r#"undefined component "{reference}" connected"#)]
-    UndefinedReference { reference: String },
-}
-
-impl<'m> ConnectionBuilder<'m> {
-    fn new(component: &'m mut ComponentData) -> Self {
-        Self {
-            component,
-            source: None,
-            sink: None,
-        }
-    }
-
-    pub(crate) fn set_source(
-        &mut self,
-        pins: PortPins,
-        component: Option<ComponentRefId>,
-    ) -> &mut Self {
-        self.source = Some((pins, component));
-        self
-    }
-
-    pub(crate) fn set_sink(
-        &mut self,
-        pins: PortPins,
-        component: Option<ComponentRefId>,
-    ) -> &mut Self {
-        self.sink = Some((pins, component));
-        self
-    }
-
-    pub fn is_source_set(&self) -> bool {
-        self.source.is_some()
-    }
-
-    pub fn is_sink_set(&self) -> bool {
-        self.sink.is_some()
-    }
-
-    pub fn finish(self) -> Result<&'m Connection, ConnectionBuildError> {
-        let source = self
-            .source
-            .ok_or(ConnectionBuildError::MissingField("source"))?;
-        let sink = self
-            .sink
-            .ok_or(ConnectionBuildError::MissingField("sink"))?;
-
-        let connections = &mut self.component.connections;
-        let i = connections.len();
-        connections.push(Connection::new(source.0, sink.0, source.1, sink.1));
-
-        Ok(&connections[i])
-    }
-}
-
-pub struct WeakConnectionBuilder<'a, 'm> {
-    builder: &'a mut ComponentBuilder<'m>,
-    source: Option<(WeakPortPins, Option<String>)>,
-    sink: Option<(WeakPortPins, Option<String>)>,
-}
-
-impl<'a, 'm> WeakConnectionBuilder<'a, 'm> {
-    fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
-        Self {
-            builder,
-            source: None,
-            sink: None,
-        }
-    }
-
-    // pub fn set_source(
-    //     &mut self,
-    //     port: &str,
-    //     range: Range<u32>,
-    //     component: Option<&str>,
-    // ) -> &mut Self {
-    //     let module = &mut self.builder.module;
-    //     let port = module.strings.entry(port);
-    //     let pins = WeakPortPins::new(port, range);
-    //     let component = component.map(|component| module.strings.entry(component));
-    //     self.source = Some((pins, component));
-    //     self
-    // }
-
-    // pub fn set_sink(
-    //     &mut self,
-    //     port: &str,
-    //     range: Range<u32>,
-    //     component: Option<&str>,
-    // ) -> &mut Self {
-    //     let module = &mut self.builder.module;
-    //     let port = module.strings.entry(port);
-    //     let pins = WeakPortPins::new(port, range);
-    //     let component = component.map(|component| self.builder.module.strings.entry(component));
-    //     self.sink = Some((pins, component));
-    //     self
-    // }
-
-    pub fn is_source_set(&self) -> bool {
-        self.source.is_some()
-    }
-
-    pub fn is_sink_set(&self) -> bool {
-        self.sink.is_some()
-    }
-
-    pub fn finish(self) -> Result<&'a WeakConnection, ConnectionBuildError> {
-        let source = self
-            .source
-            .ok_or(ConnectionBuildError::MissingField("source"))?;
-        let sink = self
-            .sink
-            .ok_or(ConnectionBuildError::MissingField("sink"))?;
-
-        let connections = &mut self.builder.unresolved_connections;
-        let i = connections.len();
-        connections.push(WeakConnection {
-            source_pins: source.0,
-            source_component: source.1,
-            sink_pins: sink.0,
-            sink_component: sink.1,
-        });
-
-        Ok(&connections[i])
-    }
 }

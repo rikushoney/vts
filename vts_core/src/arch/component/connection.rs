@@ -176,21 +176,22 @@ impl<'m> ConnectionBuilder<'m> {
 }
 
 pub struct WeakConnectionBuilder<'a, 'm> {
-    builder: &'a mut ComponentBuilder<'m>,
+    unused: std::marker::PhantomData<(&'a (), &'m ())>,
+    // builder: &'a mut ComponentBuilder<'m>,
     kind: Option<ConnectionKind>,
     source: Option<(WeakPortPins, Option<String>)>,
     sink: Option<(WeakPortPins, Option<String>)>,
 }
 
 impl<'a, 'm> WeakConnectionBuilder<'a, 'm> {
-    pub(super) fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
-        Self {
-            builder,
-            kind: None,
-            source: None,
-            sink: None,
-        }
-    }
+    // pub(super) fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
+    //     Self {
+    //         builder,
+    //         kind: None,
+    //         source: None,
+    //         sink: None,
+    //     }
+    // }
 
     pub fn set_kind(&mut self, kind: ConnectionKind) -> &mut Self {
         self.kind = Some(kind);

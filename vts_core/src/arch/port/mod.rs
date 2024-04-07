@@ -32,7 +32,7 @@ pub enum PortClass {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PortData {
-    name: String,
+    pub name: String,
     parent: ComponentId,
     pub kind: PortKind,
     pub n_pins: usize,
@@ -40,31 +40,21 @@ pub struct PortData {
 }
 
 impl PortData {
-    // fn new(
-    //     module: &mut Module,
-    //     parent: ComponentId,
-    //     name: &str,
-    //     kind: PortKind,
-    //     n_pins: usize,
-    //     class: Option<PortClass>,
-    // ) -> Self {
-    //     let name = module.strings.entry(name);
-    //     let component = &module[parent];
-    //     assert!(
-    //         component.ports.get(&name).is_none(),
-    //         r#"port "{port}" already in component "{component}""#,
-    //         port = &module.strings[name],
-    //         component = &module.strings[component.name],
-    //     );
-
-    //     Self {
-    //         name,
-    //         parent,
-    //         kind,
-    //         n_pins,
-    //         class,
-    //     }
-    // }
+    pub(crate) fn new(
+        parent: ComponentId,
+        name: &str,
+        kind: PortKind,
+        n_pins: usize,
+        class: Option<PortClass>,
+    ) -> Self {
+        Self {
+            name: name.to_string(),
+            parent,
+            kind,
+            n_pins,
+            class,
+        }
+    }
 
     // pub fn name<'m>(&'m self, module: &'m Module) -> &str {
     //     &module.strings[self.name]
@@ -93,37 +83,40 @@ impl PortData {
 }
 
 #[derive(Clone, Debug)]
-pub struct Port<'m> {
-    module: &'m Module,
-    id: PortId,
-    data: &'m PortData,
-}
+pub struct Port<'m>(&'m Module, PortId);
 
 impl<'m> Port<'m> {
-    // fn new(module: &'m Module, id: PortId) -> Self {
-    //     let data = &module.port_db[id];
+    pub(crate) fn new(module: &'m Module, port: PortId) -> Self {
+        Self(module, port)
+    }
 
-    //     Self { module, id, data }
-    // }
+    pub fn module(&self) -> &'m Module {
+        self.0
+    }
 
-    // pub fn name(&self) -> &str {
-    //     &self.module.strings[self.data.name]
-    // }
+    pub fn name(&self) -> &str {
+        &self.module()[self.1].name
+    }
+
+    pub(crate) fn data(&self) -> &'m PortData {
+        &self.module().ports[self.1]
+    }
 
     pub fn kind(&self) -> PortKind {
-        self.data.kind
+        self.data().kind
     }
 
     pub fn n_pins(&self) -> usize {
-        self.data.n_pins
+        self.data().n_pins
     }
 
     pub fn class(&self) -> Option<PortClass> {
-        self.data.class
+        self.data().class
     }
 
+    #[must_use]
     pub fn select(&self, range: Range<u32>) -> PortPins {
-        PortPins::new(self.id, range)
+        PortPins::new(self.1, range)
     }
 }
 
@@ -134,7 +127,7 @@ pub struct PortPins {
 }
 
 impl PortPins {
-    fn new(port: PortId, range: Range<u32>) -> Self {
+    pub(crate) fn new(port: PortId, range: Range<u32>) -> Self {
         Self { port, range }
     }
 
