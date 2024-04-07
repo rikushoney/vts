@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*"]
+members = ["vts_core", "vts_api", "vts_cli"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -7,4 +7,4 @@ fnv = "1.0.7"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = "1.0.113"
 thiserror = "1.0.58"
-vts_core = { path = "crates/vts_core" }
+vts_core = { path = "vts_core" }
