@@ -13,27 +13,113 @@ pub struct PyModule_ {
     inner: Module,
 }
 
+enum NameOrComponent<'py> {
+    Name(Bound<'py, PyString>),
+    Component(Bound<'py, PyComponent>),
+}
+
+impl<'py> NameOrComponent<'py> {
+    fn get_name(&self) -> PyResult<&Bound<'py, PyString>> {
+        match self {
+            NameOrComponent::Name(name) => Ok(name),
+            NameOrComponent::Component(component) => {
+                let error_ty = component.get_type();
+                Err(PyTypeError::new_err(format!(
+                    r#"expected name to be "str", not "{error_ty}""#
+                )))
+            }
+        }
+    }
+}
+
+impl<'py> FromPyObject<'py> for NameOrComponent<'py> {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        if let Ok(name) = ob.downcast::<PyString>() {
+            Ok(NameOrComponent::Name(name.clone()))
+        } else if let Ok(component) = ob.downcast::<PyComponent>() {
+            Ok(NameOrComponent::Component(component.clone()))
+        } else {
+            let error_ty = ob.get_type();
+            Err(PyTypeError::new_err(
+                r#"expected string or component, not "{error_ty}""#,
+            ))
+        }
+    }
+}
+
+enum ComponentClassOrStr<'py> {
+    Class(Bound<'py, PyComponentClass>),
+    Str(Bound<'py, PyString>),
+}
+
+impl<'py> ComponentClassOrStr<'py> {
+    fn class(py: Python<'_>, class: PyComponentClass) -> PyResult<ComponentClassOrStr> {
+        let class = Bound::new(py, class)?;
+        Ok(ComponentClassOrStr::Class(class))
+    }
+
+    fn get_class(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponentClass>> {
+        match self {
+            ComponentClassOrStr::Class(class) => Ok(class.clone()),
+            ComponentClassOrStr::Str(string) => {
+                let class = string.to_str()?.to_lowercase();
+                Bound::new(
+                    py,
+                    match class.as_str() {
+                        "lut" => PyComponentClass::LUT,
+                        "latch" | "ff" => PyComponentClass::LATCH,
+                        _ => {
+                            return Err(PyValueError::new_err(format!(
+                                r#"unknown component class "{class}""#
+                            )));
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+impl<'py> FromPyObject<'py> for ComponentClassOrStr<'py> {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        if let Ok(class) = ob.downcast::<PyComponentClass>() {
+            Ok(ComponentClassOrStr::Class(class.clone()))
+        } else if let Ok(string) = ob.downcast::<PyString>() {
+            Ok(ComponentClassOrStr::Str(string.clone()))
+        } else {
+            let error_ty = ob.get_type();
+            Err(PyTypeError::new_err(
+                r#"expected component class or string, not "{error_ty}""#,
+            ))
+        }
+    }
+}
+
 #[pymethods]
 impl PyModule_ {
     #[new]
-    pub fn new(name: &Bound<PyString>) -> PyResult<Self> {
+    fn new(name: &Bound<PyString>) -> PyResult<Self> {
         Ok(Self {
             inner: Module::new(name.to_str()?),
         })
     }
 
-    pub fn copy(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
+    fn copy(&self, name: Option<&Bound<'_, PyString>>) -> PyResult<Self> {
+        let mut module = self.inner.clone();
+
+        if let Some(name) = name {
+            module.rename(name.to_str()?);
         }
+
+        Ok(Self { inner: module })
     }
 
-    pub fn add_component_impl_(
+    fn add_component_impl_(
         slf: &Bound<'_, PyModule_>,
         py: Python<'_>,
         name: &Bound<'_, PyString>,
-        class: Option<PyComponentClass>,
-    ) -> PyResult<Py<PyComponent>> {
+        class: Option<ComponentClassOrStr<'_>>,
+    ) -> PyResult<PyComponent> {
         let mut module = slf.borrow_mut();
 
         // TODO: check for duplicate component names
@@ -41,24 +127,25 @@ impl PyModule_ {
         let mut builder = ComponentBuilder::new(&mut module.inner).set_name(name.to_str()?);
 
         if let Some(class) = class {
-            builder.set_class(ComponentClass::from(class));
+            let class = class.get_class(py)?.borrow();
+            builder.set_class(ComponentClass::from(*class));
         }
 
         let component = {
             let component = builder.finish();
-            PyComponent(slf.clone().unbind(), component.1)
+            PyComponent(slf.clone().unbind(), component.id())
         };
 
-        Py::new(py, component)
+        Ok(component)
     }
 
-    pub fn add_component_copy_(
-        slf: &Bound<'_, PyModule_>,
-        py: Python<'_>,
-        component: &Bound<'_, PyComponent>,
-        name: Option<&Bound<'_, PyString>>,
-        class: Option<PyComponentClass>,
-    ) -> PyResult<Py<PyComponent>> {
+    fn add_component_copy_<'py>(
+        slf: &Bound<'py, PyModule_>,
+        py: Python<'py>,
+        component: &Bound<'py, PyComponent>,
+        name: Option<&Bound<'py, PyString>>,
+        mut class: Option<ComponentClassOrStr<'py>>,
+    ) -> PyResult<PyComponent> {
         let (module, component) = {
             let component = component.borrow();
             (component.0.clone(), component.1)
@@ -73,49 +160,46 @@ impl PyModule_ {
         let name = name
             .cloned()
             .unwrap_or_else(|| PyString::new_bound(py, &component.name));
-        let class = component.class.map(PyComponentClass::from);
+
+        if class.is_none() {
+            class = component
+                .class
+                .map(|class| ComponentClassOrStr::class(py, class.into()))
+                .transpose()?
+        }
+
         Self::add_component_impl_(slf, py, &name, class)
     }
 
-    pub fn add_component(
+    fn add_component(
         slf: &Bound<'_, PyModule_>,
         py: Python<'_>,
-        name_or_component: Option<&Bound<'_, PyAny>>,
+        name_or_component: Option<NameOrComponent<'_>>,
         component: Option<&Bound<'_, PyComponent>>,
-        class: Option<PyComponentClass>,
-    ) -> PyResult<Py<PyComponent>> {
+        class: Option<ComponentClassOrStr<'_>>,
+    ) -> PyResult<PyComponent> {
         if let Some(component) = component {
             let name = name_or_component
-                .map(|first_arg| {
-                    first_arg.downcast::<PyString>().map_err(|_| {
-                        let error_ty = first_arg.get_type();
-                        PyTypeError::new_err(format!(
-                            r#"expected name to be "str" not "{error_ty}""#
-                        ))
-                    })
-                })
+                .as_ref()
+                .map(NameOrComponent::get_name)
                 .transpose()?;
 
             return Self::add_component_copy_(slf, py, component, name, class);
         }
 
         if let Some(first_arg) = name_or_component {
-            if let Ok(component) = first_arg.downcast::<PyComponent>() {
-                Self::add_component_copy_(slf, py, component, None, class)
-            } else if let Ok(name) = first_arg.downcast::<PyString>() {
-                Self::add_component_impl_(slf, py, name, class)
-            } else {
-                let error_ty = first_arg.get_type();
-                Err(PyTypeError::new_err(
-                    r#"expected string or component, not "{error_ty}""#,
-                ))
+            match first_arg {
+                NameOrComponent::Name(name) => Self::add_component_impl_(slf, py, &name, class),
+                NameOrComponent::Component(component) => {
+                    Self::add_component_copy_(slf, py, &component, None, class)
+                }
             }
         } else {
             Err(PyValueError::new_err("component must have a name"))
         }
     }
 
-    pub fn add_components(&mut self, components: &Bound<'_, PyMapping>) -> PyResult<()> {
+    fn add_components(&mut self, components: &Bound<'_, PyMapping>) -> PyResult<()> {
         // iter_mapping_items!(for (name: PyString, component: PyComponent) in components => {
         //     self.add_component(name, component)?;
         // });

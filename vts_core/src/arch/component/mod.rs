@@ -37,60 +37,19 @@ pub struct ComponentData {
 }
 
 impl ComponentData {
-    fn new<S: Into<String>>(name: S, class: Option<ComponentClass>) -> Self {
+    fn new(name: &str, class: Option<ComponentClass>) -> Self {
         Self {
-            name: name.into(),
+            name: name.to_string(),
             ports: Vec::new(),
             references: Vec::new(),
             connections: Vec::new(),
             class,
         }
     }
-
-    // pub fn name<'m>(&'m self, module: &'m Module) -> &str {
-    //     &module.strings[self.name]
-    // }
-
-    // pub fn get_port<'m>(&self, module: &'m Module, port: PortId) -> Option<&'m PortData> {
-    //     if self.ports.values().any(|p| p == &port) {
-    //         Some(&module[port])
-    //     } else {
-    //         None
-    //     }
-    // }
-
-    // pub fn get_port_mut<'m>(
-    //     &'m self,
-    //     module: &'m mut Module,
-    //     port: PortId,
-    // ) -> Option<&'m mut PortData> {
-    //     if self.ports.values().any(|p| p == &port) {
-    //         Some(&mut module[port])
-    //     } else {
-    //         None
-    //     }
-    // }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ComponentRefData {
-    pub(crate) component: ComponentId,
-    pub alias: String,
-    pub n_instances: usize,
-}
-
-impl ComponentRefData {
-    pub(crate) fn new(component: ComponentId, alias: String, n_instances: usize) -> Self {
-        Self {
-            component,
-            alias,
-            n_instances,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
-pub struct Component<'m>(pub &'m Module, pub ComponentId);
+pub struct Component<'m>(&'m Module, ComponentId);
 
 impl<'m> Component<'m> {
     pub(crate) fn new(module: &'m Module, component: ComponentId) -> Self {
@@ -101,8 +60,12 @@ impl<'m> Component<'m> {
         self.0
     }
 
+    pub fn id(&self) -> ComponentId {
+        self.1
+    }
+
     pub(crate) fn data(&self) -> &'m ComponentData {
-        &self.module()[self.1]
+        &self.module()[self.id()]
     }
 
     pub fn name(&self) -> &'m str {
@@ -131,6 +94,23 @@ impl<'m> Component<'m> {
 
     pub fn class(&self) -> Option<ComponentClass> {
         self.data().class
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ComponentRefData {
+    pub(crate) component: ComponentId,
+    pub alias: String,
+    pub n_instances: usize,
+}
+
+impl ComponentRefData {
+    pub(crate) fn new(component: ComponentId, alias: String, n_instances: usize) -> Self {
+        Self {
+            component,
+            alias,
+            n_instances,
+        }
     }
 }
 
@@ -264,7 +244,7 @@ impl<'m, N> ComponentBuilder<'m, N> {
 impl<'m> ComponentBuilder<'m, NameSet> {
     pub fn finish(self) -> Component<'m> {
         let component = {
-            let component = ComponentData::new(self.name.0, self.class);
+            let component = ComponentData::new(&self.name.0, self.class);
             self.module.components.insert(component)
         };
 
