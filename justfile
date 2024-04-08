@@ -24,7 +24,10 @@ check-rs:
 check-py:
     nox -s check
 
-check-all: check-rs check-py
+check-md:
+    markdownlint-cli2 README.md
+
+check-all: check-rs check-py check-md
 
 check CRATE:
     cargo check --package vts_{{CRATE}}
