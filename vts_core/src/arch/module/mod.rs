@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use super::component::{
     connection::ConnectionBuildError, Component, ComponentBuildArtifacts, ComponentData,
-    ComponentKey, ComponentRefData, WeakConnection,
+    ComponentKey, ComponentRef, ComponentRefData, ComponentRefKey, WeakConnection,
 };
 use super::port::{Port, PortData, PortKey};
 
@@ -78,6 +78,16 @@ impl Module {
 
         if self.ports.contains_key(port) {
             Some(Port::new(self, port))
+        } else {
+            None
+        }
+    }
+
+    pub fn get_reference(&self, reference: ComponentRefKey) -> Option<ComponentRef<'_>> {
+        let reference = reference.0;
+
+        if self.references.contains_key(reference) {
+            Some(ComponentRef::new(self, reference))
         } else {
             None
         }

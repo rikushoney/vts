@@ -113,12 +113,12 @@ impl<'m> Component<'m> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentRefData {
     pub(crate) component: ComponentId,
-    pub alias: String,
+    alias: Option<String>,
     pub n_instances: usize,
 }
 
 impl ComponentRefData {
-    pub(crate) fn new(component: ComponentId, alias: String, n_instances: usize) -> Self {
+    pub(crate) fn new(component: ComponentId, alias: Option<String>, n_instances: usize) -> Self {
         Self {
             component,
             alias,
@@ -127,8 +127,8 @@ impl ComponentRefData {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ComponentRefKey(ComponentRefId);
+#[derive(Clone, Copy, Debug)]
+pub struct ComponentRefKey(pub(crate) ComponentRefId);
 
 impl ComponentRefKey {
     pub(crate) fn new(reference: ComponentRefId) -> Self {
@@ -164,8 +164,16 @@ impl<'m> ComponentRef<'m> {
         Component::new(self.module(), self.data().component)
     }
 
-    pub fn alias(&self) -> &'m str {
-        &self.data().alias
+    pub fn alias(&self) -> Option<&'m String> {
+        self.data().alias.as_ref()
+    }
+
+    pub fn alias_or_name(&self) -> &'m str {
+        if let Some(alias) = self.alias() {
+            alias
+        } else {
+            self.component().name()
+        }
     }
 
     pub fn n_instances(&self) -> usize {
@@ -279,10 +287,61 @@ impl<'m> ComponentBuilder<'m, NameSet> {
     pub fn finish(self) -> Component<'m> {
         let component = {
             let component = ComponentData::new(&self.name.0, self.class);
+
+            // TODO: check duplicate components
             self.module.components.insert(component)
         };
 
         Component::new(self.module, component)
+    }
+}
+
+pub struct ComponentRefBuilder<'m> {
+    module: &'m mut Module,
+    parent: ComponentId,
+    alias: Option<String>,
+    n_instances: Option<usize>,
+}
+
+impl<'m> ComponentRefBuilder<'m> {
+    pub fn new(module: &'m mut Module, parent: ComponentKey) -> Self {
+        Self {
+            module,
+            parent: parent.0,
+            alias: None,
+            n_instances: None,
+        }
+    }
+
+    pub fn set_alias(&mut self, alias: &str) {
+        self.alias = Some(alias.to_string());
+    }
+
+    pub fn set_n_instances(&mut self, n_instances: usize) {
+        self.n_instances = Some(n_instances);
+    }
+
+    pub fn alias_is_set(&self) -> bool {
+        self.alias.is_some()
+    }
+
+    pub fn n_instances_is_set(&self) -> bool {
+        self.n_instances.is_some()
+    }
+
+    pub fn finish(self) -> ComponentRef<'m> {
+        let n_instances = self.n_instances.unwrap_or(1);
+
+        let reference = {
+            let reference = ComponentRefData::new(self.parent, self.alias, n_instances);
+            self.module.references.insert(reference)
+        };
+
+        // TODO: check duplicate references
+
+        self.module[self.parent].references.push(reference);
+
+        ComponentRef::new(self.module, reference)
     }
 }
 

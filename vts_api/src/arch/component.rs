@@ -6,7 +6,7 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyMapping, PyString};
 use vts_core::arch::{
-    component::{ComponentKey, ComponentRefKey},
+    component::{ComponentKey, ComponentRef, ComponentRefBuilder, ComponentRefKey},
     port::{PortBuilder, PortClass, PortKind},
     Component, ComponentClass,
 };
@@ -21,6 +21,16 @@ wrap_enum!(PyComponentClass => ComponentClass:
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct PyComponent(Py<PyModule_>, ComponentKey);
+
+macro_rules! extract_component {
+    ($slf:ident + $py:ident => $comp:ident) => {
+        let module = $slf.module($py).borrow();
+        let $comp = module
+            .0
+            .get_component($slf.key())
+            .expect("component should be in module");
+    };
+}
 
 impl PyComponent {
     pub(crate) fn new(module: &Bound<'_, PyModule_>, component: ComponentKey) -> Self {
@@ -40,14 +50,10 @@ impl PyComponent {
         n_pins: Option<usize>,
         class: Option<PortClassOrStr<'_>>,
     ) -> PyResult<PyPort> {
+        extract_component!(self + py => component);
+        let parent = component.key();
+
         let mut module = self.module(py).borrow_mut();
-        let parent = {
-            let component = module
-                .0
-                .get_component(self.key())
-                .expect("component should be in module");
-            component.key()
-        };
 
         // TODO: check for duplicate port names
 
@@ -253,23 +259,13 @@ impl PyComponent {
     }
 
     pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
-        let module = self.module(py).borrow();
-        let component = module
-            .0
-            .get_component(self.key())
-            .expect("component should be in module");
-
+        extract_component!(self + py => component);
         PyString::new_bound(py, component.name())
     }
 
     #[pyo3(name = "class_")]
     pub fn class(&self, py: Python<'_>) -> Option<PyComponentClass> {
-        let module = self.module(py).borrow();
-        let component = module
-            .0
-            .get_component(self.key())
-            .expect("component should be in module");
-
+        extract_component!(self + py => component);
         component.class().map(PyComponentClass::from)
     }
 
@@ -312,39 +308,33 @@ impl PyComponent {
         Ok(())
     }
 
+    #[pyo3(signature = (component, *, alias=None, n_instances=None))]
     pub fn add_reference(
         &mut self,
+        py: Python<'_>,
         component: &Bound<'_, PyComponent>,
         alias: Option<&Bound<'_, PyString>>,
         n_instances: Option<usize>,
-    ) -> PyResult<Py<PyComponentRef>> {
-        // let py = component.py();
+    ) -> PyResult<PyComponentRef> {
+        let mut module = self.module(py).borrow_mut();
+        let component = component.borrow();
 
-        // let alias = match alias {
-        //     Some(alias) => alias.clone(),
-        //     None => {
-        //         let component = component.borrow();
-        //         let alias = component.name.bind(py);
-        //         PyString::new_bound(py, alias.to_str()?)
-        //     }
-        // };
+        let mut builder = ComponentRefBuilder::new(&mut module.0, component.1);
 
-        // let references = self.references.bind(py);
-        // if references.deref().contains(alias.clone())? {
-        //     return Err(PyValueError::new_err(format!(
-        //         r#"component or alias "{alias}" already referenced in "{component}""#,
-        //         alias = alias.to_str()?,
-        //         component = self.name.bind(py).to_str()?
-        //     )));
-        // }
+        if let Some(alias) = alias {
+            builder.set_alias(alias.to_str()?);
+        }
 
-        // let reference = PyComponentRef::new(component, Some(&alias), n_instances);
-        // let reference = Bound::new(py, reference)?;
+        if let Some(n_instances) = n_instances {
+            builder.set_n_instances(n_instances);
+        }
 
-        // references.deref().set_item(alias, reference.clone())?;
+        let reference = {
+            let reference = builder.finish();
+            PyComponentRef::new(self.module(py), reference.key())
+        };
 
-        // Ok(reference.unbind())
-        todo!()
+        Ok(reference)
     }
 
     pub fn add_connection(
@@ -354,22 +344,6 @@ impl PyComponent {
         source_component: Option<&Bound<'_, PyComponentRef>>,
         sink_component: Option<&Bound<'_, PyComponentRef>>,
     ) -> PyResult<Py<PyConnection>> {
-        // let py = source_pins.py();
-
-        // // TODO: check for duplicate connections?
-
-        // let connections = self.connections.bind(py);
-        // let connection = PyConnection::new(
-        //     source_pins.clone(),
-        //     sink_pins.clone(),
-        //     source_component.cloned(),
-        //     sink_component.cloned(),
-        // );
-        // let connection = Bound::new(py, connection)?;
-
-        // connections.append(connection.clone())?;
-
-        // Ok(connection.unbind())
         todo!()
     }
 }
@@ -377,8 +351,58 @@ impl PyComponent {
 #[pyclass]
 pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
 
+impl PyComponentRef {
+    pub(crate) fn new(module: &Bound<'_, PyModule_>, reference: ComponentRefKey) -> Self {
+        let module = module.clone().unbind();
+        Self(module, reference)
+    }
+
+    pub(crate) fn key(&self) -> ComponentRefKey {
+        self.1
+    }
+}
+
+macro_rules! extract_reference {
+    ($slf:ident + $py:ident => $ref:ident) => {
+        let module = $slf.module($py).borrow();
+        let $ref = module
+            .0
+            .get_reference($slf.key())
+            .expect("reference should be in module");
+    };
+}
+
 #[pymethods]
-impl PyComponentRef {}
+impl PyComponentRef {
+    pub fn module<'py>(&self, py: Python<'py>) -> &Bound<'py, PyModule_> {
+        self.0.bind(py)
+    }
+
+    pub fn component<'py>(&self, py: Python<'py>) -> PyComponent {
+        extract_reference!(self + py => reference);
+        PyComponent::new(self.module(py), reference.component().key())
+    }
+
+    pub fn alias<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
+        extract_reference!(self + py => reference);
+
+        if let Some(alias) = reference.alias() {
+            Some(PyString::new_bound(py, alias))
+        } else {
+            None
+        }
+    }
+
+    pub fn alias_or_name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
+        extract_reference!(self + py => reference);
+        PyString::new_bound(py, reference.alias_or_name())
+    }
+
+    pub fn n_instances(&self, py: Python<'_>) -> usize {
+        extract_reference!(self + py => reference);
+        reference.n_instances()
+    }
+}
 
 #[pyclass]
 pub struct PyConnection {}

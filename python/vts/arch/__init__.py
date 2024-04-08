@@ -7,10 +7,19 @@ sys.modules["vts._vts.arch"] = vts._vts.arch
 from vts._vts.arch import (  # noqa
     PyComponent as Component,
     PyComponentClass as ComponentClass,
+    PyComponentRef as ComponentRef,
     PyModule as Module,
     PyPort as Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
 )
 
-__all__ = ["Component", "ComponentClass", "Module", "Port", "PortClass", "PortKind"]
+__all__ = [
+    "Component",
+    "ComponentClass",
+    "ComponentRef",
+    "Module",
+    "Port",
+    "PortClass",
+    "PortKind",
+]

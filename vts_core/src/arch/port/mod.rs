@@ -161,7 +161,7 @@ pub struct KindUnset;
 
 pub struct PortBuilder<'m, N, K> {
     module: &'m mut Module,
-    parent: ComponentKey,
+    parent: ComponentId,
     // data: PortData,
     // name_is_set: bool,
     // kind_is_set: bool,
@@ -176,7 +176,7 @@ impl<'m> PortBuilder<'m, NameUnset, KindUnset> {
     pub fn new(module: &'m mut Module, component: ComponentKey) -> Self {
         Self {
             module,
-            parent: component,
+            parent: component.0,
             name: NameUnset,
             kind: KindUnset,
             n_pins: None,
@@ -231,11 +231,9 @@ impl<'m, N, K> PortBuilder<'m, N, K> {
 
 impl<'m> PortBuilder<'m, NameSet, KindSet> {
     pub fn finish(self) -> Port<'m> {
-        let parent = self.parent.0;
-
         let port = {
             let port = PortData::new(
-                parent,
+                self.parent,
                 &self.name.0,
                 self.kind.0,
                 self.n_pins.unwrap_or(1),
@@ -244,8 +242,9 @@ impl<'m> PortBuilder<'m, NameSet, KindSet> {
             self.module.ports.insert(port)
         };
 
-        let parent = &mut self.module[parent];
-        parent.ports.push(port);
+        // TODO: check duplicate ports
+
+        self.module[self.parent].ports.push(port);
 
         Port::new(self.module, port)
     }
