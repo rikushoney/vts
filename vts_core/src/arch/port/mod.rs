@@ -66,7 +66,7 @@ impl PortKey {
         Self(port)
     }
 
-    pub fn promote(self, module: &Module) -> Port<'_> {
+    pub fn bind(self, module: &Module) -> Port<'_> {
         Port::new(module, self.0)
     }
 }

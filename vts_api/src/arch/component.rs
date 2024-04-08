@@ -32,7 +32,7 @@ impl PyComponent {
         self.1
     }
 
-    fn _add_port_impl(
+    fn add_port_impl(
         &self,
         py: Python<'_>,
         name: &Bound<'_, PyString>,
@@ -74,7 +74,7 @@ impl PyComponent {
         Ok(port)
     }
 
-    fn _add_port_copy<'py>(
+    fn add_port_copy<'py>(
         &self,
         py: Python<'py>,
         port: &Bound<'py, PyPort>,
@@ -96,7 +96,7 @@ impl PyComponent {
         let port = &module.0.get_port(port).expect("port should be in module");
         let name = name
             .cloned()
-            .unwrap_or_else(|| PyString::new_bound(py, &port.name()));
+            .unwrap_or_else(|| PyString::new_bound(py, port.name()));
         let kind = if let Some(kind) = kind {
             kind
         } else {
@@ -106,11 +106,11 @@ impl PyComponent {
         if class.is_none() {
             class = port
                 .class()
-                .and_then(|class| Some(PortClassOrStr::class(py, class.into())))
+                .map(|class| PortClassOrStr::class(py, class.into()))
                 .transpose()?;
         }
 
-        self._add_port_impl(py, &name, kind, n_pins, class)
+        self.add_port_impl(py, &name, kind, n_pins, class)
     }
 }
 
@@ -288,16 +288,16 @@ impl PyComponent {
         if let Some(port) = port {
             let name = name.as_ref().map(NameOrPort::get_name).transpose()?;
 
-            return self._add_port_copy(py, port, name, kind, n_pins, class);
+            return self.add_port_copy(py, port, name, kind, n_pins, class);
         }
 
         if let Some(first_arg) = name {
             match first_arg {
                 NameOrPort::Name(name) => {
                     let kind = kind.ok_or(PyValueError::new_err("port must have a kind"))?;
-                    self._add_port_impl(py, &name, kind, n_pins, class)
+                    self.add_port_impl(py, &name, kind, n_pins, class)
                 }
-                NameOrPort::Port(port) => self._add_port_copy(py, &port, None, kind, n_pins, class),
+                NameOrPort::Port(port) => self.add_port_copy(py, &port, None, kind, n_pins, class),
             }
         } else {
             Err(PyValueError::new_err("port must have a name"))

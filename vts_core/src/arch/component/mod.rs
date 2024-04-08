@@ -56,7 +56,7 @@ impl ComponentKey {
         Self(component)
     }
 
-    pub fn promote(self, module: &Module) -> Component<'_> {
+    pub fn bind(self, module: &Module) -> Component<'_> {
         Component::new(module, self.0)
     }
 }
@@ -135,7 +135,7 @@ impl ComponentRefKey {
         Self(reference)
     }
 
-    pub fn promote(self, module: &Module) -> ComponentRef<'_> {
+    pub fn bind(self, module: &Module) -> ComponentRef<'_> {
         ComponentRef::new(module, self.0)
     }
 }

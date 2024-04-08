@@ -94,7 +94,7 @@ impl<'py> FromPyObject<'py> for ComponentClassOrStr<'py> {
 }
 
 impl PyModule_ {
-    fn _add_component_impl(
+    fn add_component_impl(
         slf: &Bound<'_, PyModule_>,
         py: Python<'_>,
         name: &Bound<'_, PyString>,
@@ -119,7 +119,7 @@ impl PyModule_ {
         Ok(component)
     }
 
-    fn _add_component_copy<'py>(
+    fn add_component_copy<'py>(
         slf: &Bound<'py, PyModule_>,
         py: Python<'py>,
         component: &Bound<'py, PyComponent>,
@@ -142,7 +142,7 @@ impl PyModule_ {
             .expect("component should be in module");
         let name = name
             .cloned()
-            .unwrap_or_else(|| PyString::new_bound(py, &component.name()));
+            .unwrap_or_else(|| PyString::new_bound(py, component.name()));
 
         if class.is_none() {
             class = component
@@ -151,7 +151,7 @@ impl PyModule_ {
                 .transpose()?
         }
 
-        Self::_add_component_impl(slf, py, &name, class)
+        Self::add_component_impl(slf, py, &name, class)
     }
 }
 
@@ -189,14 +189,14 @@ impl PyModule_ {
         if let Some(component) = component {
             let name = name.as_ref().map(NameOrComponent::get_name).transpose()?;
 
-            return Self::_add_component_copy(slf, py, component, name, class);
+            return Self::add_component_copy(slf, py, component, name, class);
         }
 
         if let Some(first_arg) = name {
             match first_arg {
-                NameOrComponent::Name(name) => Self::_add_component_impl(slf, py, &name, class),
+                NameOrComponent::Name(name) => Self::add_component_impl(slf, py, &name, class),
                 NameOrComponent::Component(component) => {
-                    Self::_add_component_copy(slf, py, &component, None, class)
+                    Self::add_component_copy(slf, py, &component, None, class)
                 }
             }
         } else {
