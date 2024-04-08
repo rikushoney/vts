@@ -22,7 +22,7 @@ wrap_enum!(PyComponentClass => ComponentClass:
 #[derive(Clone, Debug)]
 pub struct PyComponent(Py<PyModule_>, ComponentKey);
 
-macro_rules! extract_component {
+macro_rules! get_component {
     ($slf:ident + $py:ident => $comp:ident) => {
         let module = $slf.module($py).borrow();
         let $comp = module
@@ -50,7 +50,7 @@ impl PyComponent {
         n_pins: Option<usize>,
         class: Option<PortClassOrStr<'_>>,
     ) -> PyResult<PyPort> {
-        extract_component!(self + py => component);
+        get_component!(self + py => component);
         let parent = component.key();
 
         let mut module = self.module(py).borrow_mut();
@@ -259,13 +259,13 @@ impl PyComponent {
     }
 
     pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
-        extract_component!(self + py => component);
+        get_component!(self + py => component);
         PyString::new_bound(py, component.name())
     }
 
     #[pyo3(name = "class_")]
     pub fn class(&self, py: Python<'_>) -> Option<PyComponentClass> {
-        extract_component!(self + py => component);
+        get_component!(self + py => component);
         component.class().map(PyComponentClass::from)
     }
 
@@ -362,7 +362,7 @@ impl PyComponentRef {
     }
 }
 
-macro_rules! extract_reference {
+macro_rules! get_reference {
     ($slf:ident + $py:ident => $ref:ident) => {
         let module = $slf.module($py).borrow();
         let $ref = module
@@ -379,12 +379,12 @@ impl PyComponentRef {
     }
 
     pub fn component<'py>(&self, py: Python<'py>) -> PyComponent {
-        extract_reference!(self + py => reference);
+        get_reference!(self + py => reference);
         PyComponent::new(self.module(py), reference.component().key())
     }
 
     pub fn alias<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
-        extract_reference!(self + py => reference);
+        get_reference!(self + py => reference);
 
         if let Some(alias) = reference.alias() {
             Some(PyString::new_bound(py, alias))
@@ -394,12 +394,12 @@ impl PyComponentRef {
     }
 
     pub fn alias_or_name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
-        extract_reference!(self + py => reference);
+        get_reference!(self + py => reference);
         PyString::new_bound(py, reference.alias_or_name())
     }
 
     pub fn n_instances(&self, py: Python<'_>) -> usize {
-        extract_reference!(self + py => reference);
+        get_reference!(self + py => reference);
         reference.n_instances()
     }
 }
