@@ -11,15 +11,15 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use thiserror::Error;
 
 use super::component::{
-    connection::ConnectionBuildError, ComponentBuildArtifacts, ComponentData, ComponentRefData,
-    WeakConnection,
+    connection::ConnectionBuildError, Component, ComponentBuildArtifacts, ComponentData,
+    ComponentKey, ComponentRefData, WeakConnection,
 };
-use super::port::PortData;
+use super::port::{Port, PortData, PortKey};
 
 new_key_type! {
-    pub struct ComponentId;
-    pub struct ComponentRefId;
-    pub struct PortId;
+    pub(crate) struct ComponentId;
+    pub(crate) struct ComponentRefId;
+    pub(crate) struct PortId;
 }
 
 #[derive(Clone, Debug)]
@@ -55,13 +55,15 @@ impl Module {
     //     }
     // }
 
-    // pub fn get_component(&self, component: ComponentId) -> Option<&ComponentData> {
-    //     if self.components.values().any(|c| c == &component) {
-    //         Some(&self[component])
-    //     } else {
-    //         None
-    //     }
-    // }
+    pub fn get_component(&self, component: ComponentKey) -> Option<Component<'_>> {
+        let component = component.0;
+
+        if self.components.contains_key(component) {
+            Some(Component::new(self, component))
+        } else {
+            None
+        }
+    }
 
     // pub fn get_component_mut(&mut self, component: ComponentId) -> Option<&mut ComponentData> {
     //     if self.components.values().any(|c| c == &component) {
@@ -70,6 +72,16 @@ impl Module {
     //         None
     //     }
     // }
+
+    pub fn get_port(&self, port: PortKey) -> Option<Port<'_>> {
+        let port = port.0;
+
+        if self.ports.contains_key(port) {
+            Some(Port::new(self, port))
+        } else {
+            None
+        }
+    }
 }
 
 macro_rules! impl_module_index_ops {

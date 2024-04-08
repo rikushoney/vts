@@ -12,7 +12,7 @@ build-backend = "maturin"
 features = ["pyo3/extension-module"]
 manifest-path = "vts_api/Cargo.toml"
 python-source = "python"
-module-name = "vts._vts_api_rs"
+module-name = "vts._vts"
 
 [tool.black]
 line-length = 88

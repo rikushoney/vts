@@ -47,19 +47,7 @@ macro_rules! wrap_enum {
 mod arch;
 
 #[pymodule]
-#[pyo3(name = "_vts_api_rs")]
-fn vts_api_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<arch::PyModule>()?;
-    m.add_class::<arch::PyComponent>()?;
-    m.add_class::<arch::PyComponentRef>()?;
-    m.add_class::<arch::PyConnection>()?;
-    m.add_class::<arch::PyComponentClass>()?;
-    m.add_class::<arch::PyPort>()?;
-    m.add_class::<arch::PyPortClass>()?;
-    m.add_class::<arch::PyPortKind>()?;
-    m.add_class::<arch::PyPortPins>()?;
-
-    m.add_function(wrap_pyfunction!(arch::json_dumps, m)?)?;
-    m.add_function(wrap_pyfunction!(arch::json_loads, m)?)?;
-    Ok(())
+#[pyo3(name = "_vts")]
+fn vts_api_rs(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    arch::register_arch(module)
 }

@@ -1,4 +1,5 @@
 #![allow(unused)]
+
 // pub mod de;
 // pub mod ser;
 
@@ -7,7 +8,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::arch::{ComponentId, Module, PortId};
+use super::{component::ComponentKey, ComponentId, Module, PortId};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -55,30 +56,18 @@ impl PortData {
             class,
         }
     }
+}
 
-    // pub fn name<'m>(&'m self, module: &'m Module) -> &str {
-    //     &module.strings[self.name]
-    // }
+#[derive(Clone, Copy, Debug)]
+pub struct PortKey(pub(crate) PortId);
 
-    // pub fn rename<'m>(&'m mut self, module: &'m mut Module, name: &str) {
-    //     let name = module.strings.entry(name);
-    //     let parent = &mut module[self.parent];
-    //     assert!(
-    //         parent.ports.get(&name).is_none(),
-    //         r#"component "{component}" already in module "{module}""#,
-    //         component = &module.strings[name],
-    //         module = &module.strings[module.name],
-    //     );
+impl PortKey {
+    pub(crate) fn new(port: PortId) -> Self {
+        Self(port)
+    }
 
-    //     if let Some(port) = parent.ports.remove(&self.name) {
-    //         parent.ports.insert(name, port);
-    //     }
-
-    //     self.name = name;
-    // }
-
-    pub(crate) fn parent(&self) -> ComponentId {
-        self.parent
+    pub fn promote(self, module: &Module) -> Port<'_> {
+        Port::new(module, self.0)
     }
 }
 
@@ -92,6 +81,10 @@ impl<'m> Port<'m> {
 
     pub fn module(&self) -> &'m Module {
         self.0
+    }
+
+    pub fn key(&self) -> PortKey {
+        PortKey::new(self.1)
     }
 
     pub fn name(&self) -> &str {
@@ -160,13 +153,102 @@ impl WeakPortPins {
     }
 }
 
-pub struct PortBuilder<'m> {
+pub struct NameSet(String);
+pub struct NameUnset;
+
+pub struct KindSet(PortKind);
+pub struct KindUnset;
+
+pub struct PortBuilder<'m, N, K> {
     module: &'m mut Module,
-    parent: ComponentId,
-    data: PortData,
-    name_is_set: bool,
-    kind_is_set: bool,
-    n_pins_is_set: bool,
+    parent: ComponentKey,
+    // data: PortData,
+    // name_is_set: bool,
+    // kind_is_set: bool,
+    // n_pins_is_set: bool,
+    name: N,
+    kind: K,
+    n_pins: Option<usize>,
+    class: Option<PortClass>,
+}
+
+impl<'m> PortBuilder<'m, NameUnset, KindUnset> {
+    pub fn new(module: &'m mut Module, component: ComponentKey) -> Self {
+        Self {
+            module,
+            parent: component,
+            name: NameUnset,
+            kind: KindUnset,
+            n_pins: None,
+            class: None,
+        }
+    }
+}
+
+impl<'m, K> PortBuilder<'m, NameUnset, K> {
+    pub fn set_name(self, name: &str) -> PortBuilder<'m, NameSet, K> {
+        PortBuilder {
+            module: self.module,
+            parent: self.parent,
+            name: NameSet(name.to_string()),
+            kind: self.kind,
+            n_pins: self.n_pins,
+            class: self.class,
+        }
+    }
+}
+
+impl<'m, N> PortBuilder<'m, N, KindUnset> {
+    pub fn set_kind(self, kind: PortKind) -> PortBuilder<'m, N, KindSet> {
+        PortBuilder {
+            module: self.module,
+            parent: self.parent,
+            name: self.name,
+            kind: KindSet(kind),
+            n_pins: self.n_pins,
+            class: self.class,
+        }
+    }
+}
+
+impl<'m, N, K> PortBuilder<'m, N, K> {
+    pub fn set_n_pins(&mut self, n_pins: usize) {
+        self.n_pins = Some(n_pins);
+    }
+
+    pub fn n_pins_is_set(&self) -> bool {
+        self.n_pins.is_some()
+    }
+
+    pub fn set_class(&mut self, class: PortClass) {
+        self.class = Some(class);
+    }
+
+    pub fn class_is_set(&self) -> bool {
+        self.class.is_some()
+    }
+}
+
+impl<'m> PortBuilder<'m, NameSet, KindSet> {
+    pub fn finish(self) -> Port<'m> {
+        let parent = self.parent.0;
+
+        let port = {
+            let port = PortData::new(
+                parent,
+                &self.name.0,
+                self.kind.0,
+                self.n_pins.unwrap_or(1),
+                self.class,
+            );
+            self.module.ports.insert(port)
+        };
+
+        let parent = &mut self.module[parent];
+        parent.ports.push(port);
+
+        Port::new(self.module, port)
+    }
 }
 
 #[derive(Debug, Error)]
@@ -175,89 +257,4 @@ pub enum PortBuildError {
     DuplicatePort { module: String, port: String },
     #[error("port must have a {0}")]
     MissingField(&'static str),
-}
-
-impl<'m> PortBuilder<'m> {
-    // pub fn new(module: &'m mut Module, parent: ComponentId) -> Self {
-    //     let data = PortData::new(module, parent, "", PortKind::Input, 1, None);
-
-    //     Self {
-    //         module,
-    //         parent,
-    //         data,
-    //         name_is_set: false,
-    //         kind_is_set: false,
-    //         n_pins_is_set: false,
-    //     }
-    // }
-
-    // pub fn set_name(&mut self, name: &str) -> &mut Self {
-    //     self.data.rename(self.module, name);
-    //     self.name_is_set = true;
-    //     self
-    // }
-
-    pub fn set_kind(&mut self, kind: PortKind) -> &mut Self {
-        self.data.kind = kind;
-        self.kind_is_set = true;
-        self
-    }
-
-    pub fn set_n_pins(&mut self, n_pins: usize) -> &mut Self {
-        self.data.n_pins = n_pins;
-        self.n_pins_is_set = true;
-        self
-    }
-
-    pub fn set_class(&mut self, class: PortClass) -> &mut Self {
-        self.data.class = Some(class);
-        self
-    }
-
-    pub fn is_name_set(&self) -> bool {
-        self.name_is_set
-    }
-
-    pub fn is_kind_set(&self) -> bool {
-        self.kind_is_set
-    }
-
-    pub fn is_n_pins_set(&self) -> bool {
-        self.n_pins_is_set
-    }
-
-    pub fn is_class_set(&self) -> bool {
-        self.data.class.is_some()
-    }
-
-    // pub fn finish(self) -> Result<PortId, PortBuildError> {
-    //     if !self.is_name_set() {
-    //         return Err(PortBuildError::MissingField("name"));
-    //     }
-
-    //     if !self.is_kind_set() {
-    //         return Err(PortBuildError::MissingField("kind"));
-    //     }
-
-    //     let name = self.data.name;
-    //     let port = self.module.port_db.entry(self.data);
-
-    //     if self.module[self.parent].ports.insert(name, port).is_some() {
-    //         let port = self.module.strings[name].to_string();
-    //         let module = self.module.strings[self.module.name].to_string();
-
-    //         return Err(PortBuildError::DuplicatePort { module, port });
-    //     }
-
-    //     debug_assert!({
-    //         let name = self
-    //             .module
-    //             .strings
-    //             .rlookup(self.module[port].name(self.module))
-    //             .expect("port name should be in module strings");
-    //         self.module[self.parent].ports.contains_key(&name)
-    //     });
-
-    //     Ok(port)
-    // }
 }

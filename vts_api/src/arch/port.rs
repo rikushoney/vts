@@ -1,8 +1,8 @@
-use std::ops::Range;
-
 use pyo3::prelude::*;
 use pyo3::types::PyString;
-use vts_core::arch::{PortClass, PortKind};
+use vts_core::arch::{port::PortKey, PortClass, PortKind};
+
+use super::module::PyModule_;
 
 wrap_enum!(PyPortClass => PortClass:
     CLOCK = Clock,
@@ -19,85 +19,70 @@ wrap_enum!(PyPortKind => PortKind:
 
 #[pyclass]
 #[derive(Clone, Debug)]
-pub struct PyPort {
-    #[pyo3(get, set)]
-    pub name: Py<PyString>,
-    #[pyo3(get, set)]
-    pub kind: PyPortKind,
-    #[pyo3(get, set)]
-    pub n_pins: usize,
-    #[pyo3(get, set)]
-    pub class_: Option<PyPortClass>,
+pub struct PyPort(Py<PyModule_>, PortKey);
+
+impl PyPort {
+    pub(crate) fn new(module: &Bound<'_, PyModule_>, port: PortKey) -> Self {
+        let module = module.clone().unbind();
+        PyPort(module, port)
+    }
+
+    pub(crate) fn key(&self) -> PortKey {
+        self.1
+    }
 }
 
 #[pymethods]
 impl PyPort {
-    #[new]
-    pub fn new(
-        name: &Bound<'_, PyString>,
-        kind: PyPortKind,
-        n_pins: Option<usize>,
-        class_: Option<PyPortClass>,
-    ) -> Self {
-        let name = name.clone().unbind();
-        let n_pins = n_pins.unwrap_or(1);
-
-        Self {
-            name,
-            kind,
-            n_pins,
-            class_,
-        }
+    pub fn module<'py>(&self, py: Python<'py>) -> &Bound<'py, PyModule_> {
+        self.0.bind(py)
     }
 
-    pub fn copy(&self, py: Python<'_>) -> PyResult<Self> {
-        let name = PyString::new_bound(py, self.name.bind(py).to_str()?);
+    pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
+        let module = self.module(py).borrow();
+        let port = module
+            .0
+            .get_port(self.key())
+            .expect("port should be in module");
 
-        Ok(Self::new(&name, self.kind, Some(self.n_pins), self.class_))
+        PyString::new_bound(py, port.name())
+    }
+
+    pub fn kind(&self, py: Python<'_>) -> PyPortKind {
+        let module = self.module(py).borrow();
+        let port = module
+            .0
+            .get_port(self.key())
+            .expect("port should be in module");
+
+        PyPortKind::from(port.kind())
+    }
+
+    pub fn n_pins(&self, py: Python<'_>) -> usize {
+        let module = self.module(py).borrow();
+        let port = module
+            .0
+            .get_port(self.key())
+            .expect("port should be in module");
+
+        port.n_pins()
+    }
+
+    #[pyo3(name = "class_")]
+    pub fn class(&self, py: Python<'_>) -> Option<PyPortClass> {
+        let module = self.module(py).borrow();
+        let port = module
+            .0
+            .get_port(self.key())
+            .expect("port should be in module");
+
+        port.class().map(PyPortClass::from)
     }
 }
 
 #[pyclass]
 #[derive(Clone, Debug)]
-pub struct PyPortPins {
-    #[pyo3(get, set)]
-    pub port: Py<PyPort>,
-    pub(crate) range: Range<u32>,
-}
+pub struct PyPortPins {}
 
 #[pymethods]
-impl PyPortPins {
-    #[new]
-    pub fn new(port: Bound<'_, PyPort>, start: Option<u32>, end: Option<u32>) -> Self {
-        let start = start.unwrap_or(0);
-        let end = end.unwrap_or_else(|| {
-            let port = port.borrow();
-            port.n_pins as u32
-        });
-
-        let port = port.unbind();
-        let range = start..end;
-
-        Self { port, range }
-    }
-
-    #[getter]
-    pub fn get_start(&self) -> u32 {
-        self.range.start
-    }
-
-    #[getter]
-    pub fn get_end(&self) -> u32 {
-        self.range.end
-    }
-
-    #[setter]
-    pub fn set_start(&mut self, start: u32) {
-        self.range.start = start;
-    }
-
-    #[setter]
-    pub fn set_end(&mut self, end: u32) {
-        self.range.end = end;
-    }
-}
+impl PyPortPins {}

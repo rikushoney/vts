@@ -48,6 +48,19 @@ impl ComponentData {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ComponentKey(pub(crate) ComponentId);
+
+impl ComponentKey {
+    pub(crate) fn new(component: ComponentId) -> Self {
+        Self(component)
+    }
+
+    pub fn promote(self, module: &Module) -> Component<'_> {
+        Component::new(module, self.0)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Component<'m>(&'m Module, ComponentId);
 
@@ -60,12 +73,12 @@ impl<'m> Component<'m> {
         self.0
     }
 
-    pub fn id(&self) -> ComponentId {
-        self.1
+    pub fn key(&self) -> ComponentKey {
+        ComponentKey::new(self.1)
     }
 
     pub(crate) fn data(&self) -> &'m ComponentData {
-        &self.module()[self.id()]
+        &self.module()[self.1]
     }
 
     pub fn name(&self) -> &'m str {
@@ -115,6 +128,19 @@ impl ComponentRefData {
 }
 
 #[derive(Clone, Debug)]
+pub struct ComponentRefKey(ComponentRefId);
+
+impl ComponentRefKey {
+    pub(crate) fn new(reference: ComponentRefId) -> Self {
+        Self(reference)
+    }
+
+    pub fn promote(self, module: &Module) -> ComponentRef<'_> {
+        ComponentRef::new(module, self.0)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct ComponentRef<'m>(&'m Module, ComponentRefId);
 
 impl<'m> ComponentRef<'m> {
@@ -124,6 +150,10 @@ impl<'m> ComponentRef<'m> {
 
     pub(crate) fn module(&self) -> &'m Module {
         self.0
+    }
+
+    pub fn key(&self) -> ComponentRefKey {
+        ComponentRefKey::new(self.1)
     }
 
     pub(crate) fn data(&self) -> &'m ComponentRefData {
@@ -238,6 +268,10 @@ impl<'m> ComponentBuilder<'m, NameUnset> {
 impl<'m, N> ComponentBuilder<'m, N> {
     pub fn set_class(&mut self, class: ComponentClass) {
         self.class = Some(class)
+    }
+
+    pub fn class_is_set(&self) -> bool {
+        self.class.is_some()
     }
 }
 
