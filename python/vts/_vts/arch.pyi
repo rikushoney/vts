@@ -18,7 +18,8 @@ _PortClassStr = Literal[
     "latch_out",
     "LATCH_OUT",
     "ff_in",
-    "FF_IN" "ff_out",
+    "FF_IN",
+    "ff_out",
     "FF_OUT",
 ]
 
