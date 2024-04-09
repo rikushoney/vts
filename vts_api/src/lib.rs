@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
 macro_rules! wrap_enum {
-    ($py_name:ident => $name:ident : $($py_variant:ident = $variant:ident $(,)*)+) => {
+    ($py_name:ident as $py_alias:expr => $name:ident : $($py_variant:ident = $variant:ident ( $alias:pat ) $(,)*)+) => {
         #[pyclass]
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         #[derive(Clone, Copy, Debug, PartialEq)]
@@ -38,6 +38,22 @@ macro_rules! wrap_enum {
                     $(
                         $name::$variant => { $py_name::$py_variant }
                     )*
+                }
+            }
+        }
+
+        impl std::str::FromStr for $py_name {
+            type Err = String;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let lower = s.to_lowercase();
+                match lower.as_str() {
+                    $(
+                        $alias => Ok($py_name::$py_variant),
+                    )+
+                    _ => {
+                        Err(s.to_string())
+                    }
                 }
             }
         }

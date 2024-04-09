@@ -8,7 +8,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::{component::ComponentKey, ComponentId, Module, PortId};
+use super::{component::ComponentKey, Component, ComponentId, Module, PortId};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -58,7 +58,7 @@ impl PortData {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct PortKey(pub(crate) PortId);
 
 impl PortKey {
@@ -85,6 +85,10 @@ impl<'m> Port<'m> {
 
     pub fn key(&self) -> PortKey {
         PortKey::new(self.1)
+    }
+
+    pub fn parent(&self) -> Component<'_> {
+        Component::new(self.0, self.data().parent)
     }
 
     pub fn name(&self) -> &str {
@@ -155,7 +159,6 @@ impl WeakPortPins {
 
 pub struct NameSet(String);
 pub struct NameUnset;
-
 pub struct KindSet(PortKind);
 pub struct KindUnset;
 
@@ -232,6 +235,7 @@ impl<'m, N, K> PortBuilder<'m, N, K> {
 impl<'m> PortBuilder<'m, NameSet, KindSet> {
     pub fn finish(self) -> Port<'m> {
         let port = {
+            // TODO: check duplicate ports
             let port = PortData::new(
                 self.parent,
                 &self.name.0,
@@ -241,8 +245,6 @@ impl<'m> PortBuilder<'m, NameSet, KindSet> {
             );
             self.module.ports.insert(port)
         };
-
-        // TODO: check duplicate ports
 
         self.module[self.parent].ports.push(port);
 

@@ -94,11 +94,82 @@ pub struct WeakConnection {
     pub(crate) sink_component: Option<String>,
 }
 
-pub struct ConnectionBuilder<'m> {
-    component: &'m mut ComponentData,
+pub struct SourceSet((PortPins, Option<ComponentRefId>));
+pub struct SourceUnset;
+pub struct SinkSet((PortPins, Option<ComponentRefId>));
+pub struct SinkUnset;
+
+pub struct ConnectionBuilder<'m, Src, Snk> {
+    module: &'m mut Module,
+    component: ComponentId,
+    source: Src,
+    sink: Snk,
     kind: Option<ConnectionKind>,
-    source: Option<(PortPins, Option<ComponentRefId>)>,
-    sink: Option<(PortPins, Option<ComponentRefId>)>,
+}
+
+impl<'m> ConnectionBuilder<'m, SourceUnset, SinkUnset> {
+    pub fn new(module: &'m mut Module, component: ComponentKey) -> Self {
+        Self {
+            module,
+            component: component.0,
+            source: SourceUnset,
+            sink: SinkUnset,
+            kind: None,
+        }
+    }
+}
+
+impl<'m, Snk> ConnectionBuilder<'m, SourceUnset, Snk> {
+    pub fn set_source(
+        self,
+        pins: PortPins,
+        component: Option<ComponentRefKey>,
+    ) -> ConnectionBuilder<'m, SourceSet, Snk> {
+        ConnectionBuilder {
+            module: self.module,
+            component: self.component,
+            source: SourceSet((pins, component.map(|c| c.0))),
+            sink: self.sink,
+            kind: self.kind,
+        }
+    }
+}
+
+impl<'m, Src> ConnectionBuilder<'m, Src, SinkUnset> {
+    pub fn set_sink(
+        self,
+        pins: PortPins,
+        component: Option<ComponentRefKey>,
+    ) -> ConnectionBuilder<'m, Src, SinkSet> {
+        ConnectionBuilder {
+            module: self.module,
+            component: self.component,
+            source: self.source,
+            sink: SinkSet((pins, component.map(|c| c.0))),
+            kind: self.kind,
+        }
+    }
+}
+
+impl<'m, Src, Snk> ConnectionBuilder<'m, Src, Snk> {
+    pub fn set_kind(&mut self, kind: ConnectionKind) {
+        self.kind = Some(kind);
+    }
+
+    pub fn kind_is_set(&self) -> bool {
+        self.kind.is_some()
+    }
+}
+
+impl<'m> ConnectionBuilder<'m, SourceSet, SinkSet> {
+    pub fn finish(self) {
+        let kind = self.kind.unwrap_or(ConnectionKind::Direct);
+        let source = self.source.0;
+        let sink = self.sink.0;
+        let connection = Connection::new(kind, source.0, sink.0, source.1, sink.1);
+
+        self.module[self.component].connections.push(connection);
+    }
 }
 
 #[derive(Debug, Error)]
@@ -109,70 +180,6 @@ pub enum ConnectionBuildError {
     UndefinedPort { port: String },
     #[error(r#"undefined component "{reference}" connected"#)]
     UndefinedReference { reference: String },
-}
-
-impl<'m> ConnectionBuilder<'m> {
-    pub(super) fn new(component: &'m mut ComponentData) -> Self {
-        Self {
-            component,
-            kind: None,
-            source: None,
-            sink: None,
-        }
-    }
-
-    pub fn set_kind(&mut self, kind: ConnectionKind) -> &mut Self {
-        self.kind = Some(kind);
-        self
-    }
-
-    pub(crate) fn set_source(
-        &mut self,
-        pins: PortPins,
-        component: Option<ComponentRefId>,
-    ) -> &mut Self {
-        self.source = Some((pins, component));
-        self
-    }
-
-    pub(crate) fn set_sink(
-        &mut self,
-        pins: PortPins,
-        component: Option<ComponentRefId>,
-    ) -> &mut Self {
-        self.sink = Some((pins, component));
-        self
-    }
-
-    pub fn is_kind_set(&self) -> bool {
-        self.kind.is_some()
-    }
-
-    pub fn is_source_set(&self) -> bool {
-        self.source.is_some()
-    }
-
-    pub fn is_sink_set(&self) -> bool {
-        self.sink.is_some()
-    }
-
-    // pub fn finish(self) -> Result<&'m Connection, ConnectionBuildError> {
-    //     let kind = self
-    //         .kind
-    //         .ok_or(ConnectionBuildError::MissingField("kind"))?;
-    //     let source = self
-    //         .source
-    //         .ok_or(ConnectionBuildError::MissingField("source"))?;
-    //     let sink = self
-    //         .sink
-    //         .ok_or(ConnectionBuildError::MissingField("sink"))?;
-
-    //     let connections = &mut self.component.connections;
-    //     let i = connections.len();
-    //     connections.push(Connection::new(kind, source.0, sink.0, source.1, sink.1));
-
-    //     Ok(&connections[i])
-    // }
 }
 
 pub struct WeakConnectionBuilder<'a, 'm> {

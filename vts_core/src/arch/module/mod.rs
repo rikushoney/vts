@@ -92,6 +92,13 @@ impl Module {
             None
         }
     }
+
+    pub fn find_component(&self, name: &str) -> Option<Component<'_>> {
+        self.components
+            .iter()
+            .find(|(_, component)| component.name == name)
+            .map(|(component, _)| Component::new(self, component))
+    }
 }
 
 macro_rules! impl_module_index_ops {

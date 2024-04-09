@@ -15,7 +15,7 @@ use thiserror::Error;
 
 use super::{
     port::{PortPins, WeakPortPins},
-    ComponentId, ComponentRefId, Module, PortId,
+    ComponentId, ComponentRefId, Module, Port, PortId,
 };
 
 use connection::Connection;
@@ -48,7 +48,7 @@ impl ComponentData {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ComponentKey(pub(crate) ComponentId);
 
 impl ComponentKey {
@@ -108,6 +108,14 @@ impl<'m> Component<'m> {
     pub fn class(&self) -> Option<ComponentClass> {
         self.data().class
     }
+
+    pub fn find_port(&self, name: &str) -> Option<Port<'_>> {
+        self.data()
+            .ports
+            .iter()
+            .find(|&port| self.module()[*port].name == name)
+            .map(|&port| Port::new(self.module(), port))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -127,7 +135,7 @@ impl ComponentRefData {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ComponentRefKey(pub(crate) ComponentRefId);
 
 impl ComponentRefKey {
