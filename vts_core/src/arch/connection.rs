@@ -1,6 +1,10 @@
-use std::ops::Range;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-use super::*;
+use super::component::ComponentKey;
+use super::module::{ComponentId, ComponentRefId, Module};
+use super::port::{PortPins, WeakPortPins};
+use super::reference::ComponentRefKey;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "UPPERCASE")]

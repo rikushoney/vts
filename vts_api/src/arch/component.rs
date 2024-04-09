@@ -4,11 +4,10 @@ use pyo3::exceptions::{PyAttributeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyMapping, PyString};
 use vts_core::arch::{
-    component::{
-        connection::{ConnectionBuilder, ConnectionKind},
-        ComponentKey, ComponentRefBuilder,
-    },
+    component::ComponentKey,
+    connection::{ConnectionBuilder, ConnectionKind},
     port::{PortBuilder, PortClass, PortKind},
+    reference::ComponentRefBuilder,
     ComponentClass,
 };
 
@@ -25,9 +24,9 @@ wrap_enum!(
 
 wrap_enum!(
     PyConnectionKind as "connection kind" => ConnectionKind:
-        DIRECT = Direct ("direct"),
-        COMPLETE = Complete ("complete"),
-        MUX = Mux ("mux")
+        DIRECT = Direct ("direct" | "d"),
+        COMPLETE = Complete ("complete" | "c"),
+        MUX = Mux ("mux" | "m")
 );
 
 #[pyclass]

@@ -1,11 +1,10 @@
-#![allow(unused)]
-
-// pub mod de;
-// pub mod ser;
-
+use std::fmt;
 use std::ops::Range;
 
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, DeserializeSeed, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 use thiserror::Error;
 
 use super::{component::ComponentKey, Component, ComponentId, Module, PortId};
@@ -31,9 +30,11 @@ pub enum PortClass {
     LatchOut,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct PortData {
+    #[serde(skip)]
     pub name: String,
+    #[serde(skip)]
     parent: ComponentId,
     pub kind: PortKind,
     pub n_pins: usize,
@@ -140,9 +141,9 @@ impl PortPins {
         self.range.clone()
     }
 
-    // pub fn port<'m>(&self, module: &'m Module) -> Port<'m> {
-    //     Port::new(module, self.port)
-    // }
+    pub fn port<'m>(&self, module: &'m Module) -> Port<'m> {
+        Port::new(module, self.port)
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -152,9 +153,9 @@ pub struct WeakPortPins {
 }
 
 impl WeakPortPins {
-    pub(crate) fn new(port: String, range: Range<u32>) -> Self {
-        Self { port, range }
-    }
+    // pub(crate) fn new(port: String, range: Range<u32>) -> Self {
+    //     Self { port, range }
+    // }
 }
 
 pub struct NameSet(String);
@@ -165,10 +166,6 @@ pub struct KindUnset;
 pub struct PortBuilder<'m, N, K> {
     module: &'m mut Module,
     parent: ComponentId,
-    // data: PortData,
-    // name_is_set: bool,
-    // kind_is_set: bool,
-    // n_pins_is_set: bool,
     name: N,
     kind: K,
     n_pins: Option<usize>,
@@ -219,12 +216,12 @@ impl<'m, N, K> PortBuilder<'m, N, K> {
         self.n_pins = Some(n_pins);
     }
 
-    pub fn n_pins_is_set(&self) -> bool {
-        self.n_pins.is_some()
-    }
-
     pub fn set_class(&mut self, class: PortClass) {
         self.class = Some(class);
+    }
+
+    pub fn n_pins_is_set(&self) -> bool {
+        self.n_pins.is_some()
     }
 
     pub fn class_is_set(&self) -> bool {
@@ -243,11 +240,11 @@ impl<'m> PortBuilder<'m, NameSet, KindSet> {
                 self.n_pins.unwrap_or(1),
                 self.class,
             );
+
             self.module.ports.insert(port)
         };
 
         self.module[self.parent].ports.push(port);
-
         Port::new(self.module, port)
     }
 }
@@ -258,4 +255,101 @@ pub enum PortBuildError {
     DuplicatePort { module: String, port: String },
     #[error("port must have a {0}")]
     MissingField(&'static str),
+}
+
+pub(crate) struct PortSeed<'m> {
+    module: &'m mut Module,
+    parent: ComponentId,
+    name: String,
+}
+
+impl<'m> PortSeed<'m> {
+    pub(crate) fn new(module: &'m mut Module, parent: ComponentId, name: String) -> Self {
+        Self {
+            module,
+            parent,
+            name,
+        }
+    }
+}
+
+impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a port description")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "lowercase")]
+        enum Field {
+            Kind,
+            #[serde(rename = "n_pins")]
+            NPins,
+            Class,
+        }
+
+        let mut kind: Option<PortKind> = None;
+        let mut n_pins: Option<usize> = None;
+        let mut class: Option<PortClass> = None;
+
+        while let Some(field) = map.next_key()? {
+            match field {
+                Field::Kind => {
+                    if kind.is_some() {
+                        return Err(de::Error::duplicate_field("kind"));
+                    }
+
+                    kind = Some(map.next_value()?);
+                }
+                Field::NPins => {
+                    if n_pins.is_some() {
+                        return Err(de::Error::duplicate_field("n_pins"));
+                    }
+
+                    n_pins = Some(map.next_value()?);
+                }
+                Field::Class => {
+                    if class.is_some() {
+                        return Err(de::Error::duplicate_field("class"));
+                    }
+
+                    class = Some(map.next_value()?);
+                }
+            }
+        }
+
+        let kind = kind.ok_or(de::Error::missing_field("kind"))?;
+
+        let mut builder = PortBuilder::new(self.module, ComponentKey(self.parent))
+            .set_name(&self.name)
+            .set_kind(kind);
+
+        if let Some(n_pins) = n_pins {
+            builder.set_n_pins(n_pins);
+        }
+
+        if let Some(class) = class {
+            builder.set_class(class);
+        }
+
+        builder.finish();
+        Ok(())
+    }
+}
+
+impl<'de, 'm> DeserializeSeed<'de> for PortSeed<'m> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["kind", "n_pins", "class"];
+        deserializer.deserialize_struct("Port", FIELDS, self)
+    }
 }

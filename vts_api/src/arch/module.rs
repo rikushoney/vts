@@ -5,8 +5,9 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyMapping, PyString};
 use vts_core::arch::{
-    component::{ComponentBuilder, ComponentKey, ComponentRefKey},
+    component::{ComponentBuilder, ComponentKey},
     port::PortKey,
+    reference::ComponentRefKey,
     ComponentClass, Module,
 };
 

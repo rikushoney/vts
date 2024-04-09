@@ -1,20 +1,12 @@
-#![allow(unused)] // TODO: remove this!
-
-// pub mod de;
-// pub mod ser;
-
-use std::collections::hash_map;
 use std::ops::{Index, IndexMut};
 
-use fnv::FnvHashMap;
-use slotmap::{new_key_type, SecondaryMap, SlotMap};
+use slotmap::{new_key_type, SlotMap};
 use thiserror::Error;
 
-use super::component::{
-    connection::ConnectionBuildError, Component, ComponentBuildArtifacts, ComponentData,
-    ComponentKey, ComponentRef, ComponentRefData, ComponentRefKey, WeakConnection,
-};
+use super::component::{Component, ComponentData, ComponentKey};
+use super::connection::ConnectionBuildError;
 use super::port::{Port, PortData, PortKey};
+use super::reference::{ComponentRef, ComponentRefData, ComponentRefKey};
 
 new_key_type! {
     pub(crate) struct ComponentId;
@@ -127,10 +119,10 @@ impl_module_index_ops!(
     ComponentRefId => ComponentRefData in references,
 );
 
-pub struct ComponentIter<'m> {
-    module: &'m Module,
-    iter: hash_map::Values<'m, String, ComponentId>,
-}
+// pub struct ComponentIter<'m> {
+//     module: &'m Module,
+//     iter: hash_map::Values<'m, String, ComponentId>,
+// }
 
 // impl<'m> Iterator for ComponentIter<'m> {
 //     type Item = Component<'m>;
@@ -494,50 +486,50 @@ impl ModuleBuilder {
     //     Ok(self)
     // }
 
-    pub(crate) fn resolve_connections<I: Iterator<Item = WeakConnection>>(
-        &mut self,
-        component: ComponentId,
-        connections: I,
-    ) -> Result<&mut Self, ModuleBuildError> {
-        // if self.connections_are_resolved {
-        //     return Ok(self);
-        // }
+    // pub(crate) fn resolve_connections<I: Iterator<Item = WeakConnection>>(
+    //     &mut self,
+    //     component: ComponentId,
+    //     connections: I,
+    // ) -> Result<&mut Self, ModuleBuildError> {
+    //     // if self.connections_are_resolved {
+    //     //     return Ok(self);
+    //     // }
 
-        for connection in connections {
-            // let (source_pins, source_reference) = if connection.source_component.is_some() {
-            //     (
-            //         connection.resolve_source_pins(&mut self.module, component)?,
-            //         connection.resolve_source_reference(&mut self.module, component)?,
-            //     )
-            // } else {
-            //     (
-            //         (&connection, component).resolve_source_pins(&mut self.module, component)?,
-            //         (&connection, component)
-            //             .resolve_source_reference(&mut self.module, component)?,
-            //     )
-            // };
+    //     for connection in connections {
+    //         // let (source_pins, source_reference) = if connection.source_component.is_some() {
+    //         //     (
+    //         //         connection.resolve_source_pins(&mut self.module, component)?,
+    //         //         connection.resolve_source_reference(&mut self.module, component)?,
+    //         //     )
+    //         // } else {
+    //         //     (
+    //         //         (&connection, component).resolve_source_pins(&mut self.module, component)?,
+    //         //         (&connection, component)
+    //         //             .resolve_source_reference(&mut self.module, component)?,
+    //         //     )
+    //         // };
 
-            // let (sink_pins, sink_reference) = if connection.sink_component.is_some() {
-            //     (
-            //         connection.resolve_sink_pins(&mut self.module, component)?,
-            //         connection.resolve_sink_reference(&mut self.module, component)?,
-            //     )
-            // } else {
-            //     (
-            //         (&connection, component).resolve_sink_pins(&mut self.module, component)?,
-            //         (&connection, component).resolve_sink_reference(&mut self.module, component)?,
-            //     )
-            // };
+    //         // let (sink_pins, sink_reference) = if connection.sink_component.is_some() {
+    //         //     (
+    //         //         connection.resolve_sink_pins(&mut self.module, component)?,
+    //         //         connection.resolve_sink_reference(&mut self.module, component)?,
+    //         //     )
+    //         // } else {
+    //         //     (
+    //         //         (&connection, component).resolve_sink_pins(&mut self.module, component)?,
+    //         //         (&connection, component).resolve_sink_reference(&mut self.module, component)?,
+    //         //     )
+    //         // };
 
-            // let connection =
-            //     Connection::new(source_pins, sink_pins, source_reference, sink_reference);
+    //         // let connection =
+    //         //     Connection::new(source_pins, sink_pins, source_reference, sink_reference);
 
-            // self.module[component].connections.push(connection);
-        }
+    //         // self.module[component].connections.push(connection);
+    //     }
 
-        // self.connections_are_resolved = true;
-        Ok(self)
-    }
+    //     // self.connections_are_resolved = true;
+    //     Ok(self)
+    // }
 
     // pub fn resolve_all<R, Rs, Ns, Cs>(
     //     &mut self,
@@ -590,21 +582,21 @@ impl ModuleBuilder {
         Ok(self.module)
     }
 
-    pub(crate) fn resolve_and_finish<I>(mut self, unresolved: I) -> Result<Module, ModuleBuildError>
-    where
-        I: IntoIterator<Item = (ComponentId, ComponentBuildArtifacts)>,
-    {
-        for (component, artifacts) in unresolved.into_iter() {
-            // self.resolve_all(
-            //     component,
-            //     artifacts.references,
-            //     artifacts.named_references,
-            //     artifacts.connections,
-            // )?;
-        }
+    // pub(crate) fn resolve_and_finish<I>(mut self, unresolved: I) -> Result<Module, ModuleBuildError>
+    // where
+    //     I: IntoIterator<Item = (ComponentId, ComponentBuildArtifacts)>,
+    // {
+    //     for (component, artifacts) in unresolved.into_iter() {
+    //         // self.resolve_all(
+    //         //     component,
+    //         //     artifacts.references,
+    //         //     artifacts.named_references,
+    //         //     artifacts.connections,
+    //         // )?;
+    //     }
 
-        self.finish()
-    }
+    //     self.finish()
+    // }
 }
 
 #[cfg(test)]

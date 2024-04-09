@@ -4,8 +4,9 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PySlice, PySliceIndices, PyString};
 use vts_core::arch::{
-    component::{ComponentKey, ComponentRefKey},
+    component::ComponentKey,
     port::{PortKey, PortPins},
+    reference::ComponentRefKey,
     PortClass, PortKind,
 };
 

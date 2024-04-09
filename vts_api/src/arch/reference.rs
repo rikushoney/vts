@@ -2,7 +2,7 @@ use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 
-use vts_core::arch::component::ComponentRefKey;
+use vts_core::arch::reference::ComponentRefKey;
 
 use super::port::SliceOrIndex;
 use super::{
