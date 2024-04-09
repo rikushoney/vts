@@ -4,9 +4,10 @@ use pyo3::types::PyString;
 
 use vts_core::arch::component::ComponentRefKey;
 
-use super::component::{PyComponent, PyConnectionKind};
-use super::module::PyModule_;
-use super::port::{PyComponentRefPort, PyPort, PyPortSelection, SliceOrIndex};
+use super::port::SliceOrIndex;
+use super::{
+    PyComponent, PyComponentRefPort, PyConnectionKind, PyModule_, PyPort, PyPortSelection,
+};
 
 #[pyclass]
 pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
@@ -18,17 +19,17 @@ impl PyComponentRef {
         reference: ComponentRefKey,
     ) -> PyResult<Bound<'py, Self>> {
         if let Some(reference) = module.borrow().references.get(&reference) {
-            Ok(reference.bind(py).clone())
-        } else {
-            let py_reference = Py::new(py, Self(module.clone().unbind(), reference))?;
-
-            module
-                .borrow_mut()
-                .references
-                .insert(reference, py_reference.clone());
-
-            Ok(py_reference.bind(py).clone())
+            return Ok(reference.bind(py).clone());
         }
+
+        let py_reference = Py::new(py, Self(module.clone().unbind(), reference))?;
+
+        module
+            .borrow_mut()
+            .references
+            .insert(reference, py_reference.clone());
+
+        Ok(py_reference.bind(py).clone())
     }
 
     pub(crate) fn key(&self) -> ComponentRefKey {
@@ -60,11 +61,9 @@ impl PyComponentRef {
     pub fn alias<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
         get_reference!(self + py => reference);
 
-        if let Some(alias) = reference.alias() {
-            Some(PyString::new_bound(py, alias))
-        } else {
-            None
-        }
+        reference
+            .alias()
+            .map(|alias| PyString::new_bound(py, alias))
     }
 
     pub fn alias_or_name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
@@ -78,7 +77,7 @@ impl PyComponentRef {
     }
 
     pub fn __getattr__(
-        slf: &Bound<'_, PyComponentRef>,
+        slf: &Bound<'_, Self>,
         py: Python<'_>,
         port: &Bound<'_, PyString>,
     ) -> PyResult<PyComponentRefPort> {
@@ -98,7 +97,7 @@ impl PyComponentRef {
     }
 
     pub fn __setattr__(
-        slf: &Bound<'_, PyComponentRef>,
+        slf: &Bound<'_, Self>,
         py: Python<'_>,
         source: &Bound<'_, PyString>,
         sink: &Bound<'_, PyPortSelection>,

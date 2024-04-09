@@ -9,7 +9,7 @@ use vts_core::arch::{
     PortClass, PortKind,
 };
 
-use super::{component::PyComponent, module::PyModule_, reference::PyComponentRef};
+use super::{PyComponent, PyComponentRef, PyModule_};
 
 wrap_enum!(
     PyPortClass as "port class" => PortClass:
@@ -47,12 +47,12 @@ impl PyPort {
         port: PortKey,
     ) -> PyResult<Bound<'py, Self>> {
         if let Some(port) = module.borrow().ports.get(&port) {
-            Ok(port.bind(py).clone())
-        } else {
-            let py_port = Py::new(py, Self(module.clone().unbind(), port))?;
-            module.borrow_mut().ports.insert(port, py_port.clone());
-            Ok(py_port.bind(py).clone())
+            return Ok(port.bind(py).clone());
         }
+
+        let py_port = Py::new(py, Self(module.clone().unbind(), port))?;
+        module.borrow_mut().ports.insert(port, py_port.clone());
+        Ok(py_port.bind(py).clone())
     }
 
     pub(crate) fn key(&self) -> PortKey {

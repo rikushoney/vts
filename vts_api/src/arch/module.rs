@@ -14,7 +14,7 @@ use super::{PyComponent, PyComponentClass, PyComponentRef, PyPort};
 
 #[pyclass]
 #[pyo3(name = "PyModule")]
-pub struct PyModule {
+pub struct PyModule_ {
     pub(crate) inner: Module,
     pub(crate) components: HashMap<ComponentKey, Py<PyComponent>>,
     pub(crate) ports: HashMap<PortKey, Py<PyPort>>,
@@ -94,9 +94,9 @@ impl<'py> FromPyObject<'py> for ComponentClassOrStr<'py> {
     }
 }
 
-impl PyModule {
+impl PyModule_ {
     fn add_component_impl<'py>(
-        slf: &Bound<'py, PyModule>,
+        slf: &Bound<'py, Self>,
         py: Python<'py>,
         name: &Bound<'py, PyString>,
         class: Option<ComponentClassOrStr<'py>>,
@@ -118,7 +118,7 @@ impl PyModule {
     }
 
     fn add_component_copy<'py>(
-        slf: &Bound<'py, PyModule>,
+        slf: &Bound<'py, Self>,
         py: Python<'py>,
         component: &Bound<'py, PyComponent>,
         name: Option<&Bound<'py, PyString>>,
@@ -158,9 +158,9 @@ impl PyModule {
 }
 
 #[pymethods]
-impl PyModule {
+impl PyModule_ {
     #[new]
-    fn new(name: &Bound<'_, PyString>) -> PyResult<Self> {
+    pub fn new(name: &Bound<'_, PyString>) -> PyResult<Self> {
         Ok(Self {
             inner: Module::new(name.to_str()?),
             components: HashMap::default(),
@@ -186,7 +186,7 @@ impl PyModule {
 
     #[pyo3(signature = (name=None, *, component=None, class_=None))]
     fn add_component<'py>(
-        slf: &Bound<'py, PyModule>,
+        slf: &Bound<'py, Self>,
         py: Python<'py>,
         name: Option<NameOrComponent<'py>>,
         component: Option<&Bound<'py, PyComponent>>,
@@ -223,7 +223,7 @@ impl PyModule {
 }
 
 #[pyfunction]
-pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule>> {
+pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let _ = input;
     // let py = input.py();
 
@@ -238,7 +238,7 @@ pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule>> {
 #[pyfunction]
 pub fn json_dumps(
     py: Python<'_>,
-    module: &Bound<'_, PyModule>,
+    module: &Bound<'_, PyModule_>,
     pretty: bool,
 ) -> PyResult<Py<PyString>> {
     let _ = py;

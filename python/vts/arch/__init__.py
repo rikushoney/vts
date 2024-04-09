@@ -12,6 +12,7 @@ from vts._vts.arch import (  # noqa
     PyPort as Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
+    smoke_test,
 )
 
 __all__ = [
