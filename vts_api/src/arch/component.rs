@@ -14,7 +14,7 @@ use vts_core::arch::{
 
 use super::{
     port::{ComponentOrRef, SliceOrIndex},
-    PyComponentRef, PyModule as PyModule_, PyPort, PyPortClass, PyPortKind, PyPortSelection,
+    PyComponentRef, PyModule, PyPort, PyPortClass, PyPortKind, PyPortSelection,
 };
 
 wrap_enum!(
@@ -32,7 +32,7 @@ wrap_enum!(
 
 #[pyclass]
 #[derive(Clone, Debug)]
-pub struct PyComponent(Py<PyModule_>, ComponentKey);
+pub struct PyComponent(Py<PyModule>, ComponentKey);
 
 macro_rules! get_component {
     ($slf:ident + $py:ident => $comp:ident) => {
@@ -48,7 +48,7 @@ macro_rules! get_component {
 impl PyComponent {
     pub(crate) fn new<'py>(
         py: Python<'py>,
-        module: &Bound<'py, PyModule_>,
+        module: &Bound<'py, PyModule>,
         component: ComponentKey,
     ) -> PyResult<Bound<'py, Self>> {
         if let Some(component) = module.borrow().components.get(&component) {
@@ -269,7 +269,7 @@ impl<'py> FromPyObject<'py> for PortClassOrStr<'py> {
 
 #[pymethods]
 impl PyComponent {
-    pub fn module<'py>(&self, py: Python<'py>) -> &Bound<'py, PyModule_> {
+    pub fn module<'py>(&self, py: Python<'py>) -> &Bound<'py, PyModule> {
         self.0.bind(py)
     }
 
