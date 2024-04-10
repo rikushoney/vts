@@ -1,5 +1,4 @@
-use serde::ser::SerializeMap;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::component::ComponentKey;
@@ -7,11 +6,12 @@ use super::module::{ComponentId, ComponentRefId, Module};
 use super::port::{PortPins, WeakPortPins};
 use super::reference::ComponentRefKey;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ConnectionKind {
-    Complete,
+    #[default]
     Direct,
+    Complete,
     Mux,
 }
 
@@ -48,46 +48,6 @@ impl Connection {
     pub fn sink_pins(&self) -> &PortPins {
         &self.sink_pins
     }
-
-    // pub fn source_component<'m>(&self, module: &'m Module) -> Option<ComponentRef<'m>> {
-    //     self.source_component
-    //         .map(|source_component| source_component.to_reference(module))
-    // }
-
-    // pub fn sink_component<'m>(&self, module: &'m Module) -> Option<ComponentRef<'m>> {
-    //     self.sink_component
-    //         .map(|sink_component| sink_component.to_reference(module))
-    // }
-
-    // pub fn source_port<'m>(
-    //     &self,
-    //     module: &'m Module,
-    //     component: &Component<'m>,
-    // ) -> Option<Port<'m>> {
-    //     if let Some(source_component) = self.source_component {
-    //         let source_component = source_component.to_component(module);
-    //         source_component
-    //             .ports()
-    //             .find(|port| port.name() == self.source_pins.port(module).name())
-    //     } else {
-    //         component
-    //             .ports()
-    //             .find(|port| port.name() == self.source_pins.port(module).name())
-    //     }
-    // }
-
-    // pub fn sink_port<'m>(&self, module: &'m Module, component: &Component<'m>) -> Option<Port<'m>> {
-    //     if let Some(sink_component) = self.sink_component {
-    //         let sink_component = sink_component.to_component(module);
-    //         sink_component
-    //             .ports()
-    //             .find(|port| port.name() == self.sink_pins.port(module).name())
-    //     } else {
-    //         component
-    //             .ports()
-    //             .find(|port| port.name() == self.sink_pins.port(module).name())
-    //     }
-    // }
 }
 
 pub struct SourceSet(PortPins, Option<ComponentRefId>);
@@ -265,5 +225,3 @@ impl WeakConnectionBuilder<WeakSourceSet, WeakSinkSet> {
         }
     }
 }
-
-pub struct 

@@ -219,20 +219,21 @@ impl<'m, N, K> PortBuilder<'m, N, K> {
 }
 
 impl<'m> PortBuilder<'m, NameSet, KindSet> {
-    pub fn finish(self) -> Port<'m> {
-        let port = {
-            // TODO: check duplicate ports
-            let port = PortData::new(
-                self.parent,
-                &self.name.0,
-                self.kind.0,
-                self.n_pins.unwrap_or(1),
-                self.class,
-            );
+    fn insert(&mut self) -> PortId {
+        // TODO: check duplicate ports
+        let port = PortData::new(
+            self.parent,
+            &self.name.0,
+            self.kind.0,
+            self.n_pins.unwrap_or(1),
+            self.class,
+        );
 
-            self.module.ports.insert(port)
-        };
+        self.module.ports.insert(port)
+    }
 
+    pub fn finish(mut self) -> Port<'m> {
+        let port = self.insert();
         self.module[self.parent].ports.push(port);
         Port::new(self.module, port)
     }
@@ -343,77 +344,76 @@ impl<'de, 'm> DeserializeSeed<'de> for PortSeed<'m> {
     }
 }
 
-const PIN_RANGE_FIELDS: &[&str] = &["port_start", "port_end"];
-const PORT_START: usize = 0;
-const PORT_END: usize = 1;
+mod pin_range {
+    use super::*;
 
-fn serialize_pin_range<S: Serializer>(
-    range: &Range<u32>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    let mut state = serializer.serialize_struct("PinRange", PIN_RANGE_FIELDS.len())?;
-    state.serialize_field(PIN_RANGE_FIELDS[PORT_START], &(range.start as u32))?;
-    state.serialize_field(PIN_RANGE_FIELDS[PORT_END], &(range.end as u32))?;
-    state.end()
-}
+    const FIELDS: &[&str] = &["port_start", "port_end"];
+    const PORT_START: usize = 0;
+    const PORT_END: usize = 1;
 
-fn deserialize_pin_range<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Range<u32>, D::Error> {
-    struct PinRangeVisitor;
-
-    impl<'de> Visitor<'de> for PinRangeVisitor {
-        type Value = Range<u32>;
-
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "a pin range description")
-        }
-
-        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-        where
-            A: MapAccess<'de>,
-        {
-            #[derive(Deserialize)]
-            enum Field {
-                PortStart,
-                PortEnd,
-            }
-
-            let mut start: Option<u32> = None;
-            let mut end: Option<u32> = None;
-
-            while let Some(field) = map.next_key()? {
-                match field {
-                    Field::PortStart => {
-                        if start.is_some() {
-                            return Err(de::Error::duplicate_field(PIN_RANGE_FIELDS[PORT_START]));
-                        }
-
-                        start = Some(map.next_value()?);
-                    }
-                    Field::PortEnd => {
-                        if end.is_some() {
-                            return Err(de::Error::duplicate_field(PIN_RANGE_FIELDS[PORT_END]));
-                        }
-
-                        end = Some(map.next_value()?);
-                    }
-                }
-            }
-
-            let start = start.ok_or(de::Error::missing_field(PIN_RANGE_FIELDS[PORT_START]))?;
-            let end = end.ok_or(de::Error::missing_field(PIN_RANGE_FIELDS[PORT_END]))?;
-
-            Ok(Range { start, end })
-        }
+    pub fn serialize<S: Serializer>(range: &Range<u32>, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("PinRange", FIELDS.len())?;
+        state.serialize_field(FIELDS[PORT_START], &(range.start as u32))?;
+        state.serialize_field(FIELDS[PORT_END], &(range.end as u32))?;
+        state.end()
     }
 
-    deserializer.deserialize_struct("PinRange", PIN_RANGE_FIELDS, PinRangeVisitor)
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Range<u32>, D::Error> {
+        struct PinRangeVisitor;
+
+        impl<'de> Visitor<'de> for PinRangeVisitor {
+            type Value = Range<u32>;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "a pin range description")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                #[derive(Deserialize)]
+                enum Field {
+                    PortStart,
+                    PortEnd,
+                }
+
+                let mut start: Option<u32> = None;
+                let mut end: Option<u32> = None;
+
+                while let Some(field) = map.next_key()? {
+                    match field {
+                        Field::PortStart => {
+                            if start.is_some() {
+                                return Err(de::Error::duplicate_field(FIELDS[PORT_START]));
+                            }
+
+                            start = Some(map.next_value()?);
+                        }
+                        Field::PortEnd => {
+                            if end.is_some() {
+                                return Err(de::Error::duplicate_field(FIELDS[PORT_END]));
+                            }
+
+                            end = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let start = start.ok_or(de::Error::missing_field(FIELDS[PORT_START]))?;
+                let end = end.ok_or(de::Error::missing_field(FIELDS[PORT_END]))?;
+
+                Ok(Range { start, end })
+            }
+        }
+
+        deserializer.deserialize_struct("PinRange", FIELDS, PinRangeVisitor)
+    }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct WeakPortPins {
     pub port: String,
-    #[serde(flatten, serialize_with = "serialize_pin_range")]
+    #[serde(flatten, with = "pin_range")]
     pub range: Range<u32>,
 }

@@ -130,18 +130,16 @@ impl<'m, C> ComponentRefBuilder<'m, C> {
 }
 
 impl<'m> ComponentRefBuilder<'m, ComponentSet> {
-    pub fn finish(self) -> ComponentRef<'m> {
+    fn insert(&mut self) -> ComponentRefId {
         let n_instances = self.n_instances.unwrap_or(1);
+        let reference = ComponentRefData::new(self.component.0, self.alias.take(), n_instances);
+        self.module.references.insert(reference)
+    }
 
-        let reference = {
-            let reference = ComponentRefData::new(self.component.0, self.alias, n_instances);
-            self.module.references.insert(reference)
-        };
-
+    pub fn finish(mut self) -> ComponentRef<'m> {
         // TODO: check duplicate references
-
+        let reference = self.insert();
         self.module[self.parent].references.push(reference);
-
         ComponentRef::new(self.module, reference)
     }
 }
