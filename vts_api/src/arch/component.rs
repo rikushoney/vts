@@ -333,7 +333,8 @@ impl PyComponent {
         let reference = {
             let mut module = self.module(py).borrow_mut();
             let component = component.borrow();
-            let mut builder = ComponentRefBuilder::new(&mut module.inner, component.1);
+            let mut builder =
+                ComponentRefBuilder::new(&mut module.inner, self.1).set_component(component.1);
 
             if let Some(alias) = alias {
                 builder.set_alias(alias.to_str()?);

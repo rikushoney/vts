@@ -3,6 +3,8 @@
 use std::fmt;
 use std::slice;
 
+use serde::ser::SerializeMap;
+use serde::ser::SerializeSeq;
 use serde::{
     de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
     ser::SerializeStruct,
@@ -12,8 +14,10 @@ use thiserror::Error;
 
 use super::{
     connection::Connection,
+    linker::Linker,
     port::{PortSeed, WeakPortPins},
-    ComponentId, ComponentRefId, Module, Port, PortId,
+    reference::{ComponentWeakRef, DeserializeComponentWeakRef},
+    ComponentId, ComponentRef, ComponentRefId, Module, Port, PortId,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -210,14 +214,6 @@ impl<'m> ComponentBuilder<'m, NameSet> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct WeakConnection {
-    pub(crate) source_pins: WeakPortPins,
-    pub(crate) source_component: Option<String>,
-    pub(crate) sink_pins: WeakPortPins,
-    pub(crate) sink_component: Option<String>,
-}
-
 #[derive(Debug, Error)]
 pub enum ComponentBuildError {
     #[error(r#"component "{component}" already in "{module}""#)]
@@ -255,7 +251,14 @@ impl<'m> Serialize for SerializePorts<'_, 'm> {
     where
         S: Serializer,
     {
-        todo!()
+        let mut state = serializer.serialize_map(Some(self.ports.len()))?;
+
+        for &port in self.ports {
+            let port = Port::new(self.module, port);
+            state.serialize_entry(port.name(), port.data())?;
+        }
+
+        state.end()
     }
 }
 
@@ -269,7 +272,31 @@ impl<'m> Serialize for SerializeReferences<'_, 'm> {
     where
         S: Serializer,
     {
-        todo!()
+        let unnamed_references = self
+            .references
+            .iter()
+            .filter(|&reference| self.module[*reference].alias.is_none());
+
+        let len = unnamed_references.clone().count();
+        let mut state = serializer.serialize_seq(Some(len))?;
+
+        if len == 0 {
+            return state.end();
+        }
+
+        for &reference in unnamed_references {
+            let reference = ComponentRef::new(self.module, reference);
+
+            if reference.alias().is_none() {
+                state.serialize_element(&ComponentWeakRef {
+                    component: reference.component().name().to_string(),
+                    alias: None,
+                    n_instances: reference.n_instances(),
+                })?;
+            }
+        }
+
+        state.end()
     }
 }
 
@@ -283,7 +310,29 @@ impl<'m> Serialize for SerializeNamedReferences<'_, 'm> {
     where
         S: Serializer,
     {
-        todo!()
+        let named_references = self
+            .references
+            .iter()
+            .filter(|&reference| self.module[*reference].alias.is_some());
+
+        let len = named_references.clone().count();
+        let mut state = serializer.serialize_map(Some(len))?;
+
+        for &reference in named_references {
+            let reference = ComponentRef::new(self.module, reference);
+            let alias = reference.alias().expect("reference should have an alias");
+
+            state.serialize_entry(
+                alias,
+                &ComponentWeakRef {
+                    component: reference.component().name().to_string(),
+                    alias: None,
+                    n_instances: reference.n_instances(),
+                },
+            )?;
+        }
+
+        state.end()
     }
 }
 
@@ -392,12 +441,13 @@ impl<'de, 'm> DeserializeSeed<'de> for DeserializePorts<'m> {
     }
 }
 
-struct DeserializeReferences<'m> {
+struct DeserializeReferences<'a, 'm> {
     module: &'m mut Module,
     parent: ComponentId,
+    linker: &'a mut Linker,
 }
 
-impl<'de, 'm> Visitor<'de> for DeserializeReferences<'m> {
+impl<'a, 'de, 'm> Visitor<'de> for DeserializeReferences<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -408,27 +458,33 @@ impl<'de, 'm> Visitor<'de> for DeserializeReferences<'m> {
     where
         A: SeqAccess<'de>,
     {
-        todo!()
+        while let Some(reference) = seq.next_element_seed(DeserializeComponentWeakRef::Unnamed)? {
+            self.linker
+                .add_reference(ComponentKey::new(self.parent), reference);
+        }
+
+        Ok(())
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for DeserializeReferences<'m> {
+impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeReferences<'a, 'm> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_map(self)
+        deserializer.deserialize_seq(self)
     }
 }
 
-struct DeserializeNamedReferences<'m> {
+struct DeserializeNamedReferences<'a, 'm> {
     module: &'m mut Module,
     parent: ComponentId,
+    linker: &'a mut Linker,
 }
 
-impl<'de, 'm> Visitor<'de> for DeserializeNamedReferences<'m> {
+impl<'a, 'de, 'm> Visitor<'de> for DeserializeNamedReferences<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -439,11 +495,17 @@ impl<'de, 'm> Visitor<'de> for DeserializeNamedReferences<'m> {
     where
         A: MapAccess<'de>,
     {
-        todo!()
+        while let Some(alias) = map.next_key()? {
+            let reference = map.next_value_seed(DeserializeComponentWeakRef::Named(alias))?;
+            self.linker
+                .add_reference(ComponentKey::new(self.parent), reference);
+        }
+
+        Ok(())
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for DeserializeNamedReferences<'m> {
+impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeNamedReferences<'a, 'm> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -454,12 +516,13 @@ impl<'de, 'm> DeserializeSeed<'de> for DeserializeNamedReferences<'m> {
     }
 }
 
-struct DeserializeConnections<'m> {
+struct DeserializeConnections<'a, 'm> {
     module: &'m mut Module,
     parent: ComponentId,
+    linker: &'a mut Linker,
 }
 
-impl<'de, 'm> Visitor<'de> for DeserializeConnections<'m> {
+impl<'a, 'de, 'm> Visitor<'de> for DeserializeConnections<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -474,7 +537,7 @@ impl<'de, 'm> Visitor<'de> for DeserializeConnections<'m> {
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for DeserializeConnections<'m> {
+impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeConnections<'a, 'm> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -485,18 +548,23 @@ impl<'de, 'm> DeserializeSeed<'de> for DeserializeConnections<'m> {
     }
 }
 
-pub(crate) struct ComponentSeed<'m> {
+pub(crate) struct ComponentSeed<'a, 'm> {
     module: &'m mut Module,
     name: String,
+    linker: &'a mut Linker,
 }
 
-impl<'m> ComponentSeed<'m> {
-    pub(crate) fn new(module: &'m mut Module, name: String) -> Self {
-        Self { module, name }
+impl<'a, 'm> ComponentSeed<'a, 'm> {
+    pub(crate) fn new(module: &'m mut Module, name: String, linker: &'a mut Linker) -> Self {
+        Self {
+            module,
+            name,
+            linker,
+        }
     }
 }
 
-impl<'de, 'm> Visitor<'de> for ComponentSeed<'m> {
+impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -551,6 +619,7 @@ impl<'de, 'm> Visitor<'de> for ComponentSeed<'m> {
                     map.next_value_seed(DeserializeReferences {
                         module: self.module,
                         parent: component,
+                        linker: self.linker,
                     })?;
 
                     references = true;
@@ -563,6 +632,7 @@ impl<'de, 'm> Visitor<'de> for ComponentSeed<'m> {
                     map.next_value_seed(DeserializeNamedReferences {
                         module: self.module,
                         parent: component,
+                        linker: self.linker,
                     })?;
 
                     named_references = true;
@@ -575,6 +645,7 @@ impl<'de, 'm> Visitor<'de> for ComponentSeed<'m> {
                     map.next_value_seed(DeserializeConnections {
                         module: self.module,
                         parent: component,
+                        linker: self.linker,
                     })?;
 
                     connections = true;
@@ -594,7 +665,7 @@ impl<'de, 'm> Visitor<'de> for ComponentSeed<'m> {
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for ComponentSeed<'m> {
+impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentSeed<'a, 'm> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
