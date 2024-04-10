@@ -287,13 +287,11 @@ impl<'m> Serialize for SerializeReferences<'_, 'm> {
         for &reference in unnamed_references {
             let reference = ComponentRef::new(self.module, reference);
 
-            if reference.alias().is_none() {
-                state.serialize_element(&ComponentWeakRef {
-                    component: reference.component().name().to_string(),
-                    alias: None,
-                    n_instances: reference.n_instances(),
-                })?;
-            }
+            state.serialize_element(&ComponentWeakRef {
+                component: reference.component().name().to_string(),
+                alias: None,
+                n_instances: reference.n_instances(),
+            })?;
         }
 
         state.end()
@@ -346,7 +344,13 @@ impl<'m> Serialize for SerializeConnections<'_, 'm> {
     where
         S: Serializer,
     {
-        todo!()
+        let mut state = serializer.serialize_seq(Some(self.connections.len()))?;
+
+        for connection in self.connections {
+            todo!()
+        }
+
+        state.end()
     }
 }
 

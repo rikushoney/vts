@@ -1,4 +1,5 @@
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use thiserror::Error;
 
 use super::component::ComponentKey;
@@ -89,18 +90,9 @@ impl Connection {
     // }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct WeakConnection {
-    pub kind: ConnectionKind,
-    pub(crate) source_pins: WeakPortPins,
-    pub(crate) source_component: Option<String>,
-    pub(crate) sink_pins: WeakPortPins,
-    pub(crate) sink_component: Option<String>,
-}
-
-pub struct SourceSet((PortPins, Option<ComponentRefId>));
+pub struct SourceSet(PortPins, Option<ComponentRefId>);
 pub struct SourceUnset;
-pub struct SinkSet((PortPins, Option<ComponentRefId>));
+pub struct SinkSet(PortPins, Option<ComponentRefId>);
 pub struct SinkUnset;
 
 pub struct ConnectionBuilder<'m, Src, Snk> {
@@ -132,7 +124,7 @@ impl<'m, Snk> ConnectionBuilder<'m, SourceUnset, Snk> {
         ConnectionBuilder {
             module: self.module,
             component: self.component,
-            source: SourceSet((pins, component.map(|c| c.0))),
+            source: SourceSet(pins, component.map(|c| c.0)),
             sink: self.sink,
             kind: self.kind,
         }
@@ -149,7 +141,7 @@ impl<'m, Src> ConnectionBuilder<'m, Src, SinkUnset> {
             module: self.module,
             component: self.component,
             source: self.source,
-            sink: SinkSet((pins, component.map(|c| c.0))),
+            sink: SinkSet(pins, component.map(|c| c.0)),
             kind: self.kind,
         }
     }
@@ -168,9 +160,9 @@ impl<'m, Src, Snk> ConnectionBuilder<'m, Src, Snk> {
 impl<'m> ConnectionBuilder<'m, SourceSet, SinkSet> {
     pub fn finish(self) {
         let kind = self.kind.unwrap_or(ConnectionKind::Direct);
-        let source = self.source.0;
-        let sink = self.sink.0;
-        let connection = Connection::new(kind, source.0, sink.0, source.1, sink.1);
+
+        let connection =
+            Connection::new(kind, self.source.0, self.sink.0, self.source.1, self.sink.1);
 
         self.module[self.component].connections.push(connection);
     }
@@ -186,90 +178,92 @@ pub enum ConnectionBuildError {
     UndefinedReference { reference: String },
 }
 
-pub struct WeakConnectionBuilder<'a, 'm> {
-    unused: std::marker::PhantomData<(&'a (), &'m ())>,
-    // builder: &'a mut ComponentBuilder<'m>,
-    kind: Option<ConnectionKind>,
-    source: Option<(WeakPortPins, Option<String>)>,
-    sink: Option<(WeakPortPins, Option<String>)>,
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+pub struct Signature {
+    pub pins: WeakPortPins,
+    pub component: Option<String>,
 }
 
-impl<'a, 'm> WeakConnectionBuilder<'a, 'm> {
-    // pub(super) fn new(builder: &'a mut ComponentBuilder<'m>) -> Self {
-    //     Self {
-    //         builder,
-    //         kind: None,
-    //         source: None,
-    //         sink: None,
-    //     }
-    // }
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+pub struct WeakConnection {
+    pub kind: ConnectionKind,
+    pub source: Signature,
+    pub sink: Signature,
+}
 
-    pub fn set_kind(&mut self, kind: ConnectionKind) -> &mut Self {
+pub struct WeakSourceSet(WeakPortPins, Option<String>);
+pub struct WeakSourceUnset;
+pub struct WeakSinkSet(WeakPortPins, Option<String>);
+pub struct WeakSinkUnset;
+
+pub struct WeakConnectionBuilder<Src, Snk> {
+    source: Src,
+    sink: Snk,
+    kind: Option<ConnectionKind>,
+}
+
+impl WeakConnectionBuilder<WeakSourceUnset, WeakSinkUnset> {
+    pub fn new() -> Self {
+        Self {
+            source: WeakSourceUnset,
+            sink: WeakSinkUnset,
+            kind: None,
+        }
+    }
+}
+
+impl<Snk> WeakConnectionBuilder<WeakSourceUnset, Snk> {
+    pub fn set_source(
+        self,
+        pins: WeakPortPins,
+        component: Option<String>,
+    ) -> WeakConnectionBuilder<WeakSourceSet, Snk> {
+        WeakConnectionBuilder {
+            source: WeakSourceSet(pins, component),
+            sink: self.sink,
+            kind: self.kind,
+        }
+    }
+}
+
+impl<Src> WeakConnectionBuilder<Src, WeakSinkUnset> {
+    pub fn set_sink(
+        self,
+        pins: WeakPortPins,
+        component: Option<String>,
+    ) -> WeakConnectionBuilder<Src, WeakSinkSet> {
+        WeakConnectionBuilder {
+            source: self.source,
+            sink: WeakSinkSet(pins, component),
+            kind: self.kind,
+        }
+    }
+}
+
+impl<Src, Snk> WeakConnectionBuilder<Src, Snk> {
+    pub fn set_kind(&mut self, kind: ConnectionKind) {
         self.kind = Some(kind);
-        self
     }
 
-    // pub fn set_source(
-    //     &mut self,
-    //     port: &str,
-    //     range: Range<u32>,
-    //     component: Option<&str>,
-    // ) -> &mut Self {
-    //     let module = &mut self.builder.module;
-    //     let port = module.strings.entry(port);
-    //     let pins = WeakPortPins::new(port, range);
-    //     let component = component.map(|component| module.strings.entry(component));
-    //     self.source = Some((pins, component));
-    //     self
-    // }
-
-    // pub fn set_sink(
-    //     &mut self,
-    //     port: &str,
-    //     range: Range<u32>,
-    //     component: Option<&str>,
-    // ) -> &mut Self {
-    //     let module = &mut self.builder.module;
-    //     let port = module.strings.entry(port);
-    //     let pins = WeakPortPins::new(port, range);
-    //     let component = component.map(|component| self.builder.module.strings.entry(component));
-    //     self.sink = Some((pins, component));
-    //     self
-    // }
-
-    pub fn is_kind_set(&self) -> bool {
+    pub fn kind_is_set(&self) -> bool {
         self.kind.is_some()
     }
-
-    pub fn is_source_set(&self) -> bool {
-        self.source.is_some()
-    }
-
-    pub fn is_sink_set(&self) -> bool {
-        self.sink.is_some()
-    }
-
-    // pub fn finish(self) -> Result<&'a WeakConnection, ConnectionBuildError> {
-    //     let kind = self
-    //         .kind
-    //         .ok_or(ConnectionBuildError::MissingField("kind"))?;
-    //     let source = self
-    //         .source
-    //         .ok_or(ConnectionBuildError::MissingField("source"))?;
-    //     let sink = self
-    //         .sink
-    //         .ok_or(ConnectionBuildError::MissingField("sink"))?;
-
-    //     let connections = &mut self.builder.unresolved_connections;
-    //     let i = connections.len();
-    //     connections.push(WeakConnection {
-    //         kind,
-    //         source_pins: source.0,
-    //         source_component: source.1,
-    //         sink_pins: sink.0,
-    //         sink_component: sink.1,
-    //     });
-
-    //     Ok(&connections[i])
-    // }
 }
+
+impl WeakConnectionBuilder<WeakSourceSet, WeakSinkSet> {
+    pub fn finish(self) -> WeakConnection {
+        WeakConnection {
+            source: Signature {
+                pins: self.source.0,
+                component: self.source.1,
+            },
+            sink: Signature {
+                pins: self.sink.0,
+                component: self.sink.1,
+            },
+            kind: self.kind.unwrap_or(ConnectionKind::Direct),
+        }
+    }
+}
+
+pub struct 
