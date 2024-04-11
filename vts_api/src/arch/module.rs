@@ -96,6 +96,15 @@ impl<'py> FromPyObject<'py> for ComponentClassOrStr<'py> {
 }
 
 impl PyModule_ {
+    pub(crate) fn new_wrap(module: Module) -> Self {
+        Self {
+            inner: module,
+            components: HashMap::default(),
+            ports: HashMap::default(),
+            references: HashMap::default(),
+        }
+    }
+
     fn add_component_impl<'py>(
         slf: &Bound<'py, Self>,
         py: Python<'py>,
@@ -162,12 +171,8 @@ impl PyModule_ {
 impl PyModule_ {
     #[new]
     pub fn new(name: &Bound<'_, PyString>) -> PyResult<Self> {
-        Ok(Self {
-            inner: Module::new(name.to_str()?),
-            components: HashMap::default(),
-            ports: HashMap::default(),
-            references: HashMap::default(),
-        })
+        let module = Module::new(name.to_str()?);
+        Ok(Self::new_wrap(module))
     }
 
     fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
@@ -225,15 +230,14 @@ impl PyModule_ {
 
 #[pyfunction]
 pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
-    let _ = input;
-    // let py = input.py();
+    let py = input.py();
 
-    // let input = input.downcast::<PyString>()?;
-    // let module: Module = map_serde_py_err!(serde_json::from_str(input.to_str()?))?;
-    // let converter = ModuleConverter(py, module);
+    let input = input.downcast::<PyString>()?;
+    let module: Module = serde_json::from_str(input.to_str()?).map_err(|err| {
+        PyValueError::new_err(format!(r#"failed parsing json with reason "{err}""#))
+    })?;
 
-    // converter.convert()
-    todo!()
+    Py::new(py, PyModule_::new_wrap(module))
 }
 
 #[pyfunction]
@@ -242,22 +246,15 @@ pub fn json_dumps(
     module: &Bound<'_, PyModule_>,
     pretty: bool,
 ) -> PyResult<Py<PyString>> {
-    let _ = py;
-    let _ = module;
-    let _ = pretty;
-    // let converter = PyModuleConverter(module.clone());
-    // let module = converter.convert().map_err(|err| match err {
-    //     PyModuleConvertError::Python(err) => err,
-    //     _ => PyValueError::new_err(format!("{err}")),
-    // })?;
+    let module = module.borrow();
 
-    // let json = if pretty {
-    //     map_serde_py_err!(serde_json::to_string_pretty(&module))?
-    // } else {
-    //     map_serde_py_err!(serde_json::to_string(&module))?
-    // };
+    let json = if pretty {
+        serde_json::to_string_pretty(&module.inner)
+    } else {
+        serde_json::to_string(&module.inner)
+    }
+    .map_err(|err| PyValueError::new_err(format!(r#"failed emitting json with reason "{err}""#)))?;
 
-    // let json = PyString::new_bound(py, json.as_str());
-    // Ok(json.into_py(py))
-    todo!()
+    let json = PyString::new_bound(py, json.as_str());
+    Ok(json.into_py(py))
 }

@@ -4,89 +4,143 @@ use fnv::FnvHashMap;
 use thiserror::Error;
 
 use super::component::ComponentKey;
-use super::module::{ComponentId, ComponentRefId, Module};
-use super::reference::{ComponentRefBuilder, ComponentRefKey, ComponentWeakRef};
+use super::connection::WeakConnection;
+use super::module::{ComponentId, Module};
+use super::reference::ComponentWeakRef;
+use super::Component;
 
 #[derive(Debug, Error)]
-pub enum LinkerError {
+pub enum Error {
     #[error(r#"undefined component "{component}" referenced in "{module}""#)]
     UndefinedComponent { module: String, component: String },
+    #[error(r#"undefined port "{port}" referenced in "{component}""#)]
+    UndefinedPort { component: String, port: String },
+    #[error(r#"undefined reference "{alias_or_name}" referenced in "{component}""#)]
+    UndefinedReference {
+        component: String,
+        alias_or_name: String,
+    },
+}
+
+impl Error {
+    pub fn undefined_component(module: &str, component: &str) -> Self {
+        Self::UndefinedComponent {
+            module: module.to_string(),
+            component: component.to_string(),
+        }
+    }
+
+    pub fn undefined_port(component: &str, port: &str) -> Self {
+        Self::UndefinedPort {
+            component: component.to_string(),
+            port: port.to_string(),
+        }
+    }
+
+    pub fn undefined_reference(component: &str, alias_or_name: &str) -> Self {
+        Self::UndefinedReference {
+            component: component.to_string(),
+            alias_or_name: alias_or_name.to_string(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct LinkerItems {
+    references: Vec<ComponentWeakRef>,
+    connections: Vec<WeakConnection>,
 }
 
 #[derive(Default)]
 pub struct Linker {
-    unresolved_references: HashMap<ComponentId, ComponentWeakRef>,
+    unresolved: HashMap<ComponentId, LinkerItems>,
+}
+
+pub struct Components(FnvHashMap<String, ComponentId>);
+
+impl Components {
+    pub fn get<'m>(&self, module: &'m Module, component: &str) -> Result<Component<'m>, Error> {
+        let make_component = |component| Component::new(module, component);
+
+        self.0
+            .get(component)
+            .copied()
+            .map(make_component)
+            .ok_or(Error::undefined_component(&module.name, component))
+    }
 }
 
 impl Linker {
     pub fn new() -> Self {
         Self {
-            unresolved_references: HashMap::default(),
+            unresolved: HashMap::default(),
         }
     }
 
     pub fn add_reference(&mut self, component: ComponentKey, reference: ComponentWeakRef) {
         // TODO: check duplicate references
-        self.unresolved_references.insert(component.0, reference);
+        self.unresolved
+            .entry(component.0)
+            .or_default()
+            .references
+            .push(reference);
     }
 
-    fn resolve_reference_impl(
-        &self,
+    pub fn add_connection(&mut self, component: ComponentKey, connection: WeakConnection) {
+        // TODO: check colliding connections
+        self.unresolved
+            .entry(component.0)
+            .or_default()
+            .connections
+            .push(connection);
+    }
+
+    fn resolve_impl(
         module: &mut Module,
         component: ComponentId,
-        reference: &ComponentWeakRef,
-        hint: Option<ComponentId>,
-    ) -> Result<ComponentRefId, LinkerError> {
-        let referenced_component = if let Some(component) = hint {
-            ComponentKey::new(component)
-        } else {
+        unresolved: &mut LinkerItems,
+        components: &Components,
+    ) -> Result<(), Error> {
+        unresolved.references.drain(..).try_for_each(|reference| {
+            reference
+                .resolve(module, ComponentKey::new(component), components)
+                .map(|_| ())
+        })?;
+
+        unresolved.connections.drain(..).try_for_each(|connection| {
+            connection
+                .resolve(module, ComponentKey::new(component), components)
+                .map(|_| ())
+        })
+    }
+
+    fn get_components(module: &Module) -> Components {
+        Components(FnvHashMap::from_iter(
             module
-                .find_component(&reference.component)
-                .ok_or(LinkerError::UndefinedComponent {
-                    module: module.name().to_string(),
-                    component: reference.component.clone(),
-                })?
-                .key()
-        };
-
-        let mut builder = ComponentRefBuilder::new(module, ComponentKey::new(component))
-            .set_component(referenced_component);
-
-        builder.set_n_instances(reference.n_instances);
-        Ok(builder.finish().key().0)
+                .components
+                .iter()
+                .map(|(component, data)| (data.name.clone(), component)),
+        ))
     }
 
-    pub fn resolve_reference(
-        &self,
-        module: &mut Module,
-        component: ComponentKey,
-        reference: &ComponentWeakRef,
-        hint: Option<ComponentKey>,
-    ) -> Result<ComponentRefKey, LinkerError> {
-        self.resolve_reference_impl(module, component.0, reference, hint.map(|hint| hint.0))
-            .map(ComponentRefKey::new)
+    pub fn resolve(&mut self, module: &mut Module) -> Result<(), Error> {
+        let components = Self::get_components(module);
+
+        self.unresolved
+            .iter_mut()
+            .try_for_each(|(&component, unresolved)| {
+                Self::resolve_impl(module, component, unresolved, &components)
+            })
     }
+}
 
-    pub fn resolve_references(&self, module: &mut Module) -> Result<(), LinkerError> {
-        let mut cached_components = FnvHashMap::<&str, ComponentId>::default();
+pub trait Resolve<'m> {
+    type Output;
 
-        for (&component, reference) in self.unresolved_references.iter() {
-            let component_name = reference.component.as_str();
-
-            match cached_components.get(component_name) {
-                Some(&hint) => {
-                    self.resolve_reference_impl(module, component, reference, Some(hint))?;
-                }
-                None => {
-                    let reference =
-                        self.resolve_reference_impl(module, component, reference, None)?;
-
-                    let component = module[reference].component;
-                    cached_components.insert(component_name, component);
-                }
-            }
-        }
-
-        Ok(())
-    }
+    fn resolve(
+        self,
+        module: &'m mut Module,
+        parent: ComponentKey,
+        components: &Components,
+    ) -> Result<Self::Output, Error>;
 }

@@ -12,7 +12,8 @@ from vts._vts.arch import (  # noqa
     PyPort as Port,
     PyPortClass as PortClass,
     PyPortKind as PortKind,
-    smoke_test,
+    json_dumps,
+    json_loads,
 )
 
 __all__ = [
@@ -23,4 +24,6 @@ __all__ = [
     "Port",
     "PortClass",
     "PortKind",
+    "json_dumps",
+    "json_loads",
 ]

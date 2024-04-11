@@ -8,7 +8,12 @@ use serde::{
 };
 use thiserror::Error;
 
-use super::{component::ComponentKey, Component, ComponentId, Module, PortId};
+use super::{
+    component::ComponentKey,
+    linker::{self, Components, Resolve},
+    reference::{ComponentRef, ComponentRefKey},
+    Component, ComponentId, Module, PortId,
+};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -39,6 +44,7 @@ pub struct PortData {
     parent: ComponentId,
     pub kind: PortKind,
     pub n_pins: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub class: Option<PortClass>,
 }
 
@@ -263,11 +269,16 @@ impl<'m> PortSeed<'m> {
     }
 }
 
+const FIELDS: &[&str] = &["kind", "n_pins", "class"];
+const KIND: usize = 0;
+const N_PINS: usize = 1;
+const CLASS: usize = 2;
+
 impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
     type Value = ();
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "a port description")
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a port description")
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -291,21 +302,21 @@ impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
             match field {
                 Field::Kind => {
                     if kind.is_some() {
-                        return Err(de::Error::duplicate_field("kind"));
+                        return Err(de::Error::duplicate_field(FIELDS[KIND]));
                     }
 
                     kind = Some(map.next_value()?);
                 }
                 Field::NPins => {
                     if n_pins.is_some() {
-                        return Err(de::Error::duplicate_field("n_pins"));
+                        return Err(de::Error::duplicate_field(FIELDS[N_PINS]));
                     }
 
                     n_pins = Some(map.next_value()?);
                 }
                 Field::Class => {
                     if class.is_some() {
-                        return Err(de::Error::duplicate_field("class"));
+                        return Err(de::Error::duplicate_field(FIELDS[CLASS]));
                     }
 
                     class = Some(map.next_value()?);
@@ -313,7 +324,7 @@ impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
             }
         }
 
-        let kind = kind.ok_or(de::Error::missing_field("kind"))?;
+        let kind = kind.ok_or(de::Error::missing_field(FIELDS[KIND]))?;
 
         let mut builder = PortBuilder::new(self.module, ComponentKey(self.parent))
             .set_name(&self.name)
@@ -339,7 +350,6 @@ impl<'de, 'm> DeserializeSeed<'de> for PortSeed<'m> {
     where
         D: Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["kind", "n_pins", "class"];
         deserializer.deserialize_struct("Port", FIELDS, self)
     }
 }
@@ -374,7 +384,9 @@ mod pin_range {
             {
                 #[derive(Deserialize)]
                 enum Field {
+                    #[serde(rename = "port_start")]
                     PortStart,
+                    #[serde(rename = "port_end")]
                     PortEnd,
                 }
 
@@ -416,4 +428,29 @@ pub struct WeakPortPins {
     pub port: String,
     #[serde(flatten, with = "pin_range")]
     pub range: Range<u32>,
+}
+
+impl<'m> Resolve<'m> for (WeakPortPins, Option<ComponentRefKey>) {
+    type Output = PortPins;
+
+    fn resolve(
+        self,
+        module: &'m mut Module,
+        parent: ComponentKey,
+        _components: &Components,
+    ) -> Result<Self::Output, linker::Error> {
+        let component = Component::new(module, parent.0);
+
+        let parent = if let Some(reference) = self.1 {
+            ComponentRef::new(module, reference.0).component()
+        } else {
+            component
+        };
+
+        let port = parent
+            .find_port(&self.0.port)
+            .ok_or(linker::Error::undefined_port(parent.name(), &self.0.port))?;
+
+        Ok(PortPins::new(port.key().0, self.0.range))
+    }
 }

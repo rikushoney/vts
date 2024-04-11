@@ -1,5 +1,3 @@
-#![allow(unused)] // TODO: remove this!
-
 use std::fmt;
 use std::slice;
 
@@ -13,9 +11,9 @@ use serde::{
 use thiserror::Error;
 
 use super::{
-    connection::{Connection, WeakConnectionBuilder},
+    connection::{Connection, WeakConnection, WeakConnectionBuilder},
     linker::Linker,
-    port::{PortPins, PortSeed, WeakPortPins},
+    port::{PortSeed, WeakPortPins},
     reference::{ComponentWeakRef, DeserializeComponentWeakRef},
     ComponentId, ComponentRef, ComponentRefId, Module, Port, PortId,
 };
@@ -110,11 +108,25 @@ impl<'m> Component<'m> {
     }
 
     pub fn find_port(&self, name: &str) -> Option<Port<'_>> {
-        self.data()
-            .ports
-            .iter()
-            .find(|&port| self.module()[*port].name == name)
-            .map(|&port| Port::new(self.module(), port))
+        self.data().ports.iter().find_map(|&port| {
+            let port = Port::new(self.module(), port);
+            if port.name() == name {
+                Some(port)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn find_reference(&self, alias_or_name: &str) -> Option<ComponentRef<'_>> {
+        self.data().references.iter().find_map(|&reference| {
+            let reference = ComponentRef::new(self.module(), reference);
+            if reference.alias_or_name() == alias_or_name {
+                Some(reference)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -434,7 +446,10 @@ impl<'m> Serialize for SerializeComponent<'m> {
             },
         )?;
 
-        state.serialize_field(FIELDS[CLASS], &self.component.class())?;
+        if self.component.class().is_some() {
+            state.serialize_field(FIELDS[CLASS], &self.component.class())?;
+        }
+
         state.end()
     }
 }
@@ -474,13 +489,12 @@ impl<'de, 'm> DeserializeSeed<'de> for DeserializePorts<'m> {
     }
 }
 
-struct DeserializeReferences<'a, 'm> {
-    module: &'m mut Module,
-    parent: ComponentId,
+struct DeserializeReferences<'a> {
     linker: &'a mut Linker,
+    parent: ComponentId,
 }
 
-impl<'a, 'de, 'm> Visitor<'de> for DeserializeReferences<'a, 'm> {
+impl<'a, 'de> Visitor<'de> for DeserializeReferences<'a> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -500,7 +514,7 @@ impl<'a, 'de, 'm> Visitor<'de> for DeserializeReferences<'a, 'm> {
     }
 }
 
-impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeReferences<'a, 'm> {
+impl<'a, 'de> DeserializeSeed<'de> for DeserializeReferences<'a> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -511,13 +525,12 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeReferences<'a, 'm> {
     }
 }
 
-struct DeserializeNamedReferences<'a, 'm> {
-    module: &'m mut Module,
-    parent: ComponentId,
+struct DeserializeNamedReferences<'a> {
     linker: &'a mut Linker,
+    parent: ComponentId,
 }
 
-impl<'a, 'de, 'm> Visitor<'de> for DeserializeNamedReferences<'a, 'm> {
+impl<'a, 'de> Visitor<'de> for DeserializeNamedReferences<'a> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -538,7 +551,7 @@ impl<'a, 'de, 'm> Visitor<'de> for DeserializeNamedReferences<'a, 'm> {
     }
 }
 
-impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeNamedReferences<'a, 'm> {
+impl<'a, 'de> DeserializeSeed<'de> for DeserializeNamedReferences<'a> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -549,13 +562,12 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeNamedReferences<'a, 'm> {
     }
 }
 
-struct DeserializeConnections<'a, 'm> {
-    module: &'m mut Module,
+struct DeserializeConnections<'a> {
     parent: ComponentId,
     linker: &'a mut Linker,
 }
 
-impl<'a, 'de, 'm> Visitor<'de> for DeserializeConnections<'a, 'm> {
+impl<'a, 'de> Visitor<'de> for DeserializeConnections<'a> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -566,11 +578,16 @@ impl<'a, 'de, 'm> Visitor<'de> for DeserializeConnections<'a, 'm> {
     where
         A: SeqAccess<'de>,
     {
-        todo!()
+        while let Some(connection) = seq.next_element::<WeakConnection>()? {
+            self.linker
+                .add_connection(ComponentKey::new(self.parent), connection);
+        }
+
+        Ok(())
     }
 }
 
-impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeConnections<'a, 'm> {
+impl<'a, 'de> DeserializeSeed<'de> for DeserializeConnections<'a> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -600,8 +617,8 @@ impl<'a, 'm> ComponentSeed<'a, 'm> {
 impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
     type Value = ();
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "a component description")
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a component description")
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -634,7 +651,7 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
             match field {
                 Field::Ports => {
                     if ports {
-                        return Err(de::Error::duplicate_field("ports"));
+                        return Err(de::Error::duplicate_field(FIELDS[PORTS]));
                     }
 
                     map.next_value_seed(DeserializePorts {
@@ -646,11 +663,10 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
                 }
                 Field::References => {
                     if references {
-                        return Err(de::Error::duplicate_field("references"));
+                        return Err(de::Error::duplicate_field(FIELDS[REFERENCES]));
                     }
 
                     map.next_value_seed(DeserializeReferences {
-                        module: self.module,
                         parent: component,
                         linker: self.linker,
                     })?;
@@ -659,11 +675,10 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
                 }
                 Field::NamedReferences => {
                     if named_references {
-                        return Err(de::Error::duplicate_field("named_references"));
+                        return Err(de::Error::duplicate_field(FIELDS[NAMED_REFERENCES]));
                     }
 
                     map.next_value_seed(DeserializeNamedReferences {
-                        module: self.module,
                         parent: component,
                         linker: self.linker,
                     })?;
@@ -672,11 +687,10 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
                 }
                 Field::Connections => {
                     if connections {
-                        return Err(de::Error::duplicate_field("connections"));
+                        return Err(de::Error::duplicate_field(FIELDS[CONNECTIONS]));
                     }
 
                     map.next_value_seed(DeserializeConnections {
-                        module: self.module,
                         parent: component,
                         linker: self.linker,
                     })?;
@@ -685,7 +699,7 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
                 }
                 Field::Class => {
                     if class.is_some() {
-                        return Err(de::Error::duplicate_field("class"));
+                        return Err(de::Error::duplicate_field(FIELDS[CLASS]));
                     }
 
                     class = Some(map.next_value()?);

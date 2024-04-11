@@ -2,7 +2,7 @@ use std::fmt;
 use std::ops::{Index, IndexMut};
 
 use serde::{
-    de::{self, DeserializeSeed, MapAccess, Visitor},
+    de::{self, DeserializeSeed, MapAccess, Unexpected, Visitor},
     ser::{SerializeMap, SerializeStruct},
     Deserialize, Deserializer, Serialize, Serializer,
 };
@@ -273,6 +273,10 @@ impl<'de> Deserialize<'de> for Module {
                 if !name {
                     return Err(de::Error::missing_field("name"));
                 }
+
+                linker
+                    .resolve(&mut module)
+                    .map_err(|err| de::Error::custom(format!("{err}")))?;
 
                 Ok(module)
             }

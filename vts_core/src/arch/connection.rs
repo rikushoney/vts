@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::component::ComponentKey;
+use super::component::{Component, ComponentKey};
+use super::linker::{self, Components, Resolve};
 use super::module::{ComponentId, ComponentRefId, Module};
 use super::port::{PortPins, WeakPortPins};
 use super::reference::ComponentRefKey;
@@ -118,13 +119,16 @@ impl<'m, Src, Snk> ConnectionBuilder<'m, Src, Snk> {
 }
 
 impl<'m> ConnectionBuilder<'m, SourceSet, SinkSet> {
-    pub fn finish(self) {
+    pub fn finish(self) -> &'m Connection {
         let kind = self.kind.unwrap_or(ConnectionKind::Direct);
 
         let connection =
             Connection::new(kind, self.source.0, self.sink.0, self.source.1, self.sink.1);
 
-        self.module[self.component].connections.push(connection);
+        let connections = &mut self.module[self.component].connections;
+        let idx = connections.len();
+        connections.push(connection);
+        &connections[idx]
     }
 }
 
@@ -138,13 +142,17 @@ pub enum ConnectionBuildError {
     UndefinedReference { reference: String },
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+// TODO: manually implement `Deserialize` to prevent deserializing "unnamed"
+// references as "named"
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Signature {
+    #[serde(flatten)]
     pub pins: WeakPortPins,
-    pub component: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference: Option<String>,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct WeakConnection {
     pub kind: ConnectionKind,
     pub source: Signature,
@@ -215,13 +223,64 @@ impl WeakConnectionBuilder<WeakSourceSet, WeakSinkSet> {
         WeakConnection {
             source: Signature {
                 pins: self.source.0,
-                component: self.source.1,
+                reference: self.source.1,
             },
             sink: Signature {
                 pins: self.sink.0,
-                component: self.sink.1,
+                reference: self.sink.1,
             },
-            kind: self.kind.unwrap_or(ConnectionKind::Direct),
+            kind: self.kind.unwrap_or_default(),
         }
+    }
+}
+
+impl<'m> Resolve<'m> for Signature {
+    type Output = (PortPins, Option<ComponentRefKey>);
+
+    fn resolve(
+        self,
+        module: &'m mut Module,
+        parent: ComponentKey,
+        components: &Components,
+    ) -> Result<Self::Output, linker::Error> {
+        let component = Component::new(module, parent.0);
+
+        let reference = self
+            .reference
+            .map(|ref reference| {
+                component
+                    .find_reference(reference)
+                    .ok_or(linker::Error::undefined_reference(
+                        component.name(),
+                        reference,
+                    ))
+                    .map(|reference| reference.key())
+            })
+            .transpose()?;
+
+        let pins = (self.pins, reference).resolve(module, parent, components)?;
+        Ok((pins, reference))
+    }
+}
+
+impl<'m> Resolve<'m> for WeakConnection {
+    type Output = &'m Connection;
+
+    fn resolve(
+        self,
+        module: &'m mut Module,
+        parent: ComponentKey,
+        components: &Components,
+    ) -> Result<Self::Output, linker::Error> {
+        let (source_pins, source_reference) = self.source.resolve(module, parent, components)?;
+        let (sink_pins, sink_reference) = self.sink.resolve(module, parent, components)?;
+
+        let mut builder = ConnectionBuilder::new(module, parent)
+            .set_source(source_pins, source_reference)
+            .set_sink(sink_pins, sink_reference);
+
+        builder.set_kind(self.kind);
+
+        Ok(builder.finish())
     }
 }

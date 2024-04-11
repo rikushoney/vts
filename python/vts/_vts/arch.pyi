@@ -114,3 +114,6 @@ class PyComponentRefPort:
 
 class PyPortSelection:
     pass
+
+def json_dumps(module: PyModule, pretty: bool) -> str: ...
+def json_loads(input: str) -> PyModule: ...
