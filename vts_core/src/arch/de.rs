@@ -211,6 +211,7 @@ impl<'a, 'de> Visitor<'de> for DeserializeNamedReferences<'a> {
     {
         while let Some(alias) = map.next_key()? {
             let reference = map.next_value_seed(DeserializeComponentWeakRef::Named(alias))?;
+
             self.linker
                 .register_reference(ComponentKey::new(self.parent), reference);
         }

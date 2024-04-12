@@ -23,8 +23,11 @@ pub struct PyModule_ {
     pub(crate) references: HashMap<ComponentRefKey, Py<PyComponentRef>>,
 }
 
+#[derive(FromPyObject)]
 enum NameOrComponent<'py> {
+    #[pyo3(annotation = "str")]
     Name(Bound<'py, PyString>),
+    #[pyo3(annotation = "Component")]
     Component(Bound<'py, PyComponent>),
 }
 
@@ -42,23 +45,11 @@ impl<'py> NameOrComponent<'py> {
     }
 }
 
-impl<'py> FromPyObject<'py> for NameOrComponent<'py> {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(name) = ob.downcast::<PyString>() {
-            Ok(NameOrComponent::Name(name.clone()))
-        } else if let Ok(component) = ob.downcast::<PyComponent>() {
-            Ok(NameOrComponent::Component(component.clone()))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                r#"expected string or component, not "{error_ty}""#,
-            )))
-        }
-    }
-}
-
+#[derive(FromPyObject)]
 enum ComponentClassOrStr<'py> {
+    #[pyo3(annotation = "ComponentClass")]
     Class(Bound<'py, PyComponentClass>),
+    #[pyo3(annotation = "str")]
     Str(Bound<'py, PyString>),
 }
 
@@ -77,21 +68,6 @@ impl<'py> ComponentClassOrStr<'py> {
                     PyValueError::new_err(format!(r#"unknown component class "{class}""#))
                 })?,
             ),
-        }
-    }
-}
-
-impl<'py> FromPyObject<'py> for ComponentClassOrStr<'py> {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(class) = ob.downcast::<PyComponentClass>() {
-            Ok(ComponentClassOrStr::Class(class.clone()))
-        } else if let Ok(string) = ob.downcast::<PyString>() {
-            Ok(ComponentClassOrStr::Str(string.clone()))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                r#"expected component class or string, not "{error_ty}""#,
-            )))
         }
     }
 }
@@ -263,9 +239,9 @@ pub fn json_dumps(
 ) -> PyResult<Py<PyString>> {
     let json = PyModule_::with_inner(module.as_borrowed(), |module| {
         if pretty {
-            json::to_string_pretty(&module)
+            json::to_string_pretty(module)
         } else {
-            json::to_string(&module)
+            json::to_string(module)
         }
     })
     .map_err(|err| PyValueError::new_err(format!(r#"failed dumping json with reason "{err}""#)))?;
@@ -288,10 +264,9 @@ pub fn yaml_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
 
 #[pyfunction]
 pub fn yaml_dumps(py: Python<'_>, module: &Bound<'_, PyModule_>) -> PyResult<Py<PyString>> {
-    let yaml = PyModule_::with_inner(module.as_borrowed(), |module| yaml::to_string(&module))
-        .map_err(|err| {
-            PyValueError::new_err(format!(r#"failed dumping yaml with reason "{err}""#))
-        })?;
+    let yaml = PyModule_::with_inner(module.as_borrowed(), yaml::to_string).map_err(|err| {
+        PyValueError::new_err(format!(r#"failed dumping yaml with reason "{err}""#))
+    })?;
 
     let yaml = PyString::new_bound(py, yaml.as_str());
     Ok(yaml.into_py(py))
@@ -317,9 +292,9 @@ pub fn toml_dumps(
 ) -> PyResult<Py<PyString>> {
     let toml = PyModule_::with_inner(module.as_borrowed(), |module| {
         if pretty {
-            toml::to_string_pretty(&module)
+            toml::to_string_pretty(module)
         } else {
-            toml::to_string(&module)
+            toml::to_string(module)
         }
     })
     .map_err(|err| PyValueError::new_err(format!(r#"failed dumping toml with reason "{err}""#)))?;

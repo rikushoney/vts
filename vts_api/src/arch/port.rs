@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PySlice, PySliceIndices, PyString};
 use vts_core::arch::{
@@ -61,8 +61,11 @@ impl PyPort {
     }
 }
 
+#[derive(FromPyObject)]
 pub enum SliceOrIndex<'py> {
+    #[pyo3(annotation = "slice")]
     Slice(Bound<'py, PySlice>),
+    #[pyo3(annotation = "int")]
     Index(u32),
 }
 
@@ -111,21 +114,6 @@ impl<'py> SliceOrIndex<'py> {
                 start: *index,
                 end: *index + 1,
             }),
-        }
-    }
-}
-
-impl<'py> FromPyObject<'py> for SliceOrIndex<'py> {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(slice) = ob.downcast::<PySlice>() {
-            Ok(SliceOrIndex::Slice(slice.clone()))
-        } else if let Ok(index) = ob.extract::<u32>() {
-            Ok(SliceOrIndex::Index(index))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                r#"expected slice or int, not "{error_ty}""#
-            )))
         }
     }
 }
@@ -194,27 +182,24 @@ impl PyPortPins {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum ComponentOrRef {
-    Component(ComponentKey),
-    Ref(ComponentRefKey),
+fn extract_component_key(ob: &Bound<'_, PyAny>) -> PyResult<ComponentKey> {
+    ob.downcast::<PyComponent>()
+        .map(|component| component.borrow().key())
+        .map_err(PyErr::from)
 }
 
-impl<'py> FromPyObject<'py> for ComponentOrRef {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(component) = ob.downcast::<PyComponent>() {
-            let component = component.borrow();
-            Ok(ComponentOrRef::Component(component.key()))
-        } else if let Ok(reference) = ob.downcast::<PyComponentRef>() {
-            let reference = reference.borrow();
-            Ok(ComponentOrRef::Ref(reference.key()))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                r#"expected component or reference, not "{error_ty}""#
-            )))
-        }
-    }
+fn extract_reference_key(ob: &Bound<'_, PyAny>) -> PyResult<ComponentRefKey> {
+    ob.downcast::<PyComponentRef>()
+        .map(|reference| reference.borrow().key())
+        .map_err(PyErr::from)
+}
+
+#[derive(Clone, Debug, FromPyObject)]
+pub enum ComponentOrRef {
+    #[pyo3(annotation = "Component")]
+    Component(#[pyo3(from_py_with = "extract_component_key")] ComponentKey),
+    #[pyo3(annotation = "ComponentRef")]
+    Ref(#[pyo3(from_py_with = "extract_reference_key")] ComponentRefKey),
 }
 
 #[pyclass]
@@ -225,8 +210,11 @@ pub struct PyPortSelection(pub(crate) ComponentOrRef, pub(crate) PyPortPins);
 #[derive(Clone, Debug)]
 pub struct PyComponentRefPort(pub(crate) Py<PyComponentRef>, pub(crate) Py<PyPort>);
 
+#[derive(FromPyObject)]
 pub enum PortSelectionOrRef<'py> {
+    #[pyo3(annotation = "PortSelection")]
     Selection(Bound<'py, PyPortSelection>),
+    #[pyo3(annotation = "ComponentRefPort")]
     Ref(Bound<'py, PyComponentRefPort>),
 }
 
@@ -242,21 +230,6 @@ impl<'py> PortSelectionOrRef<'py> {
                 let selection = port.select(py, SliceOrIndex::full(py))?;
                 Bound::new(py, PyPortSelection(reference, selection))
             }
-        }
-    }
-}
-
-impl<'py> FromPyObject<'py> for PortSelectionOrRef<'py> {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(selection) = ob.downcast::<PyPortSelection>() {
-            Ok(PortSelectionOrRef::Selection(selection.clone()))
-        } else if let Ok(reference) = ob.downcast::<PyComponentRefPort>() {
-            Ok(PortSelectionOrRef::Ref(reference.clone()))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                r#"expected port selection or reference, not "{error_ty}""#
-            )))
         }
     }
 }

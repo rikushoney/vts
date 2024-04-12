@@ -146,8 +146,11 @@ impl PyComponent {
     }
 }
 
+#[derive(FromPyObject)]
 enum NameOrPort<'py> {
+    #[pyo3(annotation = "str")]
     Name(Bound<'py, PyString>),
+    #[pyo3(annotation = "Port")]
     Port(Bound<'py, PyPort>),
 }
 
@@ -165,23 +168,11 @@ impl<'py> NameOrPort<'py> {
     }
 }
 
-impl<'py> FromPyObject<'py> for NameOrPort<'py> {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(name) = ob.downcast::<PyString>() {
-            Ok(NameOrPort::Name(name.clone()))
-        } else if let Ok(port) = ob.downcast::<PyPort>() {
-            Ok(NameOrPort::Port(port.clone()))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                r#"expected name or port, not "{error_ty}""#
-            )))
-        }
-    }
-}
-
+#[derive(FromPyObject)]
 enum PortKindOrStr<'py> {
+    #[pyo3(annotation = "PortKind")]
     Kind(Bound<'py, PyPortKind>),
+    #[pyo3(annotation = "str")]
     Str(Bound<'py, PyString>),
 }
 
@@ -204,23 +195,11 @@ impl<'py> PortKindOrStr<'py> {
     }
 }
 
-impl<'py> FromPyObject<'py> for PortKindOrStr<'py> {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(kind) = ob.downcast::<PyPortKind>() {
-            Ok(PortKindOrStr::Kind(kind.clone()))
-        } else if let Ok(string) = ob.downcast::<PyString>() {
-            Ok(PortKindOrStr::Str(string.clone()))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                "expected port kind or string, not {error_ty}"
-            )))
-        }
-    }
-}
-
+#[derive(FromPyObject)]
 enum PortClassOrStr<'py> {
+    #[pyo3(annotation = "PortClass")]
     Class(Bound<'py, PyPortClass>),
+    #[pyo3(annotation = "str")]
     Str(Bound<'py, PyString>),
 }
 
@@ -239,21 +218,6 @@ impl<'py> PortClassOrStr<'py> {
                     PyValueError::new_err(format!(r#"unknown port class "{class}""#))
                 })?,
             ),
-        }
-    }
-}
-
-impl<'py> FromPyObject<'py> for PortClassOrStr<'py> {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        if let Ok(class) = ob.downcast::<PyPortClass>() {
-            Ok(PortClassOrStr::Class(class.clone()))
-        } else if let Ok(string) = ob.downcast::<PyString>() {
-            Ok(PortClassOrStr::Str(string.clone()))
-        } else {
-            let error_ty = ob.get_type();
-            Err(PyTypeError::new_err(format!(
-                "expected port class or string, not {error_ty}"
-            )))
         }
     }
 }
