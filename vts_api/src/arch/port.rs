@@ -43,10 +43,11 @@ macro_rules! borrow_inner {
 
 impl PyPort {
     pub(crate) fn new<'py>(
-        py: Python<'py>,
         module: Borrowed<'_, 'py, PyModule_>,
         port: PortKey,
     ) -> PyResult<Bound<'py, Self>> {
+        let py = module.py();
+
         if let Some(port) = module.borrow().ports.get(&port) {
             return Ok(port.bind(py).clone());
         }
@@ -74,43 +75,47 @@ impl<'py> SliceOrIndex<'py> {
         Self::Slice(PySlice::full_bound(py))
     }
 
+    fn validate_slice(start: isize, stop: isize, step: isize) -> PyResult<()> {
+        if step != 1 {
+            return Err(PyValueError::new_err(
+                "only port slicing with step size 1 is supported",
+            ));
+        }
+
+        if start < 0 {
+            return Err(PyValueError::new_err("start should be non-negative"));
+        }
+
+        if stop < 0 {
+            return Err(PyValueError::new_err("stop should be non-negative"));
+        }
+
+        if start == stop {
+            return Err(PyValueError::new_err("empty slice"));
+        }
+
+        if start > stop {
+            return Err(PyValueError::new_err("stop should be greater than start"));
+        }
+
+        Ok(())
+    }
+
     pub fn to_range(&self, n_pins: u32) -> PyResult<Range<u32>> {
         match self {
-            SliceOrIndex::Slice(slice) => {
+            Self::Slice(slice) => {
                 let PySliceIndices {
                     start, stop, step, ..
                 } = slice.indices(n_pins as i64)?;
 
-                if step != 1 {
-                    return Err(PyValueError::new_err(
-                        "only port selection with step size 1 is supported",
-                    ));
-                }
-
-                if start < 0 {
-                    return Err(PyValueError::new_err("start index should be non-negative"));
-                }
-
-                if stop < 0 {
-                    return Err(PyValueError::new_err("stop index should be non-negative"));
-                }
-
-                if start == stop {
-                    return Err(PyValueError::new_err("empty selection"));
-                }
-
-                if start > stop {
-                    return Err(PyValueError::new_err(
-                        "stop index should be greater than start",
-                    ));
-                }
+                Self::validate_slice(start, stop, step)?;
 
                 Ok(Range {
                     start: start as u32,
                     end: stop as u32,
                 })
             }
-            SliceOrIndex::Index(index) => Ok(Range {
+            Self::Index(index) => Ok(Range {
                 start: *index,
                 end: *index + 1,
             }),
@@ -126,7 +131,7 @@ impl PyPort {
 
     pub fn parent<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
         borrow_inner!(self + py => port);
-        PyComponent::new(py, self.module(py).into(), port.parent().key())
+        PyComponent::new(self.module(py).into(), port.parent().key())
     }
 
     pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
@@ -262,7 +267,6 @@ impl PyComponentRefPort {
             .parent(py)?
             .borrow_mut()
             .add_connection(
-                py,
                 &source,
                 &sink.get_selection()?,
                 Some(PyConnectionKind::DIRECT),

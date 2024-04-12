@@ -14,10 +14,11 @@ pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
 
 impl PyComponentRef {
     pub(crate) fn new<'py>(
-        py: Python<'py>,
         module: Borrowed<'_, 'py, PyModule_>,
         reference: ComponentRefKey,
     ) -> PyResult<Bound<'py, Self>> {
+        let py = module.py();
+
         if let Some(reference) = module.borrow().references.get(&reference) {
             return Ok(reference.bind(py).clone());
         }
@@ -55,12 +56,12 @@ impl PyComponentRef {
 
     pub fn component<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
         borrow_inner!(self + py => reference);
-        PyComponent::new(py, self.module(py).into(), reference.component().key())
+        PyComponent::new(self.module(py).into(), reference.component().key())
     }
 
     pub fn parent<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
         borrow_inner!(self + py => reference);
-        PyComponent::new(py, self.module(py).into(), reference.parent().key())
+        PyComponent::new(self.module(py).into(), reference.parent().key())
     }
 
     pub fn alias<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
@@ -83,15 +84,15 @@ impl PyComponentRef {
 
     pub fn __getattr__(
         slf: &Bound<'_, Self>,
-        py: Python<'_>,
         port: &Bound<'_, PyString>,
     ) -> PyResult<PyComponentRefPort> {
+        let py = slf.py();
         let reference = slf.borrow();
         borrow_inner!(reference + py => reference);
         let port = port.to_str()?;
 
         if let Some(port) = reference.component().find_port(port) {
-            let port = PyPort::new(py, slf.borrow().module(py).as_borrowed(), port.key())?;
+            let port = PyPort::new(slf.borrow().module(py).as_borrowed(), port.key())?;
             Ok(PyComponentRefPort(slf.clone().unbind(), port.unbind()))
         } else {
             let component = reference.component().name();
@@ -103,11 +104,11 @@ impl PyComponentRef {
 
     pub fn __setattr__(
         slf: &Bound<'_, Self>,
-        py: Python<'_>,
         source: &Bound<'_, PyString>,
         sink: &Bound<'_, PyPortSelection>,
     ) -> PyResult<()> {
-        let port = Self::__getattr__(slf, py, source)?;
+        let py = slf.py();
+        let port = Self::__getattr__(slf, source)?;
 
         let source = {
             let source = port.__getitem__(py, SliceOrIndex::full(py))?;
@@ -119,6 +120,6 @@ impl PyComponentRef {
 
         parent
             .borrow_mut()
-            .add_connection(py, &source, sink, Some(PyConnectionKind::DIRECT))
+            .add_connection(&source, sink, Some(PyConnectionKind::DIRECT))
     }
 }

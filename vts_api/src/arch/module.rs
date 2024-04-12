@@ -91,11 +91,12 @@ impl PyModule_ {
 
     fn add_component_impl<'py>(
         slf: Borrowed<'_, 'py, Self>,
-        py: Python<'py>,
         name: Borrowed<'_, 'py, PyString>,
         class: Option<ComponentClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyComponent>> {
-        PyComponent::new(py, slf, {
+        let py = slf.py();
+
+        PyComponent::new(slf, {
             let mut module = slf.borrow_mut();
             let mut builder = ComponentBuilder::new(&mut module.inner).set_name(name.to_str()?);
 
@@ -110,11 +111,12 @@ impl PyModule_ {
 
     fn add_component_copy<'py>(
         slf: Borrowed<'_, 'py, Self>,
-        py: Python<'py>,
         component: Borrowed<'_, 'py, PyComponent>,
         name: Option<Borrowed<'_, 'py, PyString>>,
         mut class: Option<ComponentClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyComponent>> {
+        let py = slf.py();
+
         let (name, class) = {
             let (module, component) = {
                 let component = component.borrow();
@@ -145,7 +147,7 @@ impl PyModule_ {
             (name, class)
         };
 
-        Self::add_component_impl(slf, py, name.as_borrowed(), class)
+        Self::add_component_impl(slf, name.as_borrowed(), class)
     }
 }
 
@@ -157,7 +159,7 @@ impl PyModule_ {
         Ok(Self::new_wrap(module))
     }
 
-    fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
+    pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         PyString::new_bound(py, self.inner.name())
     }
 
@@ -175,7 +177,6 @@ impl PyModule_ {
     #[pyo3(signature = (name=None, *, component=None, class_=None))]
     fn add_component<'py>(
         slf: &Bound<'py, Self>,
-        py: Python<'py>,
         name: Option<NameOrComponent<'py>>,
         component: Option<&Bound<'py, PyComponent>>,
         class_: Option<ComponentClassOrStr<'py>>,
@@ -188,7 +189,6 @@ impl PyModule_ {
 
             return Self::add_component_copy(
                 slf,
-                py,
                 component.as_borrowed(),
                 name.map(Bound::as_borrowed),
                 class,
@@ -198,10 +198,10 @@ impl PyModule_ {
         if let Some(first_arg) = name {
             match first_arg {
                 NameOrComponent::Name(name) => {
-                    Self::add_component_impl(slf, py, name.as_borrowed(), class)
+                    Self::add_component_impl(slf, name.as_borrowed(), class)
                 }
                 NameOrComponent::Component(component) => {
-                    Self::add_component_copy(slf, py, component.as_borrowed(), None, class)
+                    Self::add_component_copy(slf, component.as_borrowed(), None, class)
                 }
             }
         } else {
@@ -220,7 +220,7 @@ impl PyModule_ {
 }
 
 #[pyfunction]
-pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
+pub fn json_loads(input: &Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
     let input = input.downcast::<PyString>()?;
 
@@ -232,11 +232,9 @@ pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
 }
 
 #[pyfunction]
-pub fn json_dumps(
-    py: Python<'_>,
-    module: &Bound<'_, PyModule_>,
-    pretty: bool,
-) -> PyResult<Py<PyString>> {
+pub fn json_dumps(module: &Bound<'_, PyModule_>, pretty: bool) -> PyResult<Py<PyString>> {
+    let py = module.py();
+
     let json = PyModule_::with_inner(module.as_borrowed(), |module| {
         if pretty {
             json::to_string_pretty(module)
@@ -251,7 +249,7 @@ pub fn json_dumps(
 }
 
 #[pyfunction]
-pub fn yaml_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
+pub fn yaml_loads(input: &Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
     let input = input.downcast::<PyString>()?;
 
@@ -263,7 +261,9 @@ pub fn yaml_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
 }
 
 #[pyfunction]
-pub fn yaml_dumps(py: Python<'_>, module: &Bound<'_, PyModule_>) -> PyResult<Py<PyString>> {
+pub fn yaml_dumps(module: &Bound<'_, PyModule_>) -> PyResult<Py<PyString>> {
+    let py = module.py();
+
     let yaml = PyModule_::with_inner(module.as_borrowed(), yaml::to_string).map_err(|err| {
         PyValueError::new_err(format!(r#"failed dumping yaml with reason "{err}""#))
     })?;
@@ -273,7 +273,7 @@ pub fn yaml_dumps(py: Python<'_>, module: &Bound<'_, PyModule_>) -> PyResult<Py<
 }
 
 #[pyfunction]
-pub fn toml_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
+pub fn toml_loads(input: &Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
     let input = input.downcast::<PyString>()?;
 
@@ -285,11 +285,9 @@ pub fn toml_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
 }
 
 #[pyfunction]
-pub fn toml_dumps(
-    py: Python<'_>,
-    module: &Bound<'_, PyModule_>,
-    pretty: bool,
-) -> PyResult<Py<PyString>> {
+pub fn toml_dumps(module: &Bound<'_, PyModule_>, pretty: bool) -> PyResult<Py<PyString>> {
+    let py = module.py();
+
     let toml = PyModule_::with_inner(module.as_borrowed(), |module| {
         if pretty {
             toml::to_string_pretty(module)
