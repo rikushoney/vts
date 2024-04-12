@@ -45,10 +45,35 @@ impl Error {
     }
 }
 
+pub struct KnownComponents(FnvHashMap<String, ComponentId>);
+
+pub trait Resolve<'m> {
+    type Output;
+
+    fn resolve(
+        self,
+        module: &'m mut Module,
+        parent: ComponentKey,
+        components: &KnownComponents,
+    ) -> Result<Self::Output, Error>;
+}
+
 #[derive(Default)]
 struct LinkerItems {
     references: Vec<ComponentWeakRef>,
     connections: Vec<WeakConnection>,
+}
+
+impl KnownComponents {
+    pub fn get<'m>(&self, module: &'m Module, component: &str) -> Result<Component<'m>, Error> {
+        self.try_get(module, component)
+            .ok_or(Error::undefined_component(&module.name, component))
+    }
+
+    pub fn try_get<'m>(&self, module: &'m Module, component: &str) -> Option<Component<'m>> {
+        let make_component = |component| Component::new(module, component);
+        self.0.get(component).copied().map(make_component)
+    }
 }
 
 #[derive(Default)]
@@ -56,19 +81,7 @@ pub struct Linker {
     unresolved: HashMap<ComponentId, LinkerItems>,
 }
 
-pub struct Components(FnvHashMap<String, ComponentId>);
-
-impl Components {
-    pub fn get<'m>(&self, module: &'m Module, component: &str) -> Result<Component<'m>, Error> {
-        let make_component = |component| Component::new(module, component);
-
-        self.0
-            .get(component)
-            .copied()
-            .map(make_component)
-            .ok_or(Error::undefined_component(&module.name, component))
-    }
-}
+fn noop<T>(_: T) {}
 
 impl Linker {
     pub fn new() -> Self {
@@ -77,7 +90,7 @@ impl Linker {
         }
     }
 
-    pub fn add_reference(&mut self, component: ComponentKey, reference: ComponentWeakRef) {
+    pub fn register_reference(&mut self, component: ComponentKey, reference: ComponentWeakRef) {
         // TODO: check duplicate references
         self.unresolved
             .entry(component.0)
@@ -86,7 +99,7 @@ impl Linker {
             .push(reference);
     }
 
-    pub fn add_connection(&mut self, component: ComponentKey, connection: WeakConnection) {
+    pub fn register_connection(&mut self, component: ComponentKey, connection: WeakConnection) {
         // TODO: check colliding connections
         self.unresolved
             .entry(component.0)
@@ -99,23 +112,23 @@ impl Linker {
         module: &mut Module,
         component: ComponentId,
         unresolved: &mut LinkerItems,
-        components: &Components,
+        components: &KnownComponents,
     ) -> Result<(), Error> {
         unresolved.references.drain(..).try_for_each(|reference| {
             reference
                 .resolve(module, ComponentKey::new(component), components)
-                .map(|_| ())
+                .map(noop)
         })?;
 
         unresolved.connections.drain(..).try_for_each(|connection| {
             connection
                 .resolve(module, ComponentKey::new(component), components)
-                .map(|_| ())
+                .map(noop)
         })
     }
 
-    fn get_components(module: &Module) -> Components {
-        Components(FnvHashMap::from_iter(
+    fn get_known_components(module: &Module) -> KnownComponents {
+        KnownComponents(FnvHashMap::from_iter(
             module
                 .components
                 .iter()
@@ -124,7 +137,7 @@ impl Linker {
     }
 
     pub fn resolve(&mut self, module: &mut Module) -> Result<(), Error> {
-        let components = Self::get_components(module);
+        let components = Self::get_known_components(module);
 
         self.unresolved
             .iter_mut()
@@ -132,15 +145,4 @@ impl Linker {
                 Self::resolve_impl(module, component, unresolved, &components)
             })
     }
-}
-
-pub trait Resolve<'m> {
-    type Output;
-
-    fn resolve(
-        self,
-        module: &'m mut Module,
-        parent: ComponentKey,
-        components: &Components,
-    ) -> Result<Self::Output, Error>;
 }

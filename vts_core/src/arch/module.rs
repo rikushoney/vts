@@ -4,6 +4,11 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::{component::ComponentKey, port::PortKey, prelude::*, reference::ComponentRefKey};
 
+pub(super) const FIELDS: &[&str] = &["name", "components"];
+
+pub(super) const NAME: usize = 0;
+pub(super) const COMPONENTS: usize = 1;
+
 new_key_type! {
     pub(crate) struct ComponentId;
     pub(crate) struct ComponentRefId;
@@ -57,22 +62,15 @@ impl Module {
 
     pub fn get_port(&self, port: PortKey) -> Option<Port<'_>> {
         let port = port.0;
-
-        if self.ports.contains_key(port) {
-            Some(Port::new(self, port))
-        } else {
-            None
-        }
+        self.ports.get(port).map(|_| Port::new(self, port))
     }
 
     pub fn get_reference(&self, reference: ComponentRefKey) -> Option<ComponentRef<'_>> {
         let reference = reference.0;
 
-        if self.references.contains_key(reference) {
-            Some(ComponentRef::new(self, reference))
-        } else {
-            None
-        }
+        self.references
+            .get(reference)
+            .map(|_| ComponentRef::new(self, reference))
     }
 
     pub fn find_component(&self, name: &str) -> Option<Component<'_>> {
@@ -123,11 +121,6 @@ impl<'m> Iterator for ComponentIter<'m> {
             .map(|component| Component::new(self.module, component))
     }
 }
-
-pub(super) const FIELDS: &[&str] = &["name", "components"];
-
-pub(super) const NAME: usize = 0;
-pub(super) const COMPONENTS: usize = 1;
 
 #[cfg(test)]
 mod tests {

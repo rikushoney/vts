@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use super::{
     component::ComponentKey,
-    linker::{self, Components, Resolve},
+    linker::{self, KnownComponents, Resolve},
     port::{PortPins, WeakPortPins},
     prelude::*,
     reference::ComponentRefKey,
@@ -242,7 +242,7 @@ impl<'m> Resolve<'m> for Signature {
         self,
         module: &'m mut Module,
         parent: ComponentKey,
-        components: &Components,
+        components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
         let component = Component::new(module, parent.0);
 
@@ -271,7 +271,7 @@ impl<'m> Resolve<'m> for WeakConnection {
         self,
         module: &'m mut Module,
         parent: ComponentKey,
-        components: &Components,
+        components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
         let (source_pins, source_reference) = self.source.resolve(module, parent, components)?;
         let (sink_pins, sink_reference) = self.sink.resolve(module, parent, components)?;

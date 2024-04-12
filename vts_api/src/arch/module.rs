@@ -6,9 +6,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyMapping, PyString};
 use vts_core::arch::{
     component::{ComponentBuilder, ComponentKey},
+    json,
     port::PortKey,
     reference::ComponentRefKey,
-    ComponentClass, Module,
+    toml, yaml, ComponentClass, Module,
 };
 
 use super::{PyComponent, PyComponentClass, PyComponentRef, PyPort};
@@ -103,6 +104,13 @@ impl PyModule_ {
             ports: HashMap::default(),
             references: HashMap::default(),
         }
+    }
+
+    fn with_inner<F, T>(slf: Borrowed<'_, '_, PyModule_>, mut exec: F) -> T
+    where
+        F: FnMut(&Module) -> T,
+    {
+        exec(&slf.borrow().inner)
     }
 
     fn add_component_impl<'py>(
@@ -240,7 +248,7 @@ pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
     let input = input.downcast::<PyString>()?;
 
-    let module: Module = serde_json::from_str(input.to_str()?).map_err(|err| {
+    let module: Module = json::from_str(input.to_str()?).map_err(|err| {
         PyValueError::new_err(format!(r#"failed parsing json with reason "{err}""#))
     })?;
 
@@ -253,17 +261,69 @@ pub fn json_dumps(
     module: &Bound<'_, PyModule_>,
     pretty: bool,
 ) -> PyResult<Py<PyString>> {
-    let json = {
-        let module = module.borrow();
-
+    let json = PyModule_::with_inner(module.as_borrowed(), |module| {
         if pretty {
-            serde_json::to_string_pretty(&module.inner)
+            json::to_string_pretty(&module)
         } else {
-            serde_json::to_string(&module.inner)
+            json::to_string(&module)
         }
-    }
+    })
     .map_err(|err| PyValueError::new_err(format!(r#"failed dumping json with reason "{err}""#)))?;
 
     let json = PyString::new_bound(py, json.as_str());
     Ok(json.into_py(py))
+}
+
+#[pyfunction]
+pub fn yaml_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
+    let py = input.py();
+    let input = input.downcast::<PyString>()?;
+
+    let module: Module = yaml::from_str(input.to_str()?).map_err(|err| {
+        PyValueError::new_err(format!(r#"failed parsing yaml with reason "{err}""#))
+    })?;
+
+    Py::new(py, PyModule_::new_wrap(module))
+}
+
+#[pyfunction]
+pub fn yaml_dumps(py: Python<'_>, module: &Bound<'_, PyModule_>) -> PyResult<Py<PyString>> {
+    let yaml = PyModule_::with_inner(module.as_borrowed(), |module| yaml::to_string(&module))
+        .map_err(|err| {
+            PyValueError::new_err(format!(r#"failed dumping yaml with reason "{err}""#))
+        })?;
+
+    let yaml = PyString::new_bound(py, yaml.as_str());
+    Ok(yaml.into_py(py))
+}
+
+#[pyfunction]
+pub fn toml_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
+    let py = input.py();
+    let input = input.downcast::<PyString>()?;
+
+    let module: Module = toml::from_str(input.to_str()?).map_err(|err| {
+        PyValueError::new_err(format!(r#"failed parsing toml with reason "{err}""#))
+    })?;
+
+    Py::new(py, PyModule_::new_wrap(module))
+}
+
+#[pyfunction]
+pub fn toml_dumps(
+    py: Python<'_>,
+    module: &Bound<'_, PyModule_>,
+    pretty: bool,
+) -> PyResult<Py<PyString>> {
+    let toml = PyModule_::with_inner(module.as_borrowed(), |module| {
+        if pretty {
+            toml::to_string_pretty(&module)
+        } else {
+            toml::to_string(&module)
+        }
+    })
+    .map_err(|err| PyValueError::new_err(format!(r#"failed dumping toml with reason "{err}""#)))?;
+
+    let toml = PyString::new_bound(py, toml.as_str());
+    Ok(toml.into_py(py))
 }

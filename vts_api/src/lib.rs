@@ -62,8 +62,21 @@ macro_rules! wrap_enum {
 
 mod arch;
 
+macro_rules! register_modules {
+    ($py:ident + $super:ident { $($module:ident :: $register:ident),* $(,)? }) => {
+        let sys_modules = $py.import_bound("sys")?.getattr("modules")?;
+
+        $(
+            let submodule = $module::$register($super)?;
+            let submodule_name = concat!("vts._vts.", stringify!($module));
+            sys_modules.set_item(submodule_name, submodule.clone())?;
+            submodule.setattr("__name__", submodule_name)?;
+        )*
+    };
+}
+
 #[pymodule]
-#[pyo3(name = "_vts")]
-fn vts_api_rs(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    arch::register_arch(module)
+fn _vts(py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
+    register_modules!(py + module { arch::register_arch });
+    Ok(())
 }

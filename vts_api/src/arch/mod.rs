@@ -4,7 +4,7 @@ mod port;
 mod reference;
 
 pub use component::{PyComponent, PyComponentClass, PyConnectionKind};
-pub use module::{json_dumps, json_loads, PyModule_};
+pub use module::PyModule_;
 pub use port::{PyComponentRefPort, PyPort, PyPortClass, PyPortKind, PyPortPins, PyPortSelection};
 pub use reference::PyComponentRef;
 
@@ -32,28 +32,49 @@ fn smoke_test(py: Python<'_>) -> PyResult<()> {
     Ok(())
 }
 
-pub fn register_arch(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    let py = module.py();
+macro_rules! register_classes {
+    ($arch:ident { $($class:path),* $(,)? }) => {
+        $(
+            $arch.add_class::<$class>()?;
+        )*
+    }
+}
 
+macro_rules! register_functions {
+    ($arch:ident { $($function:path),* $(,)? }) => {
+        $(
+            $arch.add_function(wrap_pyfunction!($function, &$arch)?)?;
+        )*
+    }
+}
+
+pub fn register_arch<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound<'py, PyModule>> {
+    let py = module.py();
     let arch = PyModule::new_bound(py, "arch")?;
 
-    arch.add_class::<PyModule_>()?;
-    arch.add_class::<PyComponent>()?;
-    arch.add_class::<PyComponentClass>()?;
-    arch.add_class::<PyComponentRef>()?;
-    arch.add_class::<PyComponentRefPort>()?;
-    arch.add_class::<PyPort>()?;
-    arch.add_class::<PyPortClass>()?;
-    arch.add_class::<PyPortKind>()?;
-    arch.add_class::<PyPortPins>()?;
-    arch.add_class::<PyPortSelection>()?;
+    register_classes!(arch {
+        PyModule_,
+        PyComponent,
+        PyComponentClass,
+        PyComponentRef,
+        PyComponentRefPort,
+        PyPort,
+        PyPortClass,
+        PyPortKind,
+        PyPortPins,
+        PyPortSelection
+    });
 
-    arch.add_function(wrap_pyfunction!(json_dumps, &arch)?)?;
-    arch.add_function(wrap_pyfunction!(json_loads, &arch)?)?;
-
-    arch.add_function(wrap_pyfunction!(smoke_test, &arch)?)?;
+    register_functions!(arch {
+        module::json_dumps,
+        module::json_loads,
+        module::yaml_dumps,
+        module::yaml_loads,
+        module::toml_dumps,
+        module::toml_loads,
+        smoke_test,
+    });
 
     module.add_submodule(&arch)?;
-
-    Ok(())
+    Ok(arch)
 }

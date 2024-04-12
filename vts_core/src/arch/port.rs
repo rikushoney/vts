@@ -1,33 +1,41 @@
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 use super::{
     component::ComponentKey,
-    linker::{self, Components, Resolve},
+    linker::{self, KnownComponents, Resolve},
     prelude::*,
     reference::ComponentRefKey,
 };
 
+pub(super) const FIELDS: &[&str] = &["kind", "n_pins", "class"];
+
+pub(super) const KIND: usize = 0;
+pub(super) const N_PINS: usize = 1;
+pub(super) const CLASS: usize = 2;
+
+pub(super) mod pin_range {
+    pub const FIELDS: &[&str] = &["port_start", "port_end"];
+
+    pub const PORT_START: usize = 0;
+    pub const PORT_END: usize = 1;
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PortKind {
     Input,
     Output,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PortClass {
-    #[serde(rename = "CLOCK")]
     Clock,
-    #[serde(rename = "LUT_IN")]
     LutIn,
-    #[serde(rename = "LUT_OUT")]
     LutOut,
-    #[serde(rename = "LATCH_IN")]
     LatchIn,
-    #[serde(rename = "LATCH_OUT")]
     LatchOut,
 }
 
@@ -313,25 +321,6 @@ impl<'m> PortBuilder<'m, NameSet, KindSet> {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum PortBuildError {
-    #[error(r#"port "{port}" already in "{module}""#)]
-    DuplicatePort { module: String, port: String },
-    #[error("port must have a {0}")]
-    MissingField(&'static str),
-}
-
-pub(super) const FIELDS: &[&str] = &["kind", "n_pins", "class"];
-pub(super) const KIND: usize = 0;
-pub(super) const N_PINS: usize = 1;
-pub(super) const CLASS: usize = 2;
-
-pub(super) mod pin_range {
-    pub const FIELDS: &[&str] = &["port_start", "port_end"];
-    pub const PORT_START: usize = 0;
-    pub const PORT_END: usize = 1;
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct WeakPortPins {
     pub port: String,
@@ -346,7 +335,7 @@ impl<'m> Resolve<'m> for (WeakPortPins, Option<ComponentRefKey>) {
         self,
         module: &'m mut Module,
         parent: ComponentKey,
-        _components: &Components,
+        _components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
         let component = Component::new(module, parent.0);
 

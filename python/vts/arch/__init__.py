@@ -1,10 +1,4 @@
-import sys
-
-import vts._vts
-
-sys.modules["vts._vts.arch"] = vts._vts.arch
-
-from vts._vts.arch import (  # noqa
+from vts._vts.arch import (
     PyComponent as Component,
     PyComponentClass as ComponentClass,
     PyComponentRef as ComponentRef,
@@ -14,6 +8,10 @@ from vts._vts.arch import (  # noqa
     PyPortKind as PortKind,
     json_dumps,
     json_loads,
+    toml_dumps,
+    toml_loads,
+    yaml_dumps,
+    yaml_loads,
 )
 
 __all__ = [
@@ -26,4 +24,8 @@ __all__ = [
     "PortKind",
     "json_dumps",
     "json_loads",
+    "toml_dumps",
+    "toml_loads",
+    "yaml_dumps",
+    "yaml_loads",
 ]

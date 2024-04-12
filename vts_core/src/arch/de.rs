@@ -171,7 +171,7 @@ impl<'a, 'de> Visitor<'de> for DeserializeReferences<'a> {
     {
         while let Some(reference) = seq.next_element_seed(DeserializeComponentWeakRef::Unnamed)? {
             self.linker
-                .add_reference(ComponentKey::new(self.parent), reference);
+                .register_reference(ComponentKey::new(self.parent), reference);
         }
 
         Ok(())
@@ -212,7 +212,7 @@ impl<'a, 'de> Visitor<'de> for DeserializeNamedReferences<'a> {
         while let Some(alias) = map.next_key()? {
             let reference = map.next_value_seed(DeserializeComponentWeakRef::Named(alias))?;
             self.linker
-                .add_reference(ComponentKey::new(self.parent), reference);
+                .register_reference(ComponentKey::new(self.parent), reference);
         }
 
         Ok(())
@@ -248,7 +248,7 @@ impl<'a, 'de> Visitor<'de> for DeserializeConnections<'a> {
     {
         while let Some(connection) = seq.next_element::<WeakConnection>()? {
             self.linker
-                .add_connection(ComponentKey::new(self.parent), connection);
+                .register_connection(ComponentKey::new(self.parent), connection);
         }
 
         Ok(())

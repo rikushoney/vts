@@ -1,12 +1,25 @@
 use std::slice;
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 use super::prelude::*;
 
+pub(super) const FIELDS: &[&str] = &[
+    "ports",
+    "references",
+    "named_references",
+    "connections",
+    "class",
+];
+
+pub(super) const PORTS: usize = 0;
+pub(super) const REFERENCES: usize = 1;
+pub(super) const NAMED_REFERENCES: usize = 2;
+pub(super) const CONNECTIONS: usize = 3;
+pub(super) const CLASS: usize = 4;
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ComponentClass {
     Lut,
     Latch,
@@ -97,22 +110,14 @@ impl<'m> Component<'m> {
     pub fn find_port(&self, name: &str) -> Option<Port<'_>> {
         self.data().ports.iter().find_map(|&port| {
             let port = Port::new(self.module(), port);
-            if port.name() == name {
-                Some(port)
-            } else {
-                None
-            }
+            (port.name() == name).then_some(port)
         })
     }
 
     pub fn find_reference(&self, alias_or_name: &str) -> Option<ComponentRef<'_>> {
         self.data().references.iter().find_map(|&reference| {
             let reference = ComponentRef::new(self.module(), reference);
-            if reference.alias_or_name() == alias_or_name {
-                Some(reference)
-            } else {
-                None
-            }
+            (reference.alias_or_name() == alias_or_name).then_some(reference)
         })
     }
 }
@@ -210,30 +215,3 @@ impl<'m> ComponentBuilder<'m, NameSet> {
         Component::new(self.module, component)
     }
 }
-
-#[derive(Debug, Error)]
-pub enum ComponentBuildError {
-    #[error(r#"component "{component}" already in "{module}""#)]
-    DuplicateComponent { module: String, component: String },
-    #[error(r#"component "{reference}" already referenced in "{component}""#)]
-    DuplicateReference {
-        component: String,
-        reference: String,
-    },
-    #[error("component must have a {0}")]
-    MissingField(&'static str),
-}
-
-pub(super) const FIELDS: &[&str] = &[
-    "ports",
-    "references",
-    "named_references",
-    "connections",
-    "class",
-];
-
-pub(super) const PORTS: usize = 0;
-pub(super) const REFERENCES: usize = 1;
-pub(super) const NAMED_REFERENCES: usize = 2;
-pub(super) const CONNECTIONS: usize = 3;
-pub(super) const CLASS: usize = 4;

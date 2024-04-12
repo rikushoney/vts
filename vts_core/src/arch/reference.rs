@@ -2,9 +2,14 @@ use serde::Serialize;
 
 use super::{
     component::ComponentKey,
-    linker::{self, Components, Resolve},
+    linker::{self, KnownComponents, Resolve},
     prelude::*,
 };
+
+pub(super) const FIELDS: &[&str] = &["component", "n_instances"];
+
+pub(super) const COMPONENT: usize = 0;
+pub(super) const N_INSTANCES: usize = 1;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentRefData {
@@ -172,10 +177,6 @@ pub struct ComponentWeakRef {
     pub n_instances: usize,
 }
 
-pub(super) const FIELDS: &[&str] = &["component", "n_instances"];
-pub(super) const COMPONENT: usize = 0;
-pub(super) const N_INSTANCES: usize = 1;
-
 impl<'m> Resolve<'m> for ComponentWeakRef {
     type Output = ComponentRefKey;
 
@@ -183,7 +184,7 @@ impl<'m> Resolve<'m> for ComponentWeakRef {
         self,
         module: &mut Module,
         component: ComponentKey,
-        components: &Components,
+        components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
         let referenced_component = {
             let component = self.component.as_str();

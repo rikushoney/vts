@@ -1,3 +1,3 @@
-from vts import arch
+from . import arch
 
 __all__ = ["arch"]
