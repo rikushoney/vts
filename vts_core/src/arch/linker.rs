@@ -3,11 +3,13 @@ use std::collections::HashMap;
 use fnv::FnvHashMap;
 use thiserror::Error;
 
-use super::component::ComponentKey;
-use super::connection::WeakConnection;
-use super::module::{ComponentId, Module};
-use super::reference::ComponentWeakRef;
-use super::Component;
+use super::{
+    component::ComponentKey,
+    connection::WeakConnection,
+    module::{ComponentId, Module},
+    reference::ComponentWeakRef,
+    Component,
+};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -15,10 +17,10 @@ pub enum Error {
     UndefinedComponent { module: String, component: String },
     #[error(r#"undefined port "{port}" referenced in "{component}""#)]
     UndefinedPort { component: String, port: String },
-    #[error(r#"undefined reference "{alias_or_name}" referenced in "{component}""#)]
+    #[error(r#"undefined reference "{reference}" referenced in "{component}""#)]
     UndefinedReference {
         component: String,
-        alias_or_name: String,
+        reference: String,
     },
 }
 
@@ -40,12 +42,12 @@ impl Error {
     pub fn undefined_reference(component: &str, alias_or_name: &str) -> Self {
         Self::UndefinedReference {
             component: component.to_string(),
-            alias_or_name: alias_or_name.to_string(),
+            reference: alias_or_name.to_string(),
         }
     }
 }
 
-pub struct KnownComponents(FnvHashMap<String, ComponentId>);
+pub struct KnownComponents(pub(super) FnvHashMap<String, ComponentId>);
 
 pub trait Resolve<'m> {
     type Output;
@@ -81,7 +83,7 @@ pub struct Linker {
     unresolved: HashMap<ComponentId, LinkerItems>,
 }
 
-fn noop<T>(_: T) {}
+fn discard<T>(_: T) {}
 
 impl Linker {
     pub fn new() -> Self {
@@ -108,6 +110,15 @@ impl Linker {
             .push(connection);
     }
 
+    fn get_known_components(module: &Module) -> KnownComponents {
+        KnownComponents(FnvHashMap::from_iter(
+            module
+                .components
+                .iter()
+                .map(|(component, data)| (data.name.clone(), component)),
+        ))
+    }
+
     fn resolve_impl(
         module: &mut Module,
         component: ComponentId,
@@ -117,23 +128,14 @@ impl Linker {
         unresolved.references.drain(..).try_for_each(|reference| {
             reference
                 .resolve(module, ComponentKey::new(component), components)
-                .map(noop)
+                .map(discard)
         })?;
 
         unresolved.connections.drain(..).try_for_each(|connection| {
             connection
                 .resolve(module, ComponentKey::new(component), components)
-                .map(noop)
+                .map(discard)
         })
-    }
-
-    fn get_known_components(module: &Module) -> KnownComponents {
-        KnownComponents(FnvHashMap::from_iter(
-            module
-                .components
-                .iter()
-                .map(|(component, data)| (data.name.clone(), component)),
-        ))
     }
 
     pub fn resolve(&mut self, module: &mut Module) -> Result<(), Error> {
