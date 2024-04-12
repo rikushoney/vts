@@ -106,16 +106,13 @@ impl PyModule_ {
     }
 
     fn add_component_impl<'py>(
-        slf: &Bound<'py, Self>,
+        slf: Borrowed<'_, 'py, Self>,
         py: Python<'py>,
-        name: &Bound<'py, PyString>,
+        name: Borrowed<'_, 'py, PyString>,
         class: Option<ComponentClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyComponent>> {
         PyComponent::new(py, slf, {
             let mut module = slf.borrow_mut();
-
-            // TODO: check for duplicate component names
-
             let mut builder = ComponentBuilder::new(&mut module.inner).set_name(name.to_str()?);
 
             if let Some(class) = class {
@@ -128,10 +125,10 @@ impl PyModule_ {
     }
 
     fn add_component_copy<'py>(
-        slf: &Bound<'py, Self>,
+        slf: Borrowed<'_, 'py, Self>,
         py: Python<'py>,
-        component: &Bound<'py, PyComponent>,
-        name: Option<&Bound<'py, PyString>>,
+        component: Borrowed<'_, 'py, PyComponent>,
+        name: Option<Borrowed<'_, 'py, PyString>>,
         mut class: Option<ComponentClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyComponent>> {
         let (name, class) = {
@@ -149,8 +146,9 @@ impl PyModule_ {
                 .inner
                 .get_component(component)
                 .expect("component should be in module");
+
             let name = name
-                .cloned()
+                .map(Borrowed::to_owned)
                 .unwrap_or_else(|| PyString::new_bound(py, component.name()));
 
             if class.is_none() {
@@ -163,7 +161,7 @@ impl PyModule_ {
             (name, class)
         };
 
-        Self::add_component_impl(slf, py, &name, class)
+        Self::add_component_impl(slf, py, name.as_borrowed(), class)
     }
 }
 
@@ -198,19 +196,28 @@ impl PyModule_ {
         component: Option<&Bound<'py, PyComponent>>,
         class_: Option<ComponentClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyComponent>> {
+        let slf = Borrowed::from(slf);
         let class = class_;
 
         if let Some(component) = component {
             let name = name.as_ref().map(NameOrComponent::get_name).transpose()?;
 
-            return Self::add_component_copy(slf, py, component, name, class);
+            return Self::add_component_copy(
+                slf,
+                py,
+                component.as_borrowed(),
+                name.map(Bound::as_borrowed),
+                class,
+            );
         }
 
         if let Some(first_arg) = name {
             match first_arg {
-                NameOrComponent::Name(name) => Self::add_component_impl(slf, py, &name, class),
+                NameOrComponent::Name(name) => {
+                    Self::add_component_impl(slf, py, name.as_borrowed(), class)
+                }
                 NameOrComponent::Component(component) => {
-                    Self::add_component_copy(slf, py, &component, None, class)
+                    Self::add_component_copy(slf, py, component.as_borrowed(), None, class)
                 }
             }
         } else {
@@ -231,8 +238,8 @@ impl PyModule_ {
 #[pyfunction]
 pub fn json_loads(input: Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
     let py = input.py();
-
     let input = input.downcast::<PyString>()?;
+
     let module: Module = serde_json::from_str(input.to_str()?).map_err(|err| {
         PyValueError::new_err(format!(r#"failed parsing json with reason "{err}""#))
     })?;
@@ -246,14 +253,16 @@ pub fn json_dumps(
     module: &Bound<'_, PyModule_>,
     pretty: bool,
 ) -> PyResult<Py<PyString>> {
-    let module = module.borrow();
+    let json = {
+        let module = module.borrow();
 
-    let json = if pretty {
-        serde_json::to_string_pretty(&module.inner)
-    } else {
-        serde_json::to_string(&module.inner)
+        if pretty {
+            serde_json::to_string_pretty(&module.inner)
+        } else {
+            serde_json::to_string(&module.inner)
+        }
     }
-    .map_err(|err| PyValueError::new_err(format!(r#"failed emitting json with reason "{err}""#)))?;
+    .map_err(|err| PyValueError::new_err(format!(r#"failed dumping json with reason "{err}""#)))?;
 
     let json = PyString::new_bound(py, json.as_str());
     Ok(json.into_py(py))

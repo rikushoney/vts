@@ -31,7 +31,7 @@ wrap_enum!(
 #[derive(Clone, Debug)]
 pub struct PyPort(Py<PyModule_>, PortKey);
 
-macro_rules! get_port {
+macro_rules! borrow_inner {
     ($slf:ident + $py:ident => $port:ident) => {
         let module = $slf.module($py).borrow();
         let $port = module
@@ -44,14 +44,14 @@ macro_rules! get_port {
 impl PyPort {
     pub(crate) fn new<'py>(
         py: Python<'py>,
-        module: &Bound<'py, PyModule_>,
+        module: Borrowed<'_, 'py, PyModule_>,
         port: PortKey,
     ) -> PyResult<Bound<'py, Self>> {
         if let Some(port) = module.borrow().ports.get(&port) {
             return Ok(port.bind(py).clone());
         }
 
-        let py_port = Py::new(py, Self(module.clone().unbind(), port))?;
+        let py_port = Py::new(py, Self(module.as_unbound().clone_ref(py), port))?;
         module.borrow_mut().ports.insert(port, py_port.clone());
         Ok(py_port.bind(py).clone())
     }
@@ -137,35 +137,35 @@ impl PyPort {
     }
 
     pub fn parent<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
-        get_port!(self + py => port);
-        PyComponent::new(py, self.module(py), port.parent().key())
+        borrow_inner!(self + py => port);
+        PyComponent::new(py, self.module(py).into(), port.parent().key())
     }
 
     pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
-        get_port!(self + py => port);
+        borrow_inner!(self + py => port);
         PyString::new_bound(py, port.name())
     }
 
     pub fn kind(&self, py: Python<'_>) -> PyPortKind {
-        get_port!(self + py => port);
+        borrow_inner!(self + py => port);
         PyPortKind::from(port.kind())
     }
 
     pub fn n_pins(&self, py: Python<'_>) -> u32 {
-        get_port!(self + py => port);
+        borrow_inner!(self + py => port);
         port.n_pins()
     }
 
     #[pyo3(name = "class_")]
     pub fn class(&self, py: Python<'_>) -> Option<PyPortClass> {
-        get_port!(self + py => port);
+        borrow_inner!(self + py => port);
         port.class().map(PyPortClass::from)
     }
 
     fn select(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyPortPins> {
         let mut range = PinRange::Bound(index.to_range(self.n_pins(py))?);
         range.flatten(self.n_pins(py));
-        get_port!(self + py => port);
+        borrow_inner!(self + py => port);
         Ok(PyPortPins::new(port.select(range)))
     }
 

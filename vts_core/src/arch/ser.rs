@@ -8,7 +8,7 @@ use super::{
     component::{self, ComponentData},
     connection::WeakConnectionBuilder,
     module,
-    port::{PinRange, WeakPortPins},
+    port::{pin_range, PinRange, WeakPortPins},
     prelude::*,
     reference::ComponentWeakRef,
 };
@@ -52,6 +52,7 @@ impl Serialize for Module {
         state.end()
     }
 }
+
 struct SerializePorts<'a, 'm> {
     module: &'m Module,
     ports: &'a Vec<PortId>,
@@ -63,7 +64,7 @@ impl SerializePorts<'_, '_> {
     }
 }
 
-impl<'m> Serialize for SerializePorts<'_, 'm> {
+impl Serialize for SerializePorts<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -84,7 +85,7 @@ struct SerializeReferences<'a, 'm> {
     references: &'a Vec<ComponentRefId>,
 }
 
-impl<'m> SerializeReferences<'_, 'm> {
+impl SerializeReferences<'_, '_> {
     pub fn iter_unnamed(&self) -> impl Clone + Iterator<Item = &ComponentRefId> {
         self.references
             .iter()
@@ -96,7 +97,7 @@ impl<'m> SerializeReferences<'_, 'm> {
     }
 }
 
-impl<'m> Serialize for SerializeReferences<'_, 'm> {
+impl Serialize for SerializeReferences<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -141,7 +142,7 @@ impl SerializeNamedReferences<'_, '_> {
     }
 }
 
-impl<'m> Serialize for SerializeNamedReferences<'_, 'm> {
+impl Serialize for SerializeNamedReferences<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -180,7 +181,7 @@ impl SerializeConnections<'_, '_> {
     }
 }
 
-impl<'m> Serialize for SerializeConnections<'_, 'm> {
+impl Serialize for SerializeConnections<'_, '_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -222,7 +223,7 @@ impl<'m> Serialize for SerializeConnections<'_, 'm> {
     }
 }
 
-pub(crate) struct SerializeComponent<'m> {
+struct SerializeComponent<'m> {
     component: Component<'m>,
 }
 
@@ -234,7 +235,7 @@ impl<'m> SerializeComponent<'m> {
     }
 }
 
-impl<'m> Serialize for SerializeComponent<'m> {
+impl Serialize for SerializeComponent<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -308,11 +309,11 @@ impl Serialize for PinRange {
         let mut state = serializer.serialize_map(Some(len))?;
 
         if let Some(port_start) = port_start {
-            state.serialize_entry("port_start", &port_start)?;
+            state.serialize_entry(pin_range::FIELDS[pin_range::PORT_START], &port_start)?;
         }
 
         if let Some(port_end) = port_end {
-            state.serialize_entry("port_end", &port_end)?;
+            state.serialize_entry(pin_range::FIELDS[pin_range::PORT_START], &port_end)?;
         }
 
         state.end()

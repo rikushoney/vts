@@ -1,14 +1,13 @@
 use std::str::FromStr;
 
-use pyo3::exceptions::{PyAttributeError, PyTypeError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::{PyMapping, PyString};
+use pyo3::{
+    exceptions::{PyAttributeError, PyTypeError, PyValueError},
+    prelude::*,
+    types::{PyMapping, PyString},
+};
 use vts_core::arch::{
-    component::ComponentKey,
-    connection::{ConnectionBuilder, ConnectionKind},
-    port::{PortBuilder, PortClass, PortKind},
+    component::ComponentKey, connection::ConnectionBuilder, port::PortBuilder, prelude::*,
     reference::ComponentRefBuilder,
-    ComponentClass,
 };
 
 use super::{
@@ -29,32 +28,31 @@ wrap_enum!(
         MUX = Mux ("mux" | "m")
 );
 
+macro_rules! borrow_inner {
+    ($slf:ident + $py:ident => $component:ident) => {
+        let module = $slf.module($py).borrow();
+        let $component = module
+            .inner
+            .get_component($slf.key())
+            .expect("component should be in module");
+    };
+}
+
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct PyComponent(Py<PyModule_>, ComponentKey);
 
-macro_rules! get_component {
-    ($slf:ident + $py:ident => $comp:ident) => {
-        let module = $slf.module($py).borrow();
-        let $comp = module
-            .inner
-            .get_component($slf.key())
-            .expect("component should be in module")
-            .clone();
-    };
-}
-
 impl PyComponent {
     pub(crate) fn new<'py>(
         py: Python<'py>,
-        module: &Bound<'py, PyModule_>,
+        module: Borrowed<'_, 'py, PyModule_>,
         component: ComponentKey,
     ) -> PyResult<Bound<'py, Self>> {
         if let Some(component) = module.borrow().components.get(&component) {
             return Ok(component.bind(py).clone());
         }
 
-        let py_component = Py::new(py, Self(module.clone().unbind(), component))?;
+        let py_component = Py::new(py, Self(module.as_unbound().clone_ref(py), component))?;
 
         module
             .borrow_mut()
@@ -71,21 +69,18 @@ impl PyComponent {
     fn add_port_impl<'py>(
         &self,
         py: Python<'py>,
-        name: &Bound<'py, PyString>,
+        name: Borrowed<'_, 'py, PyString>,
         kind: PortKindOrStr<'py>,
         n_pins: Option<u32>,
         class: Option<PortClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyPort>> {
         let port = {
             let parent = {
-                get_component!(self + py => component);
+                borrow_inner!(self + py => component);
                 component.key()
             };
 
             let mut module = self.module(py).borrow_mut();
-
-            // TODO: check for duplicate port names
-
             let kind = kind.get_kind(py)?.borrow();
 
             let mut builder = PortBuilder::new(&mut module.inner, parent)
@@ -104,14 +99,14 @@ impl PyComponent {
             builder.finish().key()
         };
 
-        PyPort::new(py, self.module(py), port)
+        PyPort::new(py, self.module(py).as_borrowed(), port)
     }
 
     fn add_port_copy<'py>(
         &self,
         py: Python<'py>,
-        port: &Bound<'py, PyPort>,
-        name: Option<&Bound<'py, PyString>>,
+        port: Borrowed<'_, 'py, PyPort>,
+        name: Option<Borrowed<'_, 'py, PyString>>,
         kind: Option<PortKindOrStr<'py>>,
         n_pins: Option<u32>,
         mut class: Option<PortClassOrStr<'py>>,
@@ -121,10 +116,7 @@ impl PyComponent {
             (port.module(py).clone().unbind(), port.key())
         };
 
-        let module = {
-            let module = module.bind(py);
-            module.borrow()
-        };
+        let module = module.bind(py).borrow();
 
         let port = &module
             .inner
@@ -132,7 +124,7 @@ impl PyComponent {
             .expect("port should be in module");
 
         let name = name
-            .cloned()
+            .map(Borrowed::to_owned)
             .unwrap_or_else(|| PyString::new_bound(py, port.name()));
 
         let kind = if let Some(kind) = kind {
@@ -150,7 +142,7 @@ impl PyComponent {
                 .transpose()?;
         }
 
-        self.add_port_impl(py, &name, kind, n_pins, class)
+        self.add_port_impl(py, name.as_borrowed(), kind, n_pins, class)
     }
 }
 
@@ -273,13 +265,13 @@ impl PyComponent {
     }
 
     pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
-        get_component!(self + py => component);
+        borrow_inner!(self + py => component);
         PyString::new_bound(py, component.name())
     }
 
     #[pyo3(name = "class_")]
     pub fn class(&self, py: Python<'_>) -> Option<PyComponentClass> {
-        get_component!(self + py => component);
+        borrow_inner!(self + py => component);
         component.class().map(PyComponentClass::from)
     }
 
@@ -297,16 +289,25 @@ impl PyComponent {
 
         if let Some(port) = port {
             let name = name.as_ref().map(NameOrPort::get_name).transpose()?;
-            return self.add_port_copy(py, port, name, kind, n_pins, class);
+            return self.add_port_copy(
+                py,
+                port.as_borrowed(),
+                name.map(Bound::as_borrowed),
+                kind,
+                n_pins,
+                class,
+            );
         }
 
         if let Some(first_arg) = name {
             match first_arg {
                 NameOrPort::Name(name) => {
                     let kind = kind.ok_or(PyValueError::new_err("port must have a kind"))?;
-                    self.add_port_impl(py, &name, kind, n_pins, class)
+                    self.add_port_impl(py, name.as_borrowed(), kind, n_pins, class)
                 }
-                NameOrPort::Port(port) => self.add_port_copy(py, &port, None, kind, n_pins, class),
+                NameOrPort::Port(port) => {
+                    self.add_port_copy(py, port.as_borrowed(), None, kind, n_pins, class)
+                }
             }
         } else {
             Err(PyValueError::new_err("port must have a name"))
@@ -347,7 +348,7 @@ impl PyComponent {
             builder.finish().key()
         };
 
-        PyComponentRef::new(py, self.module(py), reference)
+        PyComponentRef::new(py, self.module(py).as_borrowed(), reference)
     }
 
     #[pyo3(signature = (source, sink, *, kind=None))]
@@ -393,20 +394,20 @@ impl PyComponent {
         port: &Bound<'py, PyString>,
     ) -> PyResult<Bound<'py, PyPort>> {
         let port = {
+            borrow_inner!(self + py => component);
             let port = port.to_str()?;
-            get_component!(self + py => component);
-
-            let port = component.find_port(port).ok_or_else(|| {
-                let component = component.name();
-                PyAttributeError::new_err(format!(
-                    r#"undefined port "{port}" referenced in "{component}""#,
-                ))
-            })?;
-
-            port.key()
+            component
+                .find_port(port)
+                .ok_or_else(|| {
+                    let component = component.name();
+                    PyAttributeError::new_err(format!(
+                        r#"undefined port "{port}" referenced in "{component}""#,
+                    ))
+                })?
+                .key()
         };
 
-        PyPort::new(py, self.module(py), port)
+        PyPort::new(py, self.module(py).as_borrowed(), port)
     }
 
     fn __setattr__(

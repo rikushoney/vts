@@ -23,7 +23,7 @@ impl<'a, 'de, 'm> Visitor<'de> for DeserializeComponents<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a dict of components")
+        write!(f, "a dict of {}", module::FIELDS[module::COMPONENTS])
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -68,7 +68,7 @@ impl<'de> Deserialize<'de> for Module {
                 A: MapAccess<'de>,
             {
                 #[derive(Deserialize)]
-                #[serde(rename_all = "lowercase")]
+                #[serde(rename_all = "snake_case")]
                 enum Field {
                     Name,
                     Components,
@@ -266,7 +266,7 @@ impl<'a, 'de> DeserializeSeed<'de> for DeserializeConnections<'a> {
     }
 }
 
-pub(crate) struct ComponentSeed<'a, 'm> {
+struct ComponentSeed<'a, 'm> {
     module: &'m mut Module,
     name: String,
     linker: &'a mut Linker,
@@ -294,11 +294,10 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
         A: MapAccess<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(rename_all = "lowercase")]
+        #[serde(rename_all = "snake_case")]
         enum Field {
             Ports,
             References,
-            #[serde(rename = "named_references")]
             NamedReferences,
             Connections,
             Class,
@@ -401,7 +400,7 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentSeed<'a, 'm> {
     }
 }
 
-pub(crate) struct PortSeed<'m> {
+struct PortSeed<'m> {
     module: &'m mut Module,
     parent: ComponentId,
     name: String,
@@ -429,10 +428,9 @@ impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
         A: MapAccess<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(rename_all = "lowercase")]
+        #[serde(rename_all = "snake_case")]
         enum Field {
             Kind,
-            #[serde(rename = "n_pins")]
             NPins,
             Class,
         }
@@ -557,7 +555,7 @@ impl<'de> Deserialize<'de> for PinRange {
     }
 }
 
-pub enum DeserializeComponentWeakRef {
+enum DeserializeComponentWeakRef {
     Named(String),
     Unnamed,
 }
@@ -574,10 +572,9 @@ impl<'de> Visitor<'de> for DeserializeComponentWeakRef {
         A: MapAccess<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(rename_all = "lowercase")]
+        #[serde(rename_all = "snake_case")]
         enum Field {
             Component,
-            #[serde(rename = "n_instances")]
             NInstances,
         }
 

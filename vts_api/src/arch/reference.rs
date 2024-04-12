@@ -15,14 +15,14 @@ pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
 impl PyComponentRef {
     pub(crate) fn new<'py>(
         py: Python<'py>,
-        module: &Bound<'py, PyModule_>,
+        module: Borrowed<'_, 'py, PyModule_>,
         reference: ComponentRefKey,
     ) -> PyResult<Bound<'py, Self>> {
         if let Some(reference) = module.borrow().references.get(&reference) {
             return Ok(reference.bind(py).clone());
         }
 
-        let py_reference = Py::new(py, Self(module.clone().unbind(), reference))?;
+        let py_reference = Py::new(py, Self(module.as_unbound().clone_ref(py), reference))?;
 
         module
             .borrow_mut()
@@ -37,7 +37,7 @@ impl PyComponentRef {
     }
 }
 
-macro_rules! get_reference {
+macro_rules! borrow_inner {
     ($slf:ident + $py:ident => $ref:ident) => {
         let module = $slf.module($py).borrow();
         let $ref = module
@@ -54,17 +54,17 @@ impl PyComponentRef {
     }
 
     pub fn component<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
-        get_reference!(self + py => reference);
-        PyComponent::new(py, self.module(py), reference.component().key())
+        borrow_inner!(self + py => reference);
+        PyComponent::new(py, self.module(py).into(), reference.component().key())
     }
 
     pub fn parent<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
-        get_reference!(self + py => reference);
-        PyComponent::new(py, self.module(py), reference.parent().key())
+        borrow_inner!(self + py => reference);
+        PyComponent::new(py, self.module(py).into(), reference.parent().key())
     }
 
     pub fn alias<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
-        get_reference!(self + py => reference);
+        borrow_inner!(self + py => reference);
 
         reference
             .alias()
@@ -72,12 +72,12 @@ impl PyComponentRef {
     }
 
     pub fn alias_or_name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
-        get_reference!(self + py => reference);
+        borrow_inner!(self + py => reference);
         PyString::new_bound(py, reference.alias_or_name())
     }
 
     pub fn n_instances(&self, py: Python<'_>) -> usize {
-        get_reference!(self + py => reference);
+        borrow_inner!(self + py => reference);
         reference.n_instances()
     }
 
@@ -87,11 +87,11 @@ impl PyComponentRef {
         port: &Bound<'_, PyString>,
     ) -> PyResult<PyComponentRefPort> {
         let reference = slf.borrow();
-        get_reference!(reference + py => reference);
+        borrow_inner!(reference + py => reference);
         let port = port.to_str()?;
 
         if let Some(port) = reference.component().find_port(port) {
-            let port = PyPort::new(py, slf.borrow().module(py), port.key())?;
+            let port = PyPort::new(py, slf.borrow().module(py).as_borrowed(), port.key())?;
             Ok(PyComponentRefPort(slf.clone().unbind(), port.unbind()))
         } else {
             let component = reference.component().name();
