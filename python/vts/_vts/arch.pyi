@@ -111,6 +111,9 @@ class PyPortPins:
 
 class PyComponentRefPort:
     def __getitem__(self, index: slice | int) -> PyPortSelection: ...
+    def __setitem__(
+        self, index: slice | int, sink: PyPortSelection | PyComponentRefPort
+    ) -> None: ...
 
 class PyPortSelection:
     pass

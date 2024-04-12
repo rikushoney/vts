@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::component::{Component, ComponentKey};
-use super::linker::{self, Components, Resolve};
-use super::module::{ComponentId, ComponentRefId, Module};
-use super::port::{PortPins, WeakPortPins};
-use super::reference::ComponentRefKey;
+use super::{
+    component::ComponentKey,
+    linker::{self, Components, Resolve},
+    port::{PortPins, WeakPortPins},
+    prelude::*,
+    reference::ComponentRefKey,
+};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -142,8 +144,6 @@ pub enum ConnectionBuildError {
     UndefinedReference { reference: String },
 }
 
-// TODO: manually implement `Deserialize` to prevent deserializing "unnamed"
-// references as "named"
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Signature {
     #[serde(flatten)]
@@ -164,6 +164,7 @@ pub struct WeakSourceUnset;
 pub struct WeakSinkSet(WeakPortPins, Option<String>);
 pub struct WeakSinkUnset;
 
+#[derive(Default)]
 pub struct WeakConnectionBuilder<Src, Snk> {
     source: Src,
     sink: Snk,

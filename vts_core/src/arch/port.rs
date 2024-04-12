@@ -1,18 +1,13 @@
-use std::fmt;
 use std::ops::Range;
 
-use serde::{
-    de::{self, DeserializeSeed, MapAccess, Visitor},
-    ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
     component::ComponentKey,
     linker::{self, Components, Resolve},
-    reference::{ComponentRef, ComponentRefKey},
-    Component, ComponentId, Module, PortId,
+    prelude::*,
+    reference::ComponentRefKey,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -36,6 +31,10 @@ pub enum PortClass {
     LatchOut,
 }
 
+fn equals_one(x: &u32) -> bool {
+    *x == 1
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct PortData {
     #[serde(skip)]
@@ -43,7 +42,8 @@ pub struct PortData {
     #[serde(skip)]
     parent: ComponentId,
     pub kind: PortKind,
-    pub n_pins: usize,
+    #[serde(skip_serializing_if = "equals_one")]
+    pub n_pins: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub class: Option<PortClass>,
 }
@@ -53,7 +53,7 @@ impl PortData {
         parent: ComponentId,
         name: &str,
         kind: PortKind,
-        n_pins: usize,
+        n_pins: u32,
         class: Option<PortClass>,
     ) -> Self {
         Self {
@@ -111,7 +111,7 @@ impl<'m> Port<'m> {
         self.data().kind
     }
 
-    pub fn n_pins(&self) -> usize {
+    pub fn n_pins(&self) -> u32 {
         self.data().n_pins
     }
 
@@ -120,32 +120,100 @@ impl<'m> Port<'m> {
     }
 
     #[must_use]
-    pub fn select(&self, range: Range<u32>) -> PortPins {
+    pub fn select(&self, range: PinRange) -> PortPins {
         PortPins::new(self.1, range)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum PinRange {
+    Start(u32),
+    End(u32),
+    Bound(Range<u32>),
+    Full,
+}
+
+impl PinRange {
+    pub fn new(start: Option<u32>, end: Option<u32>) -> Self {
+        match (start, end) {
+            (Some(start), Some(end)) => Self::Bound(Range { start, end }),
+            (Some(start), None) => Self::Start(start),
+            (None, Some(end)) => Self::End(end),
+            (None, None) => Self::Full,
+        }
+    }
+
+    pub fn get_start(&self) -> Option<u32> {
+        match self {
+            Self::Start(start) => Some(*start),
+            Self::Bound(Range { start, .. }) => Some(*start),
+            _ => None,
+        }
+    }
+
+    pub fn get_end(&self) -> Option<u32> {
+        match self {
+            Self::End(end) => Some(*end),
+            Self::Bound(Range { end, .. }) => Some(*end),
+            _ => None,
+        }
+    }
+
+    pub fn expand(&self, n_pins: u32) -> Range<u32> {
+        match self {
+            Self::Start(start) => Range {
+                start: *start,
+                end: n_pins,
+            },
+            Self::End(end) => Range {
+                start: 0,
+                end: *end,
+            },
+            Self::Bound(range) => range.clone(),
+            Self::Full => Range {
+                start: 0,
+                end: n_pins,
+            },
+        }
+    }
+
+    pub fn flatten(&mut self, n_pins: u32) {
+        match self {
+            Self::Start(start) => {
+                if *start == 0 {
+                    *self = PinRange::Full;
+                }
+            }
+            Self::End(end) => {
+                if *end == n_pins {
+                    *self = PinRange::Full;
+                }
+            }
+            Self::Bound(range) => {
+                if range.start == 0 {
+                    *self = PinRange::End(range.end);
+                    return self.flatten(n_pins);
+                }
+
+                if range.end == n_pins {
+                    *self = PinRange::Start(range.start);
+                    self.flatten(n_pins)
+                }
+            }
+            Self::Full => {}
+        }
     }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PortPins {
     port: PortId,
-    range: Range<u32>,
+    pub range: PinRange,
 }
 
 impl PortPins {
-    pub(crate) fn new(port: PortId, range: Range<u32>) -> Self {
+    pub(crate) fn new(port: PortId, range: PinRange) -> Self {
         Self { port, range }
-    }
-
-    pub fn start(&self) -> u32 {
-        self.range.start
-    }
-
-    pub fn end(&self) -> u32 {
-        self.range.end
-    }
-
-    pub fn range(&self) -> Range<u32> {
-        self.range.clone()
     }
 
     pub fn port<'m>(&self, module: &'m Module) -> Port<'m> {
@@ -163,7 +231,7 @@ pub struct PortBuilder<'m, N, K> {
     parent: ComponentId,
     name: N,
     kind: K,
-    n_pins: Option<usize>,
+    n_pins: Option<u32>,
     class: Option<PortClass>,
 }
 
@@ -207,7 +275,7 @@ impl<'m, N> PortBuilder<'m, N, KindUnset> {
 }
 
 impl<'m, N, K> PortBuilder<'m, N, K> {
-    pub fn set_n_pins(&mut self, n_pins: usize) {
+    pub fn set_n_pins(&mut self, n_pins: u32) {
         self.n_pins = Some(n_pins);
     }
 
@@ -253,181 +321,22 @@ pub enum PortBuildError {
     MissingField(&'static str),
 }
 
-pub(crate) struct PortSeed<'m> {
-    module: &'m mut Module,
-    parent: ComponentId,
-    name: String,
-}
+pub(super) const FIELDS: &[&str] = &["kind", "n_pins", "class"];
+pub(super) const KIND: usize = 0;
+pub(super) const N_PINS: usize = 1;
+pub(super) const CLASS: usize = 2;
 
-impl<'m> PortSeed<'m> {
-    pub(crate) fn new(module: &'m mut Module, parent: ComponentId, name: String) -> Self {
-        Self {
-            module,
-            parent,
-            name,
-        }
-    }
-}
-
-const FIELDS: &[&str] = &["kind", "n_pins", "class"];
-const KIND: usize = 0;
-const N_PINS: usize = 1;
-const CLASS: usize = 2;
-
-impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
-    type Value = ();
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a port description")
-    }
-
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "lowercase")]
-        enum Field {
-            Kind,
-            #[serde(rename = "n_pins")]
-            NPins,
-            Class,
-        }
-
-        let mut kind: Option<PortKind> = None;
-        let mut n_pins: Option<usize> = None;
-        let mut class: Option<PortClass> = None;
-
-        while let Some(field) = map.next_key()? {
-            match field {
-                Field::Kind => {
-                    if kind.is_some() {
-                        return Err(de::Error::duplicate_field(FIELDS[KIND]));
-                    }
-
-                    kind = Some(map.next_value()?);
-                }
-                Field::NPins => {
-                    if n_pins.is_some() {
-                        return Err(de::Error::duplicate_field(FIELDS[N_PINS]));
-                    }
-
-                    n_pins = Some(map.next_value()?);
-                }
-                Field::Class => {
-                    if class.is_some() {
-                        return Err(de::Error::duplicate_field(FIELDS[CLASS]));
-                    }
-
-                    class = Some(map.next_value()?);
-                }
-            }
-        }
-
-        let kind = kind.ok_or(de::Error::missing_field(FIELDS[KIND]))?;
-
-        let mut builder = PortBuilder::new(self.module, ComponentKey(self.parent))
-            .set_name(&self.name)
-            .set_kind(kind);
-
-        if let Some(n_pins) = n_pins {
-            builder.set_n_pins(n_pins);
-        }
-
-        if let Some(class) = class {
-            builder.set_class(class);
-        }
-
-        builder.finish();
-        Ok(())
-    }
-}
-
-impl<'de, 'm> DeserializeSeed<'de> for PortSeed<'m> {
-    type Value = ();
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_struct("Port", FIELDS, self)
-    }
-}
-
-mod pin_range {
-    use super::*;
-
-    const FIELDS: &[&str] = &["port_start", "port_end"];
-    const PORT_START: usize = 0;
-    const PORT_END: usize = 1;
-
-    pub fn serialize<S: Serializer>(range: &Range<u32>, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut state = serializer.serialize_struct("PinRange", FIELDS.len())?;
-        state.serialize_field(FIELDS[PORT_START], &(range.start as u32))?;
-        state.serialize_field(FIELDS[PORT_END], &(range.end as u32))?;
-        state.end()
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Range<u32>, D::Error> {
-        struct PinRangeVisitor;
-
-        impl<'de> Visitor<'de> for PinRangeVisitor {
-            type Value = Range<u32>;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "a pin range description")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                #[derive(Deserialize)]
-                enum Field {
-                    #[serde(rename = "port_start")]
-                    PortStart,
-                    #[serde(rename = "port_end")]
-                    PortEnd,
-                }
-
-                let mut start: Option<u32> = None;
-                let mut end: Option<u32> = None;
-
-                while let Some(field) = map.next_key()? {
-                    match field {
-                        Field::PortStart => {
-                            if start.is_some() {
-                                return Err(de::Error::duplicate_field(FIELDS[PORT_START]));
-                            }
-
-                            start = Some(map.next_value()?);
-                        }
-                        Field::PortEnd => {
-                            if end.is_some() {
-                                return Err(de::Error::duplicate_field(FIELDS[PORT_END]));
-                            }
-
-                            end = Some(map.next_value()?);
-                        }
-                    }
-                }
-
-                let start = start.ok_or(de::Error::missing_field(FIELDS[PORT_START]))?;
-                let end = end.ok_or(de::Error::missing_field(FIELDS[PORT_END]))?;
-
-                Ok(Range { start, end })
-            }
-        }
-
-        deserializer.deserialize_struct("PinRange", FIELDS, PinRangeVisitor)
-    }
+pub(super) mod pin_range {
+    pub const FIELDS: &[&str] = &["port_start", "port_end"];
+    pub const PORT_START: usize = 0;
+    pub const PORT_END: usize = 1;
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct WeakPortPins {
     pub port: String,
-    #[serde(flatten, with = "pin_range")]
-    pub range: Range<u32>,
+    #[serde(flatten)]
+    pub range: PinRange,
 }
 
 impl<'m> Resolve<'m> for (WeakPortPins, Option<ComponentRefKey>) {

@@ -1,69 +1,47 @@
-from vts.arch import Component, ComponentClass, Module, Port, PortClass, PortKind
+from math import floor, log10
+
+from vts import arch
 
 
-def test_module():
-    m = Module("test_mod")
-    assert m.name == "test_mod"
+def print_with_linum(s: str) -> None:
+    n_lines = s.count("\n") + 1
+    margin = floor(log10(n_lines)) + 1
+
+    for i, line in enumerate(s.splitlines()):
+        linum = i + 1
+        print(f"{linum: >{margin}}. {line}")
 
 
-def test_add_component():
-    m = Module("_")
-    c = m.add_component("test_comp", class_="LUT")
-    assert c.name == "test_comp"
-    assert c.class_ == ComponentClass.LUT
-    assert c.name in m.components_dict().keys()
+def test_arch():
+    m = arch.Module("test_mod")
 
-    tmp = Component("test_comp2", class_="LATCH")
-    c2 = m.add_component(tmp)
-    assert c2.name == "test_comp2"
-    assert c2.class_ == ComponentClass.LATCH
-    assert c2.name in m.components_dict().keys()
-    assert c2 is not tmp
+    c1 = m.add_component("test_comp_1")
+    c1.add_port("test_port_1", kind="i")
 
-    c3 = m.add_component("test_comp3", component=c2)
-    assert c2.name == "test_comp2"
-    assert c3.name == "test_comp3"
+    c2 = m.add_component("test_comp_2")
+    c2.add_port("test_port_2", kind="i")
+    c1_c2 = c1.add_reference(c2)
 
+    c1.test_port_1 = c1_c2.test_port_2[:]
 
-def test_component():
-    c = Component("test_comp", class_="LUT")
-    assert c.name == "test_comp"
+    c3 = m.add_component("test_comp_3")
+    c3.add_port("test_port_3", kind="i", n_pins=2)
+    c1_c3 = c1.add_reference(c3)
 
-    c = Component("_", class_="LUT")
-    assert c.class_ == ComponentClass.LUT
+    c1_c2.test_port_2 = c1_c3.test_port_3[0]
 
+    c4 = m.add_component("test_comp_4")
+    c4.add_port("test_port_4", kind="o")
+    c1_c4 = c1.add_reference(c4, alias="c4")
 
-def test_add_port():
-    c = Component("_")
-    p = c.add_port("test_port", kind="i", class_="LUT_IN")
-    assert p.name == "test_port"
-    assert p.kind == PortKind.INPUT
-    assert p.class_ == PortClass.LUT_IN
-    assert p.name in c.ports_dict().keys()
+    c1_c3.test_port_3[1] = c1_c4.test_port_4
 
-    tmp = Port("test_port2", kind="o", class_="LATCH_OUT")
-    p2 = c.add_port(tmp)
-    assert p2.name == "test_port2"
-    assert p2.kind == PortKind.OUTPUT
-    assert p2.class_ == PortClass.LATCH_OUT
-    assert p2.name in c.ports_dict().keys()
-    assert p2 is not tmp
+    dump1 = arch.json_dumps(m, True)
 
-    p3 = c.add_port("test_port3", port=p2)
-    assert p2.name == "test_port2"
-    assert p3.name == "test_port3"
-    assert p3.kind == PortKind.OUTPUT
-    assert p3.class_ == PortClass.LATCH_OUT
-    assert p3.name in c.ports_dict().keys()
+    print("Initial:")
+    print_with_linum(dump1)
 
+    dump2 = arch.json_dumps(arch.json_loads(dump1), pretty=True)
 
-def test_port():
-    p = Port("test_port", "i")
-    assert p.name == "test_port"
-    assert p.kind == PortKind.INPUT
-
-    p = Port("_", kind="i", n_pins=2)
-    assert p.n_pins == 2
-
-    p = Port("_", kind="i", class_="LUT_IN")
-    assert p.class_ == PortClass.LUT_IN
+    print("Reloaded:")
+    print_with_linum(dump2)

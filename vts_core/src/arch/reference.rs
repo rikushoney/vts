@@ -1,27 +1,29 @@
-use std::fmt;
-
-use serde::{
-    de::{self, DeserializeSeed, MapAccess, Visitor},
-    Deserialize, Deserializer, Serialize,
-};
+use serde::Serialize;
 
 use super::{
     component::ComponentKey,
     linker::{self, Components, Resolve},
-    Component, ComponentId, ComponentRefId, Module,
+    prelude::*,
 };
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentRefData {
     pub(crate) component: ComponentId,
+    pub(crate) parent: ComponentId,
     pub(crate) alias: Option<String>,
     pub n_instances: usize,
 }
 
 impl ComponentRefData {
-    pub(crate) fn new(component: ComponentId, alias: Option<String>, n_instances: usize) -> Self {
+    pub(crate) fn new(
+        component: ComponentId,
+        parent: ComponentId,
+        alias: Option<String>,
+        n_instances: usize,
+    ) -> Self {
         Self {
             component,
+            parent,
             alias,
             n_instances,
         }
@@ -63,6 +65,10 @@ impl<'m> ComponentRef<'m> {
 
     pub fn component(&self) -> Component<'m> {
         Component::new(self.module(), self.data().component)
+    }
+
+    pub fn parent(&self) -> Component<'m> {
+        Component::new(self.module(), self.data().parent)
     }
 
     pub fn alias(&self) -> Option<&'m String> {
@@ -136,7 +142,12 @@ impl<'m, C> ComponentRefBuilder<'m, C> {
 impl<'m> ComponentRefBuilder<'m, ComponentSet> {
     fn insert(&mut self) -> ComponentRefId {
         let n_instances = self.n_instances.unwrap_or(1);
-        let reference = ComponentRefData::new(self.component.0, self.alias.take(), n_instances);
+        let reference = ComponentRefData::new(
+            self.component.0,
+            self.parent,
+            self.alias.take(),
+            n_instances,
+        );
         self.module.references.insert(reference)
     }
 
@@ -148,90 +159,22 @@ impl<'m> ComponentRefBuilder<'m, ComponentSet> {
     }
 }
 
+fn equals_one(x: &usize) -> bool {
+    *x == 1
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct ComponentWeakRef {
     pub component: String,
     #[serde(skip)]
     pub alias: Option<String>,
+    #[serde(skip_serializing_if = "equals_one")]
     pub n_instances: usize,
 }
 
-pub enum DeserializeComponentWeakRef {
-    Named(String),
-    Unnamed,
-}
-
-const FIELDS: &[&str] = &["component", "n_instances"];
-const COMPONENT: usize = 0;
-const N_INSTANCES: usize = 1;
-
-impl<'de> Visitor<'de> for DeserializeComponentWeakRef {
-    type Value = ComponentWeakRef;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a component reference description")
-    }
-
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "lowercase")]
-        enum Field {
-            Component,
-            #[serde(rename = "n_instances")]
-            NInstances,
-        }
-
-        let mut component: Option<String> = None;
-        let mut n_instances: Option<usize> = None;
-
-        while let Some(field) = map.next_key()? {
-            match field {
-                Field::Component => {
-                    if component.is_some() {
-                        return Err(de::Error::duplicate_field(FIELDS[COMPONENT]));
-                    }
-
-                    component = Some(map.next_value()?);
-                }
-                Field::NInstances => {
-                    if n_instances.is_some() {
-                        return Err(de::Error::duplicate_field(FIELDS[N_INSTANCES]));
-                    }
-
-                    n_instances = Some(map.next_value()?);
-                }
-            }
-        }
-
-        let component = component.ok_or(de::Error::missing_field(FIELDS[COMPONENT]))?;
-        let n_instances = n_instances.unwrap_or(1);
-
-        let alias = match self {
-            DeserializeComponentWeakRef::Named(alias) => Some(alias),
-            DeserializeComponentWeakRef::Unnamed => None,
-        };
-
-        Ok(ComponentWeakRef {
-            component,
-            alias,
-            n_instances,
-        })
-    }
-}
-
-impl<'de> DeserializeSeed<'de> for DeserializeComponentWeakRef {
-    type Value = ComponentWeakRef;
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_struct("ComponentRef", FIELDS, self)
-    }
-}
+pub(super) const FIELDS: &[&str] = &["component", "n_instances"];
+pub(super) const COMPONENT: usize = 0;
+pub(super) const N_INSTANCES: usize = 1;
 
 impl<'m> Resolve<'m> for ComponentWeakRef {
     type Output = ComponentRefKey;

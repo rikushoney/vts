@@ -1,22 +1,9 @@
-use std::fmt;
 use std::slice;
 
-use serde::ser::SerializeMap;
-use serde::ser::SerializeSeq;
-use serde::{
-    de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
-    ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::{
-    connection::{Connection, WeakConnection, WeakConnectionBuilder},
-    linker::Linker,
-    port::{PortSeed, WeakPortPins},
-    reference::{ComponentWeakRef, DeserializeComponentWeakRef},
-    ComponentId, ComponentRef, ComponentRefId, Module, Port, PortId,
-};
+use super::prelude::*;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -60,7 +47,7 @@ impl ComponentKey {
 }
 
 #[derive(Clone, Debug)]
-pub struct Component<'m>(&'m Module, ComponentId);
+pub struct Component<'m>(&'m Module, pub(super) ComponentId);
 
 impl<'m> Component<'m> {
     pub(crate) fn new(module: &'m Module, component: ComponentId) -> Self {
@@ -83,25 +70,25 @@ impl<'m> Component<'m> {
         &self.data().name
     }
 
-    // pub fn ports(&self) -> PortIter<'m> {
-    //     PortIter {
-    //         module: self.module,
-    //         iter: self.data.ports.values(),
-    //     }
-    // }
+    pub fn ports(&self) -> PortIter<'m> {
+        PortIter {
+            module: self.module(),
+            iter: self.data().ports.iter(),
+        }
+    }
 
-    // pub fn references(&self) -> ComponentRefIter<'m> {
-    //     ComponentRefIter {
-    //         module: self.module,
-    //         iter: self.data.references.iter(),
-    //     }
-    // }
+    pub fn references(&self) -> ComponentRefIter<'m> {
+        ComponentRefIter {
+            module: self.module(),
+            iter: self.data().references.iter(),
+        }
+    }
 
-    // pub fn connections(&self) -> ConnectionIter<'m> {
-    //     ConnectionIter {
-    //         iter: self.data.connections.iter(),
-    //     }
-    // }
+    pub fn connections(&self) -> ConnectionIter<'m> {
+        ConnectionIter {
+            iter: self.data().connections.iter(),
+        }
+    }
 
     pub fn class(&self) -> Option<ComponentClass> {
         self.data().class
@@ -130,35 +117,33 @@ impl<'m> Component<'m> {
     }
 }
 
-// pub struct PortIter<'m> {
-//     module: &'m Module,
-//     iter: hash_map::Values<'m, String, PortId>,
-// }
+pub struct PortIter<'m> {
+    module: &'m Module,
+    iter: slice::Iter<'m, PortId>,
+}
 
-// impl<'m> Iterator for PortIter<'m> {
-//     type Item = Port<'m>;
+impl<'m> Iterator for PortIter<'m> {
+    type Item = Port<'m>;
 
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let port = *self.iter.next()?;
-//         Some(port.to_port(self.module))
-//     }
-// }
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|&port| Port::new(self.module, port))
+    }
+}
 
-// pub struct ComponentRefIter<'m> {
-//     module: &'m Module,
-//     iter: hash_map::Iter<'m, String, ComponentRefId>,
-// }
+pub struct ComponentRefIter<'m> {
+    module: &'m Module,
+    iter: slice::Iter<'m, ComponentRefId>,
+}
 
-// impl<'m> Iterator for ComponentRefIter<'m> {
-//     type Item = (&'m str, ComponentRef<'m>);
+impl<'m> Iterator for ComponentRefIter<'m> {
+    type Item = ComponentRef<'m>;
 
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let (&alias, &reference) = self.iter.next()?;
-//         let alias = &self.module.strings[alias];
-//         let reference = ComponentRef::new(self.module, reference);
-//         Some((alias, reference))
-//     }
-// }
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .map(|&reference| ComponentRef::new(self.module, reference))
+    }
+}
 
 pub struct ConnectionIter<'m> {
     iter: slice::Iter<'m, Connection>,
@@ -239,7 +224,7 @@ pub enum ComponentBuildError {
     MissingField(&'static str),
 }
 
-const FIELDS: &[&str] = &[
+pub(super) const FIELDS: &[&str] = &[
     "ports",
     "references",
     "named_references",
@@ -247,478 +232,8 @@ const FIELDS: &[&str] = &[
     "class",
 ];
 
-const PORTS: usize = 0;
-const REFERENCES: usize = 1;
-const NAMED_REFERENCES: usize = 2;
-const CONNECTIONS: usize = 3;
-const CLASS: usize = 4;
-
-struct SerializePorts<'a, 'm> {
-    module: &'m Module,
-    ports: &'a Vec<PortId>,
-}
-
-impl<'m> Serialize for SerializePorts<'_, 'm> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_map(Some(self.ports.len()))?;
-
-        for &port in self.ports {
-            let port = Port::new(self.module, port);
-            state.serialize_entry(port.name(), port.data())?;
-        }
-
-        state.end()
-    }
-}
-
-struct SerializeReferences<'a, 'm> {
-    module: &'m Module,
-    references: &'a Vec<ComponentRefId>,
-}
-
-impl<'m> Serialize for SerializeReferences<'_, 'm> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let unnamed_references = self
-            .references
-            .iter()
-            .filter(|&reference| self.module[*reference].alias.is_none());
-
-        let len = unnamed_references.clone().count();
-        let mut state = serializer.serialize_seq(Some(len))?;
-
-        if len == 0 {
-            return state.end();
-        }
-
-        for &reference in unnamed_references {
-            let reference = ComponentRef::new(self.module, reference);
-
-            state.serialize_element(&ComponentWeakRef {
-                component: reference.component().name().to_string(),
-                alias: None,
-                n_instances: reference.n_instances(),
-            })?;
-        }
-
-        state.end()
-    }
-}
-
-struct SerializeNamedReferences<'a, 'm> {
-    module: &'m Module,
-    references: &'a Vec<ComponentRefId>,
-}
-
-impl<'m> Serialize for SerializeNamedReferences<'_, 'm> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let named_references = self
-            .references
-            .iter()
-            .filter(|&reference| self.module[*reference].alias.is_some());
-
-        let len = named_references.clone().count();
-        let mut state = serializer.serialize_map(Some(len))?;
-
-        for &reference in named_references {
-            let reference = ComponentRef::new(self.module, reference);
-            let alias = reference.alias().expect("reference should have an alias");
-
-            state.serialize_entry(
-                alias,
-                &ComponentWeakRef {
-                    component: reference.component().name().to_string(),
-                    alias: None,
-                    n_instances: reference.n_instances(),
-                },
-            )?;
-        }
-
-        state.end()
-    }
-}
-
-struct SerializeConnections<'a, 'm> {
-    module: &'m Module,
-    connections: &'a Vec<Connection>,
-}
-
-impl<'m> Serialize for SerializeConnections<'_, 'm> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_seq(Some(self.connections.len()))?;
-
-        for connection in self.connections {
-            let source_pins = WeakPortPins {
-                port: connection.source_pins.port(self.module).name().to_string(),
-                range: connection.source_pins.range(),
-            };
-
-            let sink_pins = WeakPortPins {
-                port: connection.sink_pins.port(self.module).name().to_string(),
-                range: connection.sink_pins.range(),
-            };
-
-            let source_component = connection.source_component.map(|component| {
-                ComponentRef::new(self.module, component)
-                    .component()
-                    .name()
-                    .to_string()
-            });
-
-            let sink_component = connection.sink_component.map(|component| {
-                ComponentRef::new(self.module, component)
-                    .component()
-                    .name()
-                    .to_string()
-            });
-
-            let mut builder = WeakConnectionBuilder::new()
-                .set_source(source_pins, source_component)
-                .set_sink(sink_pins, sink_component);
-
-            builder.set_kind(connection.kind);
-            state.serialize_element(&builder.finish())?;
-        }
-
-        state.end()
-    }
-}
-
-pub(crate) struct SerializeComponent<'m> {
-    component: Component<'m>,
-}
-
-impl<'m> SerializeComponent<'m> {
-    pub(crate) fn new(module: &'m Module, component: ComponentId) -> Self {
-        Self {
-            component: Component::new(module, component),
-        }
-    }
-}
-
-impl<'m> Serialize for SerializeComponent<'m> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Component", FIELDS.len())?;
-
-        state.serialize_field(
-            FIELDS[PORTS],
-            &SerializePorts {
-                module: self.component.module(),
-                ports: &self.component.data().ports,
-            },
-        )?;
-
-        state.serialize_field(
-            FIELDS[REFERENCES],
-            &SerializeReferences {
-                module: self.component.module(),
-                references: &self.component.data().references,
-            },
-        )?;
-
-        state.serialize_field(
-            FIELDS[NAMED_REFERENCES],
-            &SerializeNamedReferences {
-                module: self.component.module(),
-                references: &self.component.data().references,
-            },
-        )?;
-
-        state.serialize_field(
-            FIELDS[CONNECTIONS],
-            &SerializeConnections {
-                module: self.component.module(),
-                connections: &self.component.data().connections,
-            },
-        )?;
-
-        if self.component.class().is_some() {
-            state.serialize_field(FIELDS[CLASS], &self.component.class())?;
-        }
-
-        state.end()
-    }
-}
-
-struct DeserializePorts<'m> {
-    module: &'m mut Module,
-    parent: ComponentId,
-}
-
-impl<'de, 'm> Visitor<'de> for DeserializePorts<'m> {
-    type Value = ();
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a dict of {}", FIELDS[PORTS])
-    }
-
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        while let Some(port) = map.next_key::<String>()? {
-            map.next_value_seed(PortSeed::new(self.module, self.parent, port))?;
-        }
-
-        Ok(())
-    }
-}
-
-impl<'de, 'm> DeserializeSeed<'de> for DeserializePorts<'m> {
-    type Value = ();
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_map(self)
-    }
-}
-
-struct DeserializeReferences<'a> {
-    linker: &'a mut Linker,
-    parent: ComponentId,
-}
-
-impl<'a, 'de> Visitor<'de> for DeserializeReferences<'a> {
-    type Value = ();
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a dict of {}", FIELDS[REFERENCES])
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        while let Some(reference) = seq.next_element_seed(DeserializeComponentWeakRef::Unnamed)? {
-            self.linker
-                .add_reference(ComponentKey::new(self.parent), reference);
-        }
-
-        Ok(())
-    }
-}
-
-impl<'a, 'de> DeserializeSeed<'de> for DeserializeReferences<'a> {
-    type Value = ();
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_seq(self)
-    }
-}
-
-struct DeserializeNamedReferences<'a> {
-    linker: &'a mut Linker,
-    parent: ComponentId,
-}
-
-impl<'a, 'de> Visitor<'de> for DeserializeNamedReferences<'a> {
-    type Value = ();
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a dict of {}", FIELDS[NAMED_REFERENCES])
-    }
-
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        while let Some(alias) = map.next_key()? {
-            let reference = map.next_value_seed(DeserializeComponentWeakRef::Named(alias))?;
-            self.linker
-                .add_reference(ComponentKey::new(self.parent), reference);
-        }
-
-        Ok(())
-    }
-}
-
-impl<'a, 'de> DeserializeSeed<'de> for DeserializeNamedReferences<'a> {
-    type Value = ();
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_map(self)
-    }
-}
-
-struct DeserializeConnections<'a> {
-    parent: ComponentId,
-    linker: &'a mut Linker,
-}
-
-impl<'a, 'de> Visitor<'de> for DeserializeConnections<'a> {
-    type Value = ();
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a list of {}", FIELDS[CONNECTIONS])
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        while let Some(connection) = seq.next_element::<WeakConnection>()? {
-            self.linker
-                .add_connection(ComponentKey::new(self.parent), connection);
-        }
-
-        Ok(())
-    }
-}
-
-impl<'a, 'de> DeserializeSeed<'de> for DeserializeConnections<'a> {
-    type Value = ();
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_seq(self)
-    }
-}
-
-pub(crate) struct ComponentSeed<'a, 'm> {
-    module: &'m mut Module,
-    name: String,
-    linker: &'a mut Linker,
-}
-
-impl<'a, 'm> ComponentSeed<'a, 'm> {
-    pub(crate) fn new(module: &'m mut Module, name: String, linker: &'a mut Linker) -> Self {
-        Self {
-            module,
-            name,
-            linker,
-        }
-    }
-}
-
-impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
-    type Value = ();
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a component description")
-    }
-
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    where
-        A: MapAccess<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "lowercase")]
-        enum Field {
-            Ports,
-            References,
-            #[serde(rename = "named_references")]
-            NamedReferences,
-            Connections,
-            Class,
-        }
-
-        let component = ComponentBuilder::new(self.module)
-            .set_name(&self.name)
-            .finish()
-            .1;
-
-        let mut ports = false;
-        let mut references = false;
-        let mut named_references = false;
-        let mut connections = false;
-        let mut class: Option<ComponentClass> = None;
-
-        while let Some(field) = map.next_key()? {
-            match field {
-                Field::Ports => {
-                    if ports {
-                        return Err(de::Error::duplicate_field(FIELDS[PORTS]));
-                    }
-
-                    map.next_value_seed(DeserializePorts {
-                        module: self.module,
-                        parent: component,
-                    })?;
-
-                    ports = true;
-                }
-                Field::References => {
-                    if references {
-                        return Err(de::Error::duplicate_field(FIELDS[REFERENCES]));
-                    }
-
-                    map.next_value_seed(DeserializeReferences {
-                        parent: component,
-                        linker: self.linker,
-                    })?;
-
-                    references = true;
-                }
-                Field::NamedReferences => {
-                    if named_references {
-                        return Err(de::Error::duplicate_field(FIELDS[NAMED_REFERENCES]));
-                    }
-
-                    map.next_value_seed(DeserializeNamedReferences {
-                        parent: component,
-                        linker: self.linker,
-                    })?;
-
-                    named_references = true;
-                }
-                Field::Connections => {
-                    if connections {
-                        return Err(de::Error::duplicate_field(FIELDS[CONNECTIONS]));
-                    }
-
-                    map.next_value_seed(DeserializeConnections {
-                        parent: component,
-                        linker: self.linker,
-                    })?;
-
-                    connections = true;
-                }
-                Field::Class => {
-                    if class.is_some() {
-                        return Err(de::Error::duplicate_field(FIELDS[CLASS]));
-                    }
-
-                    class = Some(map.next_value()?);
-                }
-            }
-        }
-
-        self.module[component].class = class;
-        Ok(())
-    }
-}
-
-impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentSeed<'a, 'm> {
-    type Value = ();
-
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_struct("Component", FIELDS, self)
-    }
-}
+pub(super) const PORTS: usize = 0;
+pub(super) const REFERENCES: usize = 1;
+pub(super) const NAMED_REFERENCES: usize = 2;
+pub(super) const CONNECTIONS: usize = 3;
+pub(super) const CLASS: usize = 4;

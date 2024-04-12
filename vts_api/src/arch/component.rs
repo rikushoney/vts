@@ -73,7 +73,7 @@ impl PyComponent {
         py: Python<'py>,
         name: &Bound<'py, PyString>,
         kind: PortKindOrStr<'py>,
-        n_pins: Option<usize>,
+        n_pins: Option<u32>,
         class: Option<PortClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyPort>> {
         let port = {
@@ -113,7 +113,7 @@ impl PyComponent {
         port: &Bound<'py, PyPort>,
         name: Option<&Bound<'py, PyString>>,
         kind: Option<PortKindOrStr<'py>>,
-        n_pins: Option<usize>,
+        n_pins: Option<u32>,
         mut class: Option<PortClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyPort>> {
         let (module, port) = {
@@ -290,7 +290,7 @@ impl PyComponent {
         name: Option<NameOrPort<'py>>,
         port: Option<&Bound<'py, PyPort>>,
         kind: Option<PortKindOrStr<'py>>,
-        n_pins: Option<usize>,
+        n_pins: Option<u32>,
         class_: Option<PortClassOrStr<'py>>,
     ) -> PyResult<Bound<'py, PyPort>> {
         let class = class_;

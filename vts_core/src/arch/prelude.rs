@@ -1,7 +1,15 @@
-pub use super::component::{Component, ComponentClass};
-pub use super::connection::{Connection, ConnectionKind};
-pub use super::module::Module;
-pub use super::port::{Port, PortClass, PortKind};
-pub use super::reference::ComponentRef;
+pub use super::{
+    component::{Component, ComponentClass},
+    connection::{Connection, ConnectionKind},
+    module::Module,
+    port::{Port, PortClass, PortKind},
+    reference::ComponentRef,
+};
 
-pub(crate) use super::module::{ComponentId, ComponentRefId, PortId};
+pub(crate) use super::{
+    component::ComponentData,
+    linker::Linker,
+    module::{ComponentId, ComponentRefId, PortId},
+    port::PortData,
+    reference::ComponentRefData,
+};

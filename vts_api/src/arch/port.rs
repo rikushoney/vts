@@ -5,12 +5,12 @@ use pyo3::prelude::*;
 use pyo3::types::{PySlice, PySliceIndices, PyString};
 use vts_core::arch::{
     component::ComponentKey,
-    port::{PortKey, PortPins},
+    port::{PinRange, PortKey, PortPins},
     reference::ComponentRefKey,
     PortClass, PortKind,
 };
 
-use super::{PyComponent, PyComponentRef, PyModule_};
+use super::{PyComponent, PyComponentRef, PyConnectionKind, PyModule_};
 
 wrap_enum!(
     PyPortClass as "port class" => PortClass:
@@ -71,7 +71,7 @@ impl<'py> SliceOrIndex<'py> {
         Self::Slice(PySlice::full_bound(py))
     }
 
-    pub fn to_range(&self, n_pins: usize) -> PyResult<Range<u32>> {
+    pub fn to_range(&self, n_pins: u32) -> PyResult<Range<u32>> {
         match self {
             SliceOrIndex::Slice(slice) => {
                 let PySliceIndices {
@@ -151,7 +151,7 @@ impl PyPort {
         PyPortKind::from(port.kind())
     }
 
-    pub fn n_pins(&self, py: Python<'_>) -> usize {
+    pub fn n_pins(&self, py: Python<'_>) -> u32 {
         get_port!(self + py => port);
         port.n_pins()
     }
@@ -163,7 +163,8 @@ impl PyPort {
     }
 
     fn select(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyPortPins> {
-        let range = index.to_range(self.n_pins(py))?;
+        let mut range = PinRange::Bound(index.to_range(self.n_pins(py))?);
+        range.flatten(self.n_pins(py));
         get_port!(self + py => port);
         Ok(PyPortPins::new(port.select(range)))
     }
@@ -224,6 +225,42 @@ pub struct PyPortSelection(pub(crate) ComponentOrRef, pub(crate) PyPortPins);
 #[derive(Clone, Debug)]
 pub struct PyComponentRefPort(pub(crate) Py<PyComponentRef>, pub(crate) Py<PyPort>);
 
+pub enum PortSelectionOrRef<'py> {
+    Selection(Bound<'py, PyPortSelection>),
+    Ref(Bound<'py, PyComponentRefPort>),
+}
+
+impl<'py> PortSelectionOrRef<'py> {
+    pub fn get_selection(&self) -> PyResult<Bound<'py, PyPortSelection>> {
+        match self {
+            PortSelectionOrRef::Selection(selection) => Ok(selection.clone()),
+            PortSelectionOrRef::Ref(reference) => {
+                let py = reference.py();
+                let reference = reference.borrow();
+                let port = reference.1.bind(py).borrow();
+                let reference = ComponentOrRef::Ref(reference.0.borrow(py).key());
+                let selection = port.select(py, SliceOrIndex::full(py))?;
+                Bound::new(py, PyPortSelection(reference, selection))
+            }
+        }
+    }
+}
+
+impl<'py> FromPyObject<'py> for PortSelectionOrRef<'py> {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        if let Ok(selection) = ob.downcast::<PyPortSelection>() {
+            Ok(PortSelectionOrRef::Selection(selection.clone()))
+        } else if let Ok(reference) = ob.downcast::<PyComponentRefPort>() {
+            Ok(PortSelectionOrRef::Ref(reference.clone()))
+        } else {
+            let error_ty = ob.get_type();
+            Err(PyTypeError::new_err(format!(
+                r#"expected port selection or reference, not "{error_ty}""#
+            )))
+        }
+    }
+}
+
 #[pymethods]
 impl PyComponentRefPort {
     pub fn __getitem__(
@@ -236,5 +273,28 @@ impl PyComponentRefPort {
         let reference = self.0.bind(py).borrow();
 
         Ok(PyPortSelection(ComponentOrRef::Ref(reference.key()), pins))
+    }
+
+    pub fn __setitem__(
+        &self,
+        py: Python<'_>,
+        index: SliceOrIndex<'_>,
+        sink: PortSelectionOrRef<'_>,
+    ) -> PyResult<()> {
+        let source = Bound::new(py, self.__getitem__(py, index)?)?;
+
+        self.0
+            .bind(py)
+            .borrow()
+            .parent(py)?
+            .borrow_mut()
+            .add_connection(
+                py,
+                &source,
+                &sink.get_selection()?,
+                Some(PyConnectionKind::DIRECT),
+            )?;
+
+        Ok(())
     }
 }
