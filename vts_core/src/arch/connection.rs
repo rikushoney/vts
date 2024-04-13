@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use ustr::{ustr, Ustr};
 
 use super::{
     component::ComponentKey,
@@ -149,7 +150,7 @@ pub struct Signature {
     #[serde(flatten)]
     pub pins: WeakPortPins,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reference: Option<String>,
+    pub reference: Option<Ustr>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -159,9 +160,9 @@ pub struct WeakConnection {
     pub sink: Signature,
 }
 
-pub struct WeakSourceSet(WeakPortPins, Option<String>);
+pub struct WeakSourceSet(WeakPortPins, Option<Ustr>);
 pub struct WeakSourceUnset;
-pub struct WeakSinkSet(WeakPortPins, Option<String>);
+pub struct WeakSinkSet(WeakPortPins, Option<Ustr>);
 pub struct WeakSinkUnset;
 
 #[derive(Default)]
@@ -185,10 +186,10 @@ impl<Snk> WeakConnectionBuilder<WeakSourceUnset, Snk> {
     pub fn set_source(
         self,
         pins: WeakPortPins,
-        component: Option<String>,
+        component: Option<&str>,
     ) -> WeakConnectionBuilder<WeakSourceSet, Snk> {
         WeakConnectionBuilder {
-            source: WeakSourceSet(pins, component),
+            source: WeakSourceSet(pins, component.map(ustr)),
             sink: self.sink,
             kind: self.kind,
         }
@@ -199,11 +200,11 @@ impl<Src> WeakConnectionBuilder<Src, WeakSinkUnset> {
     pub fn set_sink(
         self,
         pins: WeakPortPins,
-        component: Option<String>,
+        component: Option<&str>,
     ) -> WeakConnectionBuilder<Src, WeakSinkSet> {
         WeakConnectionBuilder {
             source: self.source,
-            sink: WeakSinkSet(pins, component),
+            sink: WeakSinkSet(pins, component.map(ustr)),
             kind: self.kind,
         }
     }

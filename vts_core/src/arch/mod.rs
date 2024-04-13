@@ -1,3 +1,4 @@
+pub mod checker;
 pub mod component;
 pub mod connection;
 pub mod de;
@@ -7,7 +8,6 @@ pub mod port;
 pub mod prelude;
 pub mod reference;
 pub mod ser;
-pub mod validate;
 
 use ::toml::{de as toml_de, ser as toml_ser};
 use serde_json;
@@ -20,9 +20,9 @@ pub use prelude::*;
 pub enum Error {
     #[error(r#"linker error: "{0}""#)]
     Linker(#[from] linker::Error),
-    #[error(r#"validation failed: "{0}""#)]
-    Validation(#[from] validate::Error),
-    #[error(r#"unhandled error occurred: "{0}""#)]
+    #[error(r#"validation error: "{0}""#)]
+    Check(#[from] checker::Error),
+    #[error(r#"unhandled error: "{0}""#)]
     Generic(Box<dyn std::error::Error>),
 }
 

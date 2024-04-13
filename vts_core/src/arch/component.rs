@@ -1,6 +1,7 @@
 use std::slice;
 
 use serde::{Deserialize, Serialize};
+use ustr::{ustr, Ustr};
 
 use super::prelude::*;
 
@@ -27,7 +28,7 @@ pub enum ComponentClass {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentData {
-    pub name: String,
+    pub name: Ustr,
     pub(crate) ports: Vec<PortId>,
     pub(crate) references: Vec<ComponentRefId>,
     pub(crate) connections: Vec<Connection>,
@@ -37,7 +38,7 @@ pub struct ComponentData {
 impl ComponentData {
     fn new(name: &str, class: Option<ComponentClass>) -> Self {
         Self {
-            name: name.to_string(),
+            name: ustr(name),
             ports: Vec::new(),
             references: Vec::new(),
             connections: Vec::new(),

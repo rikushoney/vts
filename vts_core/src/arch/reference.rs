@@ -1,4 +1,5 @@
 use serde::Serialize;
+use ustr::{ustr, Ustr};
 
 use super::{
     component::ComponentKey,
@@ -15,7 +16,7 @@ pub(super) const N_INSTANCES: usize = 1;
 pub struct ComponentRefData {
     pub(crate) component: ComponentId,
     pub(crate) parent: ComponentId,
-    pub(crate) alias: Option<String>,
+    pub(crate) alias: Option<Ustr>,
     pub n_instances: usize,
 }
 
@@ -23,7 +24,7 @@ impl ComponentRefData {
     pub(crate) fn new(
         component: ComponentId,
         parent: ComponentId,
-        alias: Option<String>,
+        alias: Option<Ustr>,
         n_instances: usize,
     ) -> Self {
         Self {
@@ -76,8 +77,8 @@ impl<'m> ComponentRef<'m> {
         Component::new(self.module(), self.data().parent)
     }
 
-    pub fn alias(&self) -> Option<&'m String> {
-        self.data().alias.as_ref()
+    pub fn alias(&self) -> Option<&'m str> {
+        self.data().alias.as_ref().map(Ustr::as_str)
     }
 
     pub fn alias_or_name(&self) -> &'m str {
@@ -100,7 +101,7 @@ pub struct ComponentRefBuilder<'m, C> {
     module: &'m mut Module,
     parent: ComponentId,
     component: C,
-    alias: Option<String>,
+    alias: Option<Ustr>,
     n_instances: Option<usize>,
 }
 
@@ -128,7 +129,7 @@ impl<'m> ComponentRefBuilder<'m, ComponentUnset> {
 
 impl<'m, C> ComponentRefBuilder<'m, C> {
     pub fn set_alias(&mut self, alias: &str) {
-        self.alias = Some(alias.to_string());
+        self.alias = Some(ustr(alias));
     }
 
     pub fn set_n_instances(&mut self, n_instances: usize) {
@@ -170,9 +171,9 @@ fn equals_one(x: &usize) -> bool {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct ComponentWeakRef {
-    pub component: String,
+    pub component: Ustr,
     #[serde(skip)]
-    pub alias: Option<String>,
+    pub alias: Option<Ustr>,
     #[serde(skip_serializing_if = "equals_one")]
     pub n_instances: usize,
 }

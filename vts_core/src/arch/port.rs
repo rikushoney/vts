@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
+use ustr::{ustr, Ustr};
 
 use super::{
     component::ComponentKey,
@@ -46,7 +47,7 @@ fn equals_one(x: &u32) -> bool {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct PortData {
     #[serde(skip)]
-    pub name: String,
+    pub name: Ustr,
     #[serde(skip)]
     parent: ComponentId,
     pub kind: PortKind,
@@ -65,7 +66,7 @@ impl PortData {
         class: Option<PortClass>,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: ustr(name),
             parent,
             kind,
             n_pins,
@@ -229,7 +230,7 @@ impl PortPins {
     }
 }
 
-pub struct NameSet(String);
+pub struct NameSet(Ustr);
 pub struct NameUnset;
 pub struct KindSet(PortKind);
 pub struct KindUnset;
@@ -261,7 +262,7 @@ impl<'m, K> PortBuilder<'m, NameUnset, K> {
         PortBuilder {
             module: self.module,
             parent: self.parent,
-            name: NameSet(name.to_string()),
+            name: NameSet(ustr(name)),
             kind: self.kind,
             n_pins: self.n_pins,
             class: self.class,
@@ -323,7 +324,7 @@ impl<'m> PortBuilder<'m, NameSet, KindSet> {
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct WeakPortPins {
-    pub port: String,
+    pub port: Ustr,
     #[serde(flatten)]
     pub range: PinRange,
 }

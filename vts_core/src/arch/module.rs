@@ -1,6 +1,7 @@
 use std::ops::{Index, IndexMut};
 
 use slotmap::{new_key_type, SlotMap};
+use ustr::{ustr, Ustr};
 
 use super::{component::ComponentKey, port::PortKey, prelude::*, reference::ComponentRefKey};
 
@@ -17,7 +18,7 @@ new_key_type! {
 
 #[derive(Clone, Debug)]
 pub struct Module {
-    pub(crate) name: String,
+    pub(crate) name: Ustr,
     pub(crate) components: SlotMap<ComponentId, ComponentData>,
     pub(crate) ports: SlotMap<PortId, PortData>,
     pub(crate) references: SlotMap<ComponentRefId, ComponentRefData>,
@@ -26,7 +27,7 @@ pub struct Module {
 impl Module {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_string(),
+            name: ustr(name),
             components: SlotMap::default(),
             ports: SlotMap::default(),
             references: SlotMap::default(),
@@ -38,7 +39,7 @@ impl Module {
     }
 
     pub fn rename(&mut self, name: &str) {
-        self.name = name.to_string();
+        self.name = ustr(name);
     }
 
     pub fn components(&self) -> ComponentIter {

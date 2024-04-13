@@ -4,6 +4,7 @@ use serde::{
     de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
     Deserialize, Deserializer,
 };
+use ustr::ustr;
 
 use super::{
     component::{self, ComponentBuilder, ComponentKey},
@@ -617,8 +618,8 @@ impl<'de> Visitor<'de> for DeserializeComponentWeakRef {
         };
 
         Ok(ComponentWeakRef {
-            component,
-            alias,
+            component: ustr(&component),
+            alias: alias.map(|alias| ustr(&alias)),
             n_instances,
         })
     }

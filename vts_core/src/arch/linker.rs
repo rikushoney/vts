@@ -1,14 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use fnv::FnvHashMap;
 use thiserror::Error;
+use ustr::{ustr, Ustr};
 
 use super::{
+    checker::{CheckComponent, Checker},
     component::ComponentKey,
     connection::WeakConnection,
-    module::{ComponentId, Module},
+    module::ComponentId,
+    prelude::*,
     reference::ComponentWeakRef,
-    Component,
 };
 
 #[derive(Debug, Error)]
@@ -47,7 +48,7 @@ impl Error {
     }
 }
 
-pub struct KnownComponents(pub(super) FnvHashMap<String, ComponentId>);
+pub struct KnownComponents(pub(super) HashMap<Ustr, ComponentId>);
 
 pub trait Resolve<'m> {
     type Output;
@@ -74,7 +75,29 @@ impl KnownComponents {
 
     pub fn try_get<'m>(&self, module: &'m Module, component: &str) -> Option<Component<'m>> {
         let make_component = |component| Component::new(module, component);
-        self.0.get(component).copied().map(make_component)
+        self.0.get(&ustr(component)).copied().map(make_component)
+    }
+}
+
+pub(super) struct ResolvedComponent {
+    pub(super) component: ComponentId,
+    pub(super) ports: HashSet<Ustr>,
+    pub(super) references: HashSet<Ustr>,
+}
+
+pub struct ResolvedComponents(pub(super) HashMap<Ustr, ResolvedComponent>);
+
+impl ResolvedComponents {
+    pub fn into_checker(self, module: &Module) -> Checker {
+        let mut checker = Checker::new(module);
+
+        checker.components = HashMap::from_iter(
+            self.0
+                .into_iter()
+                .map(|(component, resolved)| (component, CheckComponent::from(resolved))),
+        );
+
+        checker
     }
 }
 
@@ -82,8 +105,6 @@ impl KnownComponents {
 pub struct Linker {
     unresolved: HashMap<ComponentId, LinkerItems>,
 }
-
-fn discard<T>(_: T) {}
 
 impl Linker {
     pub fn new() -> Self {
@@ -111,7 +132,7 @@ impl Linker {
     }
 
     fn get_known_components(module: &Module) -> KnownComponents {
-        KnownComponents(FnvHashMap::from_iter(
+        KnownComponents(HashMap::from_iter(
             module
                 .components
                 .iter()
@@ -119,32 +140,58 @@ impl Linker {
         ))
     }
 
+    fn get_known_ports(module: &Module, component: ComponentId) -> HashSet<Ustr> {
+        let component = Component::new(module, component);
+        HashSet::from_iter(component.ports().map(|port| ustr(port.name())))
+    }
+
     fn resolve_impl(
         module: &mut Module,
         component: ComponentId,
         unresolved: &mut LinkerItems,
         components: &KnownComponents,
-    ) -> Result<(), Error> {
-        unresolved.references.drain(..).try_for_each(|reference| {
-            reference
-                .resolve(module, ComponentKey::new(component), components)
-                .map(discard)
-        })?;
+    ) -> Result<ResolvedComponent, Error> {
+        let references = unresolved.references.drain(..).try_fold(
+            HashSet::default(),
+            |mut resolved, reference| {
+                let reference =
+                    reference.resolve(module, ComponentKey::new(component), components)?;
 
-        unresolved.connections.drain(..).try_for_each(|connection| {
-            connection
-                .resolve(module, ComponentKey::new(component), components)
-                .map(discard)
+                resolved.insert(ustr(ComponentRef::new(module, reference.0).alias_or_name()));
+                Ok(resolved)
+            },
+        )?;
+
+        unresolved
+            .connections
+            .drain(..)
+            .try_for_each(|connection| {
+                connection.resolve(module, ComponentKey::new(component), components)?;
+                Ok(())
+            })?;
+
+        Ok(ResolvedComponent {
+            component,
+            ports: Self::get_known_ports(module, component),
+            references,
         })
     }
 
-    pub fn resolve(&mut self, module: &mut Module) -> Result<(), Error> {
+    pub fn resolve(&mut self, module: &mut Module) -> Result<ResolvedComponents, Error> {
         let components = Self::get_known_components(module);
 
-        self.unresolved
-            .iter_mut()
-            .try_for_each(|(&component, unresolved)| {
-                Self::resolve_impl(module, component, unresolved, &components)
-            })
+        let resolved = self.unresolved.iter_mut().try_fold(
+            HashMap::default(),
+            |mut resolved, (&component, unresolved)| {
+                resolved.insert(
+                    module[component].name,
+                    Self::resolve_impl(module, component, unresolved, &components)?,
+                );
+
+                Ok::<_, Error>(resolved)
+            },
+        )?;
+
+        Ok(ResolvedComponents(resolved))
     }
 }

@@ -26,7 +26,10 @@ impl<'a, 'm> Serialize for SerializeComponents<'a, 'm> {
         let mut state = serializer.serialize_map(Some(self.components.len()))?;
 
         for (component, data) in self.components.iter() {
-            state.serialize_entry(&data.name, &SerializeComponent::new(self.module, component))?;
+            state.serialize_entry(
+                data.name.as_str(),
+                &SerializeComponent::new(self.module, component),
+            )?;
         }
 
         state.end()
@@ -115,7 +118,7 @@ impl Serialize for SerializeReferences<'_, '_> {
             let reference = ComponentRef::new(self.module, reference);
 
             state.serialize_element(&ComponentWeakRef {
-                component: reference.component().name().to_string(),
+                component: reference.component().data().name,
                 alias: None,
                 n_instances: reference.n_instances(),
             })?;
@@ -159,7 +162,7 @@ impl Serialize for SerializeNamedReferences<'_, '_> {
             state.serialize_entry(
                 alias,
                 &ComponentWeakRef {
-                    component: reference.component().name().to_string(),
+                    component: reference.component().data().name,
                     alias: None,
                     n_instances: reference.n_instances(),
                 },
@@ -190,26 +193,22 @@ impl Serialize for SerializeConnections<'_, '_> {
 
         for connection in self.connections {
             let source_pins = WeakPortPins {
-                port: connection.source_pins.port(self.module).name().to_string(),
+                port: connection.source_pins.port(self.module).data().name,
                 range: connection.source_pins.range.clone(),
             };
 
             let sink_pins = WeakPortPins {
-                port: connection.sink_pins.port(self.module).name().to_string(),
+                port: connection.sink_pins.port(self.module).data().name,
                 range: connection.sink_pins.range.clone(),
             };
 
-            let source_component = connection.source_component.map(|component| {
-                ComponentRef::new(self.module, component)
-                    .alias_or_name()
-                    .to_string()
-            });
+            let source_component = connection
+                .source_component
+                .map(|component| ComponentRef::new(self.module, component).alias_or_name());
 
-            let sink_component = connection.sink_component.map(|component| {
-                ComponentRef::new(self.module, component)
-                    .alias_or_name()
-                    .to_string()
-            });
+            let sink_component = connection
+                .sink_component
+                .map(|component| ComponentRef::new(self.module, component).alias_or_name());
 
             let mut builder = WeakConnectionBuilder::new()
                 .set_source(source_pins, source_component)
