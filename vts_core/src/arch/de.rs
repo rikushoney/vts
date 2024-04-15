@@ -317,7 +317,7 @@ impl<'a, 'b, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'b, 'm> {
         }
 
         let component = ComponentBuilder::new(self.module, self.linker.checker_mut())
-            .set_name(&self.name)
+            .set_name(self.name)
             .finish()
             .map_err(de::Error::custom)?
             .1;
@@ -492,7 +492,7 @@ impl<'a, 'b, 'de, 'm> Visitor<'de> for PortSeed<'a, 'b, 'm> {
         let kind = kind.ok_or(de::Error::missing_field(port::FIELDS[port::KIND]))?;
 
         let mut builder = PortBuilder::new(self.module, self.checker, ComponentKey(self.parent))
-            .set_name(&self.name)
+            .set_name(self.name)
             .set_kind(kind);
 
         if let Some(n_pins) = n_pins {

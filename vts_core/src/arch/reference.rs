@@ -172,7 +172,7 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
             };
 
             self.checker.register_reference(
-                &self.module,
+                self.module,
                 reference.component().key(),
                 reference.key(),
             )?;
