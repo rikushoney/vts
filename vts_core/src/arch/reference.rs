@@ -2,6 +2,7 @@ use serde::Serialize;
 use ustr::{ustr, Ustr};
 
 use super::{
+    checker,
     component::ComponentKey,
     linker::{self, KnownComponents, Resolve},
     prelude::*,
@@ -97,18 +98,20 @@ impl<'m> ComponentRef<'m> {
 pub struct ComponentSet(ComponentId);
 pub struct ComponentUnset;
 
-pub struct ComponentRefBuilder<'m, C> {
+pub struct ComponentRefBuilder<'a, 'm, C> {
     module: &'m mut Module,
+    checker: &'a mut Checker,
     parent: ComponentId,
     component: C,
     alias: Option<Ustr>,
     n_instances: Option<usize>,
 }
 
-impl<'m> ComponentRefBuilder<'m, ComponentUnset> {
-    pub fn new(module: &'m mut Module, parent: ComponentKey) -> Self {
+impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentUnset> {
+    pub fn new(module: &'m mut Module, checker: &'a mut Checker, parent: ComponentKey) -> Self {
         Self {
             module,
+            checker,
             parent: parent.0,
             component: ComponentUnset,
             alias: None,
@@ -116,9 +119,13 @@ impl<'m> ComponentRefBuilder<'m, ComponentUnset> {
         }
     }
 
-    pub fn set_component(self, component: ComponentKey) -> ComponentRefBuilder<'m, ComponentSet> {
+    pub fn set_component(
+        self,
+        component: ComponentKey,
+    ) -> ComponentRefBuilder<'a, 'm, ComponentSet> {
         ComponentRefBuilder {
             module: self.module,
+            checker: self.checker,
             parent: self.parent,
             component: ComponentSet(component.0),
             alias: self.alias,
@@ -127,7 +134,7 @@ impl<'m> ComponentRefBuilder<'m, ComponentUnset> {
     }
 }
 
-impl<'m, C> ComponentRefBuilder<'m, C> {
+impl<'a, 'm, C> ComponentRefBuilder<'a, 'm, C> {
     pub fn set_alias(&mut self, alias: &str) {
         self.alias = Some(ustr(alias));
     }
@@ -145,7 +152,7 @@ impl<'m, C> ComponentRefBuilder<'m, C> {
     }
 }
 
-impl<'m> ComponentRefBuilder<'m, ComponentSet> {
+impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
     fn insert(&mut self) -> ComponentRefId {
         let n_instances = self.n_instances.unwrap_or(1);
         let reference = ComponentRefData::new(
@@ -157,11 +164,23 @@ impl<'m> ComponentRefBuilder<'m, ComponentSet> {
         self.module.references.insert(reference)
     }
 
-    pub fn finish(mut self) -> ComponentRef<'m> {
-        // TODO: check duplicate references
-        let reference = self.insert();
+    pub fn finish(mut self) -> Result<ComponentRef<'m>, checker::Error> {
+        let reference = {
+            let reference = {
+                let reference = self.insert();
+                ComponentRef::new(self.module, reference)
+            };
+
+            self.checker.register_reference(
+                &self.module,
+                reference.component().key(),
+                reference.key(),
+            )?;
+            reference.1
+        };
+
         self.module[self.parent].references.push(reference);
-        ComponentRef::new(self.module, reference)
+        Ok(ComponentRef::new(self.module, reference))
     }
 }
 
@@ -178,12 +197,24 @@ pub struct ComponentWeakRef {
     pub n_instances: usize,
 }
 
-impl<'m> Resolve<'m> for ComponentWeakRef {
+impl ComponentWeakRef {
+    pub fn alias_or_name(&self) -> &str {
+        if let Some(alias) = self.alias {
+            alias
+        } else {
+            self.component
+        }
+        .as_str()
+    }
+}
+
+impl<'a, 'm> Resolve<'a, 'm> for ComponentWeakRef {
     type Output = ComponentRefKey;
 
     fn resolve(
         self,
         module: &mut Module,
+        checker: &mut Checker,
         component: ComponentKey,
         components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
@@ -192,13 +223,13 @@ impl<'m> Resolve<'m> for ComponentWeakRef {
             components.get(module, component)?.key()
         };
 
-        let mut builder =
-            ComponentRefBuilder::new(module, component).set_component(referenced_component);
+        let mut builder = ComponentRefBuilder::new(module, checker, component)
+            .set_component(referenced_component);
 
         if let Some(alias) = &self.alias {
             builder.set_alias(alias);
         }
 
-        Ok(builder.finish().key())
+        Ok(builder.finish().map_err(linker::Error::from)?.key())
     }
 }

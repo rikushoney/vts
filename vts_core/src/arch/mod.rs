@@ -20,8 +20,8 @@ pub use prelude::*;
 pub enum Error {
     #[error(r#"linker error: "{0}""#)]
     Linker(#[from] linker::Error),
-    #[error(r#"validation error: "{0}""#)]
-    Check(#[from] checker::Error),
+    #[error(r#"checker error: "{0}""#)]
+    Checker(#[from] checker::Error),
     #[error(r#"unhandled error: "{0}""#)]
     Generic(Box<dyn std::error::Error>),
 }

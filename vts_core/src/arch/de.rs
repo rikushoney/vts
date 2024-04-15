@@ -10,7 +10,7 @@ use super::{
     component::{self, ComponentBuilder, ComponentKey},
     connection::WeakConnection,
     module,
-    port::{self, pin_range, PinRange, PortBuilder},
+    port::{self, pin_range, PinRange, PortBuilder, PortKey},
     prelude::*,
     reference::{self, ComponentWeakRef},
 };
@@ -32,7 +32,7 @@ impl<'a, 'de, 'm> Visitor<'de> for DeserializeComponents<'a, 'm> {
         A: MapAccess<'de>,
     {
         while let Some(component) = map.next_key()? {
-            map.next_value_seed(ComponentSeed::new(self.module, component, self.linker))?;
+            map.next_value_seed(ComponentSeed::new(self.module, &component, self.linker))?;
         }
 
         Ok(())
@@ -119,12 +119,13 @@ impl<'de> Deserialize<'de> for Module {
     }
 }
 
-struct DeserializePorts<'m> {
+struct DeserializePorts<'a, 'm> {
     module: &'m mut Module,
+    linker: &'a mut Linker,
     parent: ComponentId,
 }
 
-impl<'de, 'm> Visitor<'de> for DeserializePorts<'m> {
+impl<'a, 'de, 'm> Visitor<'de> for DeserializePorts<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -135,15 +136,20 @@ impl<'de, 'm> Visitor<'de> for DeserializePorts<'m> {
     where
         A: MapAccess<'de>,
     {
-        while let Some(port) = map.next_key::<String>()? {
-            map.next_value_seed(PortSeed::new(self.module, self.parent, port))?;
+        while let Some(port) = map.next_key()? {
+            map.next_value_seed(PortSeed::new(
+                self.module,
+                self.linker.checker_mut(),
+                self.parent,
+                &port,
+            ))?;
         }
 
         Ok(())
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for DeserializePorts<'m> {
+impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializePorts<'a, 'm> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -154,12 +160,13 @@ impl<'de, 'm> DeserializeSeed<'de> for DeserializePorts<'m> {
     }
 }
 
-struct DeserializeReferences<'a> {
+struct DeserializeReferences<'a, 'm> {
+    module: &'m mut Module,
     linker: &'a mut Linker,
     parent: ComponentId,
 }
 
-impl<'a, 'de> Visitor<'de> for DeserializeReferences<'a> {
+impl<'a, 'de, 'm> Visitor<'de> for DeserializeReferences<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -172,14 +179,15 @@ impl<'a, 'de> Visitor<'de> for DeserializeReferences<'a> {
     {
         while let Some(reference) = seq.next_element_seed(DeserializeComponentWeakRef::Unnamed)? {
             self.linker
-                .register_reference(ComponentKey::new(self.parent), reference);
+                .register_reference(self.module, ComponentKey::new(self.parent), reference)
+                .map_err(de::Error::custom)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, 'de> DeserializeSeed<'de> for DeserializeReferences<'a> {
+impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeReferences<'a, 'm> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -190,12 +198,13 @@ impl<'a, 'de> DeserializeSeed<'de> for DeserializeReferences<'a> {
     }
 }
 
-struct DeserializeNamedReferences<'a> {
+struct DeserializeNamedReferences<'a, 'm> {
+    module: &'m mut Module,
     linker: &'a mut Linker,
     parent: ComponentId,
 }
 
-impl<'a, 'de> Visitor<'de> for DeserializeNamedReferences<'a> {
+impl<'a, 'de, 'm> Visitor<'de> for DeserializeNamedReferences<'a, 'm> {
     type Value = ();
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -214,14 +223,15 @@ impl<'a, 'de> Visitor<'de> for DeserializeNamedReferences<'a> {
             let reference = map.next_value_seed(DeserializeComponentWeakRef::Named(alias))?;
 
             self.linker
-                .register_reference(ComponentKey::new(self.parent), reference);
+                .register_reference(self.module, ComponentKey::new(self.parent), reference)
+                .map_err(de::Error::custom)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, 'de> DeserializeSeed<'de> for DeserializeNamedReferences<'a> {
+impl<'a, 'de, 'm> DeserializeSeed<'de> for DeserializeNamedReferences<'a, 'm> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -250,7 +260,8 @@ impl<'a, 'de> Visitor<'de> for DeserializeConnections<'a> {
     {
         while let Some(connection) = seq.next_element::<WeakConnection>()? {
             self.linker
-                .register_connection(ComponentKey::new(self.parent), connection);
+                .register_connection(ComponentKey::new(self.parent), connection)
+                .map_err(de::Error::custom)?;
         }
 
         Ok(())
@@ -268,14 +279,14 @@ impl<'a, 'de> DeserializeSeed<'de> for DeserializeConnections<'a> {
     }
 }
 
-struct ComponentSeed<'a, 'm> {
+struct ComponentSeed<'a, 'b, 'm> {
     module: &'m mut Module,
-    name: String,
-    linker: &'a mut Linker,
+    name: &'a String,
+    linker: &'b mut Linker,
 }
 
-impl<'a, 'm> ComponentSeed<'a, 'm> {
-    pub(crate) fn new(module: &'m mut Module, name: String, linker: &'a mut Linker) -> Self {
+impl<'a, 'b, 'm> ComponentSeed<'a, 'b, 'm> {
+    pub(crate) fn new(module: &'m mut Module, name: &'a String, linker: &'b mut Linker) -> Self {
         Self {
             module,
             name,
@@ -284,8 +295,8 @@ impl<'a, 'm> ComponentSeed<'a, 'm> {
     }
 }
 
-impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
-    type Value = ();
+impl<'a, 'b, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'b, 'm> {
+    type Value = ComponentKey;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "a component description")
@@ -305,9 +316,10 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
             Class,
         }
 
-        let component = ComponentBuilder::new(self.module)
+        let component = ComponentBuilder::new(self.module, self.linker.checker_mut())
             .set_name(&self.name)
             .finish()
+            .map_err(de::Error::custom)?
             .1;
 
         let mut ports = false;
@@ -328,6 +340,7 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
                     map.next_value_seed(DeserializePorts {
                         module: self.module,
                         parent: component,
+                        linker: self.linker,
                     })?;
 
                     ports = true;
@@ -340,6 +353,7 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
                     }
 
                     map.next_value_seed(DeserializeReferences {
+                        module: self.module,
                         parent: component,
                         linker: self.linker,
                     })?;
@@ -354,6 +368,7 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
                     }
 
                     map.next_value_seed(DeserializeNamedReferences {
+                        module: self.module,
                         parent: component,
                         linker: self.linker,
                     })?;
@@ -387,12 +402,12 @@ impl<'a, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'm> {
         }
 
         self.module[component].class = class;
-        Ok(())
+        Ok(ComponentKey::new(component))
     }
 }
 
-impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentSeed<'a, 'm> {
-    type Value = ();
+impl<'a, 'b, 'de, 'm> DeserializeSeed<'de> for ComponentSeed<'a, 'b, 'm> {
+    type Value = ComponentKey;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -402,24 +417,31 @@ impl<'a, 'de, 'm> DeserializeSeed<'de> for ComponentSeed<'a, 'm> {
     }
 }
 
-struct PortSeed<'m> {
+struct PortSeed<'a, 'b, 'm> {
     module: &'m mut Module,
+    name: &'a String,
+    checker: &'b mut Checker,
     parent: ComponentId,
-    name: String,
 }
 
-impl<'m> PortSeed<'m> {
-    pub(crate) fn new(module: &'m mut Module, parent: ComponentId, name: String) -> Self {
+impl<'a, 'b, 'm> PortSeed<'a, 'b, 'm> {
+    pub(crate) fn new(
+        module: &'m mut Module,
+        checker: &'b mut Checker,
+        parent: ComponentId,
+        name: &'a String,
+    ) -> Self {
         Self {
             module,
-            parent,
             name,
+            checker,
+            parent,
         }
     }
 }
 
-impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
-    type Value = ();
+impl<'a, 'b, 'de, 'm> Visitor<'de> for PortSeed<'a, 'b, 'm> {
+    type Value = PortKey;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "a port description")
@@ -469,7 +491,7 @@ impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
 
         let kind = kind.ok_or(de::Error::missing_field(port::FIELDS[port::KIND]))?;
 
-        let mut builder = PortBuilder::new(self.module, ComponentKey(self.parent))
+        let mut builder = PortBuilder::new(self.module, self.checker, ComponentKey(self.parent))
             .set_name(&self.name)
             .set_kind(kind);
 
@@ -481,13 +503,12 @@ impl<'de, 'm> Visitor<'de> for PortSeed<'m> {
             builder.set_class(class);
         }
 
-        builder.finish();
-        Ok(())
+        Ok(builder.finish().map_err(de::Error::custom)?.key())
     }
 }
 
-impl<'de, 'm> DeserializeSeed<'de> for PortSeed<'m> {
-    type Value = ();
+impl<'a, 'b, 'de, 'm> DeserializeSeed<'de> for PortSeed<'a, 'b, 'm> {
+    type Value = PortKey;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where

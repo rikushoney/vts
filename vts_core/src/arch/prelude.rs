@@ -7,6 +7,7 @@ pub use super::{
 };
 
 pub(crate) use super::{
+    checker::Checker,
     component::ComponentData,
     linker::Linker,
     module::{ComponentId, ComponentRefId, PortId},

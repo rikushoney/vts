@@ -12,7 +12,7 @@ use vts_core::arch::{
 
 use super::{
     port::{ComponentOrRef, SliceOrIndex},
-    PyComponentRef, PyModule_, PyPort, PyPortClass, PyPortKind, PyPortSelection,
+    PyCheckerError, PyComponentRef, PyModule_, PyPort, PyPortClass, PyPortKind, PyPortSelection,
 };
 
 wrap_enum!(
@@ -31,8 +31,9 @@ wrap_enum!(
 macro_rules! borrow_inner {
     ($slf:ident + $py:ident => $component:ident) => {
         let module = $slf.module($py).borrow();
-        let $component = module
-            .inner
+        let inner = module.inner.borrow($py);
+        let $component = inner
+            .0
             .get_component($slf.key())
             .expect("component should be in module");
     };
@@ -82,10 +83,12 @@ impl PyComponent {
                 component.key()
             };
 
-            let mut module = self.module(py).borrow_mut();
+            let module = self.module(py).borrow_mut();
+            let mut inner = module.inner.borrow_mut(py);
+            let mut checker = module.checker.borrow_mut(py);
             let kind = kind.get_kind(py)?.borrow();
 
-            let mut builder = PortBuilder::new(&mut module.inner, parent)
+            let mut builder = PortBuilder::new(&mut inner.0, &mut checker.0, parent)
                 .set_name(name.to_str()?)
                 .set_kind(PortKind::from(*kind));
 
@@ -98,7 +101,7 @@ impl PyComponent {
                 builder.set_class(PortClass::from(*class));
             }
 
-            builder.finish().key()
+            builder.finish().map_err(PyCheckerError::from)?.key()
         };
 
         PyPort::new(self.module(py).as_borrowed(), port)
@@ -120,11 +123,9 @@ impl PyComponent {
         };
 
         let module = module.bind(py).borrow();
+        let inner = module.inner.borrow(py);
 
-        let port = &module
-            .inner
-            .get_port(port)
-            .expect("port should be in module");
+        let port = &inner.0.get_port(port).expect("port should be in module");
 
         let name = name
             .map(Borrowed::to_owned)
@@ -294,11 +295,13 @@ impl PyComponent {
         let py = component.py();
 
         let reference = {
-            let mut module = self.module(py).borrow_mut();
+            let module = self.module(py).borrow_mut();
+            let mut inner = module.inner.borrow_mut(py);
+            let mut checker = module.checker.borrow_mut(py);
             let component = component.borrow();
 
-            let mut builder =
-                ComponentRefBuilder::new(&mut module.inner, self.1).set_component(component.1);
+            let mut builder = ComponentRefBuilder::new(&mut inner.0, &mut checker.0, self.1)
+                .set_component(component.1);
 
             if let Some(alias) = alias {
                 builder.set_alias(alias.to_str()?);
@@ -308,7 +311,7 @@ impl PyComponent {
                 builder.set_n_instances(n_instances);
             }
 
-            builder.finish().key()
+            builder.finish().map_err(PyCheckerError::from)?.key()
         };
 
         PyComponentRef::new(self.module(py).as_borrowed(), reference)
@@ -323,7 +326,8 @@ impl PyComponent {
     ) -> PyResult<()> {
         let py = source.py();
 
-        let mut module = self.module(py).borrow_mut();
+        let module = self.module(py).borrow_mut();
+        let mut inner = module.inner.borrow_mut(py);
         let source = source.borrow();
         let source_pins = &source.1;
 
@@ -340,7 +344,7 @@ impl PyComponent {
             ComponentOrRef::Ref(reference) => Some(reference),
         };
 
-        let mut builder = ConnectionBuilder::new(&mut module.inner, self.key())
+        let mut builder = ConnectionBuilder::new(&mut inner.0, self.key())
             .set_source(source_pins.0.clone(), source_component)
             .set_sink(sink_pins.0.clone(), sink_component);
 

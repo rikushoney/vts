@@ -3,7 +3,7 @@ use std::slice;
 use serde::{Deserialize, Serialize};
 use ustr::{ustr, Ustr};
 
-use super::prelude::*;
+use super::{checker, prelude::*};
 
 pub(super) const FIELDS: &[&str] = &[
     "ports",
@@ -60,7 +60,7 @@ impl ComponentKey {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Component<'m>(&'m Module, pub(super) ComponentId);
 
 impl<'m> Component<'m> {
@@ -170,31 +170,34 @@ impl<'m> Iterator for ConnectionIter<'m> {
 pub struct NameSet(String);
 pub struct NameUnset;
 
-pub struct ComponentBuilder<'m, N> {
+pub struct ComponentBuilder<'a, 'm, N> {
     pub(crate) module: &'m mut Module,
+    checker: &'a mut Checker,
     name: N,
     class: Option<ComponentClass>,
 }
 
-impl<'m> ComponentBuilder<'m, NameUnset> {
-    pub fn new(module: &'m mut Module) -> Self {
+impl<'a, 'm> ComponentBuilder<'a, 'm, NameUnset> {
+    pub fn new(module: &'m mut Module, checker: &'a mut Checker) -> Self {
         Self {
             module,
+            checker,
             name: NameUnset,
             class: None,
         }
     }
 
-    pub fn set_name(self, name: &str) -> ComponentBuilder<'m, NameSet> {
+    pub fn set_name(self, name: &str) -> ComponentBuilder<'a, 'm, NameSet> {
         ComponentBuilder {
             module: self.module,
+            checker: self.checker,
             name: NameSet(name.to_string()),
             class: self.class,
         }
     }
 }
 
-impl<'m, N> ComponentBuilder<'m, N> {
+impl<'m, N> ComponentBuilder<'_, 'm, N> {
     pub fn set_class(&mut self, class: ComponentClass) {
         self.class = Some(class)
     }
@@ -204,15 +207,18 @@ impl<'m, N> ComponentBuilder<'m, N> {
     }
 }
 
-impl<'m> ComponentBuilder<'m, NameSet> {
+impl<'m> ComponentBuilder<'_, 'm, NameSet> {
     fn insert(&mut self) -> ComponentId {
-        // TODO: check duplicate components
         let component = ComponentData::new(&self.name.0, self.class);
         self.module.components.insert(component)
     }
 
-    pub fn finish(mut self) -> Component<'m> {
+    pub fn finish(mut self) -> Result<Component<'m>, checker::Error> {
         let component = self.insert();
-        Component::new(self.module, component)
+
+        self.checker
+            .register_component(self.module, ComponentKey::new(component))?;
+
+        Ok(Component::new(self.module, component))
     }
 }

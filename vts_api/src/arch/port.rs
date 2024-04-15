@@ -1,8 +1,10 @@
 use std::ops::Range;
 
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
-use pyo3::types::{PySlice, PySliceIndices, PyString};
+use pyo3::{
+    exceptions::PyValueError,
+    prelude::*,
+    types::{PySlice, PySliceIndices, PyString},
+};
 use vts_core::arch::{
     component::ComponentKey,
     port::{PinRange, PortKey, PortPins},
@@ -34,8 +36,9 @@ pub struct PyPort(Py<PyModule_>, PortKey);
 macro_rules! borrow_inner {
     ($slf:ident + $py:ident => $port:ident) => {
         let module = $slf.module($py).borrow();
-        let $port = module
-            .inner
+        let inner = module.inner.borrow($py);
+        let $port = inner
+            .0
             .get_port($slf.key())
             .expect("port should be in module");
     };

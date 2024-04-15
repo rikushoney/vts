@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::{PyMapping, PyString};
+use pyo3::{
+    exceptions::{PyTypeError, PyValueError},
+    prelude::*,
+    types::{PyMapping, PyString},
+};
 use vts_core::arch::{
+    checker::Checker,
     component::{ComponentBuilder, ComponentKey},
     json,
     port::PortKey,
@@ -12,15 +15,23 @@ use vts_core::arch::{
     toml, yaml, ComponentClass, Module,
 };
 
-use super::{PyComponent, PyComponentClass, PyComponentRef, PyPort};
+use super::{PyCheckerError, PyComponent, PyComponentClass, PyComponentRef, PyPort};
+
+#[pyclass]
+pub(crate) struct PyModuleInner(pub(crate) Module);
+
+#[pyclass]
+#[derive(Default)]
+pub(crate) struct PyChecker(pub(crate) Checker);
 
 #[pyclass]
 #[pyo3(name = "PyModule")]
 pub struct PyModule_ {
-    pub(crate) inner: Module,
+    pub(crate) inner: Py<PyModuleInner>,
     pub(crate) components: HashMap<ComponentKey, Py<PyComponent>>,
     pub(crate) ports: HashMap<PortKey, Py<PyPort>>,
     pub(crate) references: HashMap<ComponentRefKey, Py<PyComponentRef>>,
+    pub(crate) checker: Py<PyChecker>,
 }
 
 #[derive(FromPyObject)]
@@ -73,20 +84,24 @@ impl<'py> ComponentClassOrStr<'py> {
 }
 
 impl PyModule_ {
-    pub(crate) fn new_wrap(module: Module) -> Self {
-        Self {
-            inner: module,
-            components: HashMap::default(),
-            ports: HashMap::default(),
-            references: HashMap::default(),
-        }
+    pub(crate) fn new_wrap(py: Python<'_>, module: Module) -> PyResult<Self> {
+        Py::new(py, PyChecker::default()).and_then(|checker| {
+            Ok(Self {
+                inner: Py::new(py, PyModuleInner(module))?,
+                components: HashMap::default(),
+                ports: HashMap::default(),
+                references: HashMap::default(),
+                checker,
+            })
+        })
     }
 
     fn with_inner<F, T>(slf: Borrowed<'_, '_, PyModule_>, mut exec: F) -> T
     where
         F: FnMut(&Module) -> T,
     {
-        exec(&slf.borrow().inner)
+        let py = slf.py();
+        exec(&slf.borrow().inner.borrow(py).0)
     }
 
     fn add_component_impl<'py>(
@@ -97,15 +112,19 @@ impl PyModule_ {
         let py = slf.py();
 
         PyComponent::new(slf, {
-            let mut module = slf.borrow_mut();
-            let mut builder = ComponentBuilder::new(&mut module.inner).set_name(name.to_str()?);
+            let module = slf.borrow_mut();
+            let mut inner = module.inner.borrow_mut(py);
+            let mut checker = module.checker.borrow_mut(py);
+
+            let mut builder =
+                ComponentBuilder::new(&mut inner.0, &mut checker.0).set_name(name.to_str()?);
 
             if let Some(class) = class {
                 let class = class.get_class(py)?.borrow();
                 builder.set_class(ComponentClass::from(*class));
             }
 
-            builder.finish().key()
+            builder.finish().map_err(PyCheckerError::from)?.key()
         })
     }
 
@@ -128,8 +147,10 @@ impl PyModule_ {
                 module.borrow()
             };
 
-            let component = &module
-                .inner
+            let inner = module.inner.borrow(py);
+
+            let component = &inner
+                .0
                 .get_component(component)
                 .expect("component should be in module");
 
@@ -155,19 +176,21 @@ impl PyModule_ {
 impl PyModule_ {
     #[new]
     pub fn new(name: &Bound<'_, PyString>) -> PyResult<Self> {
+        let py = name.py();
         let module = Module::new(name.to_str()?);
-        Ok(Self::new_wrap(module))
+        Self::new_wrap(py, module)
     }
 
     pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
-        PyString::new_bound(py, self.inner.name())
+        PyString::new_bound(py, self.inner.borrow(py).0.name())
     }
 
     fn copy(&self, name: Option<&Bound<'_, PyString>>) -> PyResult<Self> {
-        let mut module = self.inner.clone();
+        let module = self.inner.clone();
 
         if let Some(name) = name {
-            module.rename(name.to_str()?);
+            let py = name.py();
+            module.borrow_mut(py).0.rename(name.to_str()?);
         }
 
         // TODO: rebuild module
@@ -228,7 +251,7 @@ pub fn json_loads(input: &Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
         PyValueError::new_err(format!(r#"failed parsing json with reason "{err}""#))
     })?;
 
-    Py::new(py, PyModule_::new_wrap(module))
+    Py::new(py, PyModule_::new_wrap(py, module)?)
 }
 
 #[pyfunction]
@@ -257,7 +280,7 @@ pub fn yaml_loads(input: &Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
         PyValueError::new_err(format!(r#"failed parsing yaml with reason "{err}""#))
     })?;
 
-    Py::new(py, PyModule_::new_wrap(module))
+    Py::new(py, PyModule_::new_wrap(py, module)?)
 }
 
 #[pyfunction]
@@ -281,7 +304,7 @@ pub fn toml_loads(input: &Bound<'_, PyString>) -> PyResult<Py<PyModule_>> {
         PyValueError::new_err(format!(r#"failed parsing toml with reason "{err}""#))
     })?;
 
-    Py::new(py, PyModule_::new_wrap(module))
+    Py::new(py, PyModule_::new_wrap(py, module)?)
 }
 
 #[pyfunction]

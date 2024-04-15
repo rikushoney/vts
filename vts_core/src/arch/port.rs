@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use ustr::{ustr, Ustr};
 
 use super::{
+    checker,
     component::ComponentKey,
     linker::{self, KnownComponents, Resolve},
     prelude::*,
@@ -235,8 +236,9 @@ pub struct NameUnset;
 pub struct KindSet(PortKind);
 pub struct KindUnset;
 
-pub struct PortBuilder<'m, N, K> {
+pub struct PortBuilder<'a, 'm, N, K> {
     module: &'m mut Module,
+    checker: &'a mut Checker,
     parent: ComponentId,
     name: N,
     kind: K,
@@ -244,10 +246,11 @@ pub struct PortBuilder<'m, N, K> {
     class: Option<PortClass>,
 }
 
-impl<'m> PortBuilder<'m, NameUnset, KindUnset> {
-    pub fn new(module: &'m mut Module, component: ComponentKey) -> Self {
+impl<'a, 'm> PortBuilder<'a, 'm, NameUnset, KindUnset> {
+    pub fn new(module: &'m mut Module, checker: &'a mut Checker, component: ComponentKey) -> Self {
         Self {
             module,
+            checker,
             parent: component.0,
             name: NameUnset,
             kind: KindUnset,
@@ -257,10 +260,11 @@ impl<'m> PortBuilder<'m, NameUnset, KindUnset> {
     }
 }
 
-impl<'m, K> PortBuilder<'m, NameUnset, K> {
-    pub fn set_name(self, name: &str) -> PortBuilder<'m, NameSet, K> {
+impl<'a, 'm, K> PortBuilder<'a, 'm, NameUnset, K> {
+    pub fn set_name(self, name: &str) -> PortBuilder<'a, 'm, NameSet, K> {
         PortBuilder {
             module: self.module,
+            checker: self.checker,
             parent: self.parent,
             name: NameSet(ustr(name)),
             kind: self.kind,
@@ -270,10 +274,11 @@ impl<'m, K> PortBuilder<'m, NameUnset, K> {
     }
 }
 
-impl<'m, N> PortBuilder<'m, N, KindUnset> {
-    pub fn set_kind(self, kind: PortKind) -> PortBuilder<'m, N, KindSet> {
+impl<'a, 'm, N> PortBuilder<'a, 'm, N, KindUnset> {
+    pub fn set_kind(self, kind: PortKind) -> PortBuilder<'a, 'm, N, KindSet> {
         PortBuilder {
             module: self.module,
+            checker: self.checker,
             parent: self.parent,
             name: self.name,
             kind: KindSet(kind),
@@ -283,7 +288,7 @@ impl<'m, N> PortBuilder<'m, N, KindUnset> {
     }
 }
 
-impl<'m, N, K> PortBuilder<'m, N, K> {
+impl<'a, 'm, N, K> PortBuilder<'a, 'm, N, K> {
     pub fn set_n_pins(&mut self, n_pins: u32) {
         self.n_pins = Some(n_pins);
     }
@@ -301,9 +306,8 @@ impl<'m, N, K> PortBuilder<'m, N, K> {
     }
 }
 
-impl<'m> PortBuilder<'m, NameSet, KindSet> {
+impl<'a, 'm> PortBuilder<'a, 'm, NameSet, KindSet> {
     fn insert(&mut self) -> PortId {
-        // TODO: check duplicate ports
         let port = PortData::new(
             self.parent,
             &self.name.0,
@@ -315,10 +319,17 @@ impl<'m> PortBuilder<'m, NameSet, KindSet> {
         self.module.ports.insert(port)
     }
 
-    pub fn finish(mut self) -> Port<'m> {
+    pub fn finish(mut self) -> Result<Port<'m>, checker::Error> {
         let port = self.insert();
+
+        self.checker.register_port(
+            self.module,
+            ComponentKey::new(self.parent),
+            PortKey::new(port),
+        )?;
+
         self.module[self.parent].ports.push(port);
-        Port::new(self.module, port)
+        Ok(Port::new(self.module, port))
     }
 }
 
@@ -329,12 +340,13 @@ pub struct WeakPortPins {
     pub range: PinRange,
 }
 
-impl<'m> Resolve<'m> for (WeakPortPins, Option<ComponentRefKey>) {
+impl<'a, 'm> Resolve<'a, 'm> for (WeakPortPins, Option<ComponentRefKey>) {
     type Output = PortPins;
 
     fn resolve(
         self,
         module: &'m mut Module,
+        checker: &'a mut Checker,
         parent: ComponentKey,
         _components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
@@ -350,6 +362,7 @@ impl<'m> Resolve<'m> for (WeakPortPins, Option<ComponentRefKey>) {
             .find_port(&self.0.port)
             .ok_or(linker::Error::undefined_port(parent.name(), &self.0.port))?;
 
+        checker.register_connection()?;
         Ok(PortPins::new(port.key().0, self.0.range))
     }
 }

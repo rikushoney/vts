@@ -236,12 +236,13 @@ impl WeakConnectionBuilder<WeakSourceSet, WeakSinkSet> {
     }
 }
 
-impl<'m> Resolve<'m> for Signature {
+impl<'a, 'm> Resolve<'a, 'm> for Signature {
     type Output = (PortPins, Option<ComponentRefKey>);
 
     fn resolve(
         self,
         module: &'m mut Module,
+        checker: &'a mut Checker,
         parent: ComponentKey,
         components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
@@ -260,22 +261,24 @@ impl<'m> Resolve<'m> for Signature {
             })
             .transpose()?;
 
-        let pins = (self.pins, reference).resolve(module, parent, components)?;
+        let pins = (self.pins, reference).resolve(module, checker, parent, components)?;
         Ok((pins, reference))
     }
 }
 
-impl<'m> Resolve<'m> for WeakConnection {
+impl<'a, 'm> Resolve<'a, 'm> for WeakConnection {
     type Output = &'m Connection;
 
     fn resolve(
         self,
         module: &'m mut Module,
+        checker: &'a mut Checker,
         parent: ComponentKey,
         components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
-        let (source_pins, source_reference) = self.source.resolve(module, parent, components)?;
-        let (sink_pins, sink_reference) = self.sink.resolve(module, parent, components)?;
+        let (source_pins, source_reference) =
+            self.source.resolve(module, checker, parent, components)?;
+        let (sink_pins, sink_reference) = self.sink.resolve(module, checker, parent, components)?;
 
         let mut builder = ConnectionBuilder::new(module, parent)
             .set_source(source_pins, source_reference)

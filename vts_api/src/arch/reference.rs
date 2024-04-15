@@ -41,8 +41,9 @@ impl PyComponentRef {
 macro_rules! borrow_inner {
     ($slf:ident + $py:ident => $ref:ident) => {
         let module = $slf.module($py).borrow();
-        let $ref = module
-            .inner
+        let inner = module.inner.borrow($py);
+        let $ref = inner
+            .0
             .get_reference($slf.key())
             .expect("reference should be in module");
     };
