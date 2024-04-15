@@ -5,8 +5,8 @@ format-rs:
     cargo fmt --all
 
 format-py:
-    ruff check --select I --fix python/vts
-    black --quiet python/vts
+    ruff check --select I --fix python/vts scratchpad.ipynb
+    black --quiet python/vts scratchpad.ipynb
 
 format: format-rs format-py
 
