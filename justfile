@@ -15,6 +15,7 @@ lock:
     pip-compile -o requirements/check.txt requirements/check.in 
     pip-compile -o requirements/format.txt requirements/format.in 
     pip-compile -o requirements/build.txt requirements/build.in 
+    pip-compile -o requirements/notebook.txt requirements/notebook.in
     pip-compile -o requirements/dev.txt requirements/dev.in
 
 check-rs:
@@ -51,6 +52,9 @@ build-py:
     maturin build
 
 build: build-rs build-py
+
+notebook:
+    jupyter-lab
 
 clean:
     cargo clean
