@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use ustr::{ustr, Ustr};
 
 use super::{
@@ -59,18 +58,20 @@ pub struct SourceUnset;
 pub struct SinkSet(PortPins, Option<ComponentRefId>);
 pub struct SinkUnset;
 
-pub struct ConnectionBuilder<'m, Src, Snk> {
+pub struct ConnectionBuilder<'a, 'm, Src, Snk> {
     module: &'m mut Module,
+    checker: &'a mut Checker,
     component: ComponentId,
     source: Src,
     sink: Snk,
     kind: Option<ConnectionKind>,
 }
 
-impl<'m> ConnectionBuilder<'m, SourceUnset, SinkUnset> {
-    pub fn new(module: &'m mut Module, component: ComponentKey) -> Self {
+impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceUnset, SinkUnset> {
+    pub fn new(module: &'m mut Module, checker: &'a mut Checker, component: ComponentKey) -> Self {
         Self {
             module,
+            checker,
             component: component.0,
             source: SourceUnset,
             sink: SinkUnset,
@@ -79,14 +80,15 @@ impl<'m> ConnectionBuilder<'m, SourceUnset, SinkUnset> {
     }
 }
 
-impl<'m, Snk> ConnectionBuilder<'m, SourceUnset, Snk> {
+impl<'a, 'm, Snk> ConnectionBuilder<'a, 'm, SourceUnset, Snk> {
     pub fn set_source(
         self,
         pins: PortPins,
         component: Option<ComponentRefKey>,
-    ) -> ConnectionBuilder<'m, SourceSet, Snk> {
+    ) -> ConnectionBuilder<'a, 'm, SourceSet, Snk> {
         ConnectionBuilder {
             module: self.module,
+            checker: self.checker,
             component: self.component,
             source: SourceSet(pins, component.map(|c| c.0)),
             sink: self.sink,
@@ -95,14 +97,15 @@ impl<'m, Snk> ConnectionBuilder<'m, SourceUnset, Snk> {
     }
 }
 
-impl<'m, Src> ConnectionBuilder<'m, Src, SinkUnset> {
+impl<'a, 'm, Src> ConnectionBuilder<'a, 'm, Src, SinkUnset> {
     pub fn set_sink(
         self,
         pins: PortPins,
         component: Option<ComponentRefKey>,
-    ) -> ConnectionBuilder<'m, Src, SinkSet> {
+    ) -> ConnectionBuilder<'a, 'm, Src, SinkSet> {
         ConnectionBuilder {
             module: self.module,
+            checker: self.checker,
             component: self.component,
             source: self.source,
             sink: SinkSet(pins, component.map(|c| c.0)),
@@ -111,7 +114,7 @@ impl<'m, Src> ConnectionBuilder<'m, Src, SinkUnset> {
     }
 }
 
-impl<'m, Src, Snk> ConnectionBuilder<'m, Src, Snk> {
+impl<'a, 'm, Src, Snk> ConnectionBuilder<'a, 'm, Src, Snk> {
     pub fn set_kind(&mut self, kind: ConnectionKind) {
         self.kind = Some(kind);
     }
@@ -121,7 +124,7 @@ impl<'m, Src, Snk> ConnectionBuilder<'m, Src, Snk> {
     }
 }
 
-impl<'m> ConnectionBuilder<'m, SourceSet, SinkSet> {
+impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceSet, SinkSet> {
     pub fn finish(self) -> &'m Connection {
         let kind = self.kind.unwrap_or(ConnectionKind::Direct);
 
@@ -133,16 +136,6 @@ impl<'m> ConnectionBuilder<'m, SourceSet, SinkSet> {
         connections.push(connection);
         &connections[idx]
     }
-}
-
-#[derive(Debug, Error)]
-pub enum ConnectionBuildError {
-    #[error("connection must have a {0}")]
-    MissingField(&'static str),
-    #[error(r#"undefined port "{port}" connected"#)]
-    UndefinedPort { port: String },
-    #[error(r#"undefined component "{reference}" connected"#)]
-    UndefinedReference { reference: String },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -278,9 +271,10 @@ impl<'a, 'm> Resolve<'a, 'm> for WeakConnection {
     ) -> Result<Self::Output, linker::Error> {
         let (source_pins, source_reference) =
             self.source.resolve(module, checker, parent, components)?;
+
         let (sink_pins, sink_reference) = self.sink.resolve(module, checker, parent, components)?;
 
-        let mut builder = ConnectionBuilder::new(module, parent)
+        let mut builder = ConnectionBuilder::new(module, checker, parent)
             .set_source(source_pins, source_reference)
             .set_sink(sink_pins, sink_reference);
 
