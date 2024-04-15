@@ -328,6 +328,7 @@ impl PyComponent {
 
         let module = self.module(py).borrow_mut();
         let mut inner = module.inner.borrow_mut(py);
+        let mut checker = module.checker.borrow_mut(py);
         let source = source.borrow();
         let source_pins = &source.1;
 
@@ -344,7 +345,7 @@ impl PyComponent {
             ComponentOrRef::Ref(reference) => Some(reference),
         };
 
-        let mut builder = ConnectionBuilder::new(&mut inner.0, self.key())
+        let mut builder = ConnectionBuilder::new(&mut inner.0, &mut checker.0, self.key())
             .set_source(source_pins.0.clone(), source_component)
             .set_sink(sink_pins.0.clone(), sink_component);
 
