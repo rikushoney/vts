@@ -15,18 +15,18 @@ use vts_core::arch::{
 use super::{PyComponent, PyComponentRef, PyConnectionKind, PyModule_};
 
 wrap_enum!(
-    PyPortClass ("PortClass") as "port class" => PortClass:
-        CLOCK = Clock ("clock" | "clk"),
-        LUT_IN = LutIn ("lut_in"),
-        LUT_OUT = LutOut ("lut_out"),
-        LATCH_IN = LatchIn ("latch_in" | "ff_in"),
-        LATCH_OUT = LatchOut ("latch_out" | "ff_out"),
+    PyPortClass (name = "PortClass", help = "port class") => PortClass:
+        CLOCK = Clock (alias = "clock" | "clk"),
+        LUT_IN = LutIn (alias = "lut_in"),
+        LUT_OUT = LutOut (alias = "lut_out"),
+        LATCH_IN = LatchIn (alias = "latch_in" | "ff_in"),
+        LATCH_OUT = LatchOut (alias = "latch_out" | "ff_out"),
 );
 
 wrap_enum!(
-    PyPortKind ("PortKind") as "port kind" => PortKind:
-        INPUT = Input ("i" | "in" | "input"),
-        OUTPUT = Output ("o" | "out" | "output"),
+    PyPortKind (name = "PortKind", help = "port kind") => PortKind:
+        INPUT = Input (alias = "i" | "in" | "input"),
+        OUTPUT = Output (alias = "o" | "out" | "output"),
 );
 
 #[pyclass(name = "Port")]

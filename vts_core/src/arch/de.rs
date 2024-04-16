@@ -537,10 +537,9 @@ impl<'de> Deserialize<'de> for PinRange {
                 A: MapAccess<'de>,
             {
                 #[derive(Deserialize)]
+                #[serde(rename_all = "snake_case")]
                 enum Field {
-                    #[serde(rename = "port_start")]
                     PortStart,
-                    #[serde(rename = "port_end")]
                     PortEnd,
                 }
 

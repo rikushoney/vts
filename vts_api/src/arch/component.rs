@@ -16,16 +16,16 @@ use super::{
 };
 
 wrap_enum!(
-    PyComponentClass ("ComponentClass") as "component class" => ComponentClass:
-        LUT = Lut ("lut"),
-        LATCH = Latch ("latch" | "ff"),
+    PyComponentClass (name = "ComponentClass", help = "component class") => ComponentClass:
+        LUT = Lut (alias = "lut"),
+        LATCH = Latch (alias = "latch" | "ff"),
 );
 
 wrap_enum!(
-    PyConnectionKind ("ConnectionKind") as "connection kind" => ConnectionKind:
-        DIRECT = Direct ("direct" | "d"),
-        COMPLETE = Complete ("complete" | "c"),
-        MUX = Mux ("mux" | "m")
+    PyConnectionKind (name = "ConnectionKind", help = "connection kind") => ConnectionKind:
+        DIRECT = Direct (alias = "direct" | "d"),
+        COMPLETE = Complete (alias = "complete" | "c"),
+        MUX = Mux (alias = "mux" | "m")
 );
 
 macro_rules! borrow_inner {
