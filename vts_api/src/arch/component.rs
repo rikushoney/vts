@@ -16,13 +16,13 @@ use super::{
 };
 
 wrap_enum!(
-    PyComponentClass as "component class" => ComponentClass:
+    PyComponentClass ("ComponentClass") as "component class" => ComponentClass:
         LUT = Lut ("lut"),
         LATCH = Latch ("latch" | "ff"),
 );
 
 wrap_enum!(
-    PyConnectionKind as "connection kind" => ConnectionKind:
+    PyConnectionKind ("ConnectionKind") as "connection kind" => ConnectionKind:
         DIRECT = Direct ("direct" | "d"),
         COMPLETE = Complete ("complete" | "c"),
         MUX = Mux ("mux" | "m")
@@ -39,7 +39,7 @@ macro_rules! borrow_inner {
     };
 }
 
-#[pyclass]
+#[pyclass(name = "Component")]
 #[derive(Clone, Debug)]
 pub struct PyComponent(Py<PyModule_>, ComponentKey);
 

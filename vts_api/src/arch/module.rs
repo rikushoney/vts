@@ -24,8 +24,7 @@ pub(crate) struct PyModuleInner(pub(crate) Module);
 #[derive(Default)]
 pub(crate) struct PyChecker(pub(crate) Checker);
 
-#[pyclass]
-#[pyo3(name = "PyModule")]
+#[pyclass(name = "Module")]
 pub struct PyModule_ {
     pub(crate) inner: Py<PyModuleInner>,
     pub(crate) components: HashMap<ComponentKey, Py<PyComponent>>,

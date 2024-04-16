@@ -15,7 +15,7 @@ use vts_core::arch::{
 use super::{PyComponent, PyComponentRef, PyConnectionKind, PyModule_};
 
 wrap_enum!(
-    PyPortClass as "port class" => PortClass:
+    PyPortClass ("PortClass") as "port class" => PortClass:
         CLOCK = Clock ("clock" | "clk"),
         LUT_IN = LutIn ("lut_in"),
         LUT_OUT = LutOut ("lut_out"),
@@ -24,12 +24,12 @@ wrap_enum!(
 );
 
 wrap_enum!(
-    PyPortKind as "port kind" => PortKind:
+    PyPortKind ("PortKind") as "port kind" => PortKind:
         INPUT = Input ("i" | "in" | "input"),
         OUTPUT = Output ("o" | "out" | "output"),
 );
 
-#[pyclass]
+#[pyclass(name = "Port")]
 #[derive(Clone, Debug)]
 pub struct PyPort(Py<PyModule_>, PortKey);
 
@@ -180,7 +180,7 @@ impl PyPort {
     }
 }
 
-#[pyclass]
+#[pyclass(name = "PortPins")]
 #[derive(Clone, Debug)]
 pub struct PyPortPins(pub(crate) PortPins);
 
@@ -210,11 +210,11 @@ pub enum ComponentOrRef {
     Ref(#[pyo3(from_py_with = "extract_reference_key")] ComponentRefKey),
 }
 
-#[pyclass]
+#[pyclass(name = "PortSelection")]
 #[derive(Clone, Debug)]
 pub struct PyPortSelection(pub(crate) ComponentOrRef, pub(crate) PyPortPins);
 
-#[pyclass]
+#[pyclass(name = "ComponentRefPort")]
 #[derive(Clone, Debug)]
 pub struct PyComponentRefPort(pub(crate) Py<PyComponentRef>, pub(crate) Py<PyPort>);
 

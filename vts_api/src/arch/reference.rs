@@ -9,7 +9,7 @@ use super::{
     PyComponent, PyComponentRefPort, PyConnectionKind, PyModule_, PyPort, PyPortSelection,
 };
 
-#[pyclass]
+#[pyclass(name = "ComponentRef")]
 pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
 
 impl PyComponentRef {

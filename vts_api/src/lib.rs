@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 
 macro_rules! wrap_enum {
-    ($py_name:ident as $py_alias:expr => $name:ident : $($py_variant:ident = $variant:ident ( $alias:pat ) $(,)*)+) => {
-        #[pyclass]
+    ($py_name:ident ($py_rename:literal) as $py_alias:expr => $name:ident : $($py_variant:ident = $variant:ident ( $alias:pat ) $(,)*)+) => {
+        #[pyclass(name = $py_rename)]
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         #[derive(Clone, Copy, Debug, PartialEq)]
         pub enum $py_name {
