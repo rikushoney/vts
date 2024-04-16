@@ -11,12 +11,12 @@ format-py:
 format: format-rs format-py
 
 lock:
-    pip-compile -o requirements/tests.txt requirements/tests.in 
-    pip-compile -o requirements/check.txt requirements/check.in 
-    pip-compile -o requirements/format.txt requirements/format.in 
-    pip-compile -o requirements/build.txt requirements/build.in 
-    pip-compile -o requirements/notebook.txt requirements/notebook.in
-    pip-compile -o requirements/dev.txt requirements/dev.in
+    pip-compile --strip-extras -o requirements/tests.txt requirements/tests.in 
+    pip-compile --strip-extras -o requirements/check.txt requirements/check.in 
+    pip-compile --strip-extras -o requirements/format.txt requirements/format.in 
+    pip-compile --strip-extras -o requirements/build.txt requirements/build.in 
+    pip-compile --strip-extras -o requirements/notebook.txt requirements/notebook.in
+    pip-compile --strip-extras -o requirements/dev.txt requirements/dev.in
 
 check-rs:
     cargo check --workspace
@@ -24,6 +24,8 @@ check-rs:
 
 check-py:
     nox -s check
+    nbqa ruff scratchpad.ipynb --ignore E402
+    nbqa mypy scratchpad.ipynb
 
 check-md:
     markdownlint-cli2 README.md

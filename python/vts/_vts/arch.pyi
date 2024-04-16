@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, overload
 
 _ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
 
@@ -48,11 +48,26 @@ class Module:
     def __new__(cls, name: str) -> Module: ...
     def name(self) -> str: ...
     def copy(self, name: str | None = None) -> Module: ...
+    @overload
     def add_component(
         self,
-        name: str | Component | None = None,
+        name: str,
         *,
         component: Component | None = None,
+        class_: ComponentClass | _ComponentClassStr | None = None,
+    ) -> Component: ...
+    @overload
+    def add_component(
+        self,
+        name: Component,
+        *,
+        class_: ComponentClass | _ComponentClassStr | None = None,
+    ) -> Component: ...
+    @overload
+    def add_component(
+        self,
+        *,
+        component: Component,
         class_: ComponentClass | _ComponentClassStr | None = None,
     ) -> Component: ...
 
@@ -60,11 +75,30 @@ class Component:
     def module(self) -> Module: ...
     def name(self) -> str: ...
     def class_(self) -> ComponentClass: ...
+    @overload
     def add_port(
         self,
-        name: str | Port | None = None,
+        name: str,
         *,
         port: Port | None = None,
+        kind: PortKind | _PortKindStr | None = None,
+        n_pins: int | None = None,
+        class_: PortClass | _PortClassStr | None = None,
+    ) -> Port: ...
+    @overload
+    def add_port(
+        self,
+        name: Port,
+        *,
+        kind: PortKind | _PortKindStr | None = None,
+        n_pins: int | None = None,
+        class_: PortClass | _PortClassStr | None = None,
+    ) -> Port: ...
+    @overload
+    def add_port(
+        self,
+        *,
+        port: Port,
         kind: PortKind | _PortKindStr | None = None,
         n_pins: int | None = None,
         class_: PortClass | _PortClassStr | None = None,
