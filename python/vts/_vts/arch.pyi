@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 _ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
 
@@ -117,7 +117,7 @@ class Component:
         *,
         kind: ConnectionKind | _ConnectionKindStr | None = None,
     ) -> None: ...
-    def __getattr__(self, port: str) -> Port: ...
+    def __getattr__(self, port_or_reference: str) -> Any: ...
     def __setattr__(
         self, sink: str, source: Signature | ComponentRefPort | Port
     ) -> None: ...

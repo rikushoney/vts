@@ -71,6 +71,38 @@ impl PyComponent {
         self.1
     }
 
+    fn find_port<'a, 'py>(
+        &self,
+        port: Borrowed<'a, 'py, PyString>,
+    ) -> PyResult<Option<Bound<'py, PyPort>>> {
+        // TODO: cache
+        let py = port.py();
+
+        borrow_inner!(self + py => component);
+        let port = port.to_str()?;
+
+        component
+            .find_port(port)
+            .map(|port| PyPort::new(self.module(py).as_borrowed(), port.key()))
+            .transpose()
+    }
+
+    fn find_reference<'a, 'py>(
+        &self,
+        reference: Borrowed<'a, 'py, PyString>,
+    ) -> PyResult<Option<Bound<'py, PyComponentRef>>> {
+        // TODO: cache
+        let py = reference.py();
+
+        borrow_inner!(self + py => component);
+        let reference = reference.to_str()?;
+
+        component
+            .find_reference(reference)
+            .map(|reference| PyComponentRef::new(self.module(py).as_borrowed(), reference.key()))
+            .transpose()
+    }
+
     fn add_port_impl<'py>(
         &self,
         name: Borrowed<'_, 'py, PyString>,
@@ -373,25 +405,25 @@ impl PyComponent {
         Ok(())
     }
 
-    // TODO: support getting references
-    fn __getattr__<'py>(&self, port: &Bound<'py, PyString>) -> PyResult<Bound<'py, PyPort>> {
-        let py = port.py();
+    fn __getattr__<'py>(
+        &'py self,
+        port_or_reference: &'py Bound<'py, PyString>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let py = port_or_reference.py();
 
-        let port = {
-            borrow_inner!(self + py => component);
-            let port = port.to_str()?;
-            component
-                .find_port(port)
-                .ok_or_else(|| {
-                    let component = component.name();
-                    PyAttributeError::new_err(format!(
-                        r#"undefined port "{port}" referenced in "{component}""#,
-                    ))
-                })?
-                .key()
-        };
+        if let Some(port) = self.find_port(port_or_reference.as_borrowed())? {
+            return Ok(port.as_any().clone());
+        }
 
-        PyPort::new(self.module(py).as_borrowed(), port)
+        if let Some(reference) = self.find_reference(port_or_reference.as_borrowed())? {
+            return Ok(reference.as_any().clone());
+        }
+
+        let component = self.name(py);
+
+        Err(PyAttributeError::new_err(format!(
+            r#"undefined port or component "{port_or_reference}" referenced in "{component}""#
+        )))
     }
 
     fn __setattr__(
@@ -402,7 +434,18 @@ impl PyComponent {
         let py = slf.py();
 
         let sink = {
-            let port = slf.borrow().__getattr__(sink)?.borrow();
+            let component = slf.borrow();
+
+            let port = component
+                .find_port(sink.as_borrowed())?
+                .ok_or_else(|| {
+                    let component = slf.borrow().name(py);
+                    PyAttributeError::new_err(format!(
+                        r#"undefined port "{sink}" referenced in "{component}""#,
+                    ))
+                })?
+                .borrow();
+
             let sink = port.__getitem__(py, SliceOrIndex::full(py))?;
             Bound::new(py, sink)?
         };
