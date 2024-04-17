@@ -163,6 +163,7 @@ impl PyComponentRefSelection {
         let port = {
             let reference = reference.borrow();
             borrow_inner!(reference + py => reference);
+
             reference
                 .component()
                 .find_port(port.to_str()?)
@@ -192,6 +193,7 @@ impl PyComponentRefSelection {
 
         let reference = self.0.bind(py).borrow();
         let parent = reference.parent(py)?;
+
         parent
             .borrow_mut()
             .add_connection(&source.into_signature()?, &sink, None)

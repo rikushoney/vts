@@ -148,6 +148,7 @@ impl PyComponentRefPort {
     pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
         let port = self.1.bind(py).borrow();
         let pins = port.select(py, index)?;
+
         Ok(PySignature(
             pins,
             ComponentOrRef::Reference(self.0.borrow(py).clone()),
@@ -161,16 +162,14 @@ impl PyComponentRefPort {
         source: IntoSignature<'_>,
     ) -> PyResult<()> {
         let sink = Bound::new(py, self.__getitem__(py, sink)?)?;
+        let selection = self.0.bind(py).borrow();
+        let reference = selection.0.bind(py).borrow();
 
-        self.0
-            .bind(py)
-            .borrow()
-            .0
-            .bind(py)
-            .borrow()
-            .parent(py)?
-            .borrow_mut()
-            .add_connection(&source.into_signature()?, &sink, None)?;
+        reference.parent(py)?.borrow_mut().add_connection(
+            &source.into_signature()?,
+            &sink,
+            None,
+        )?;
 
         Ok(())
     }
