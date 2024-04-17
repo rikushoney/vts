@@ -7,7 +7,9 @@ use vts_core::arch::{
     PortClass, PortKind,
 };
 
-use super::{component::ComponentOrRef, PyComponent, PyComponentRef, PyModule_, PySignature};
+use super::{
+    component::ComponentOrRef, PyComponent, PyComponentRefSelection, PyModule_, PySignature,
+};
 
 wrap_enum!(
     PyPortClass (name = "PortClass", help = "port class") => PortClass:
@@ -136,17 +138,20 @@ impl PyPortPins {
 
 #[pyclass(name = "ComponentRefPort")]
 #[derive(Clone, Debug)]
-pub struct PyComponentRefPort(pub(crate) Py<PyComponentRef>, pub(crate) Py<PyPort>);
+pub struct PyComponentRefPort(
+    pub(crate) Py<PyComponentRefSelection>,
+    pub(crate) Py<PyPort>,
+);
 
 #[pymethods]
 impl PyComponentRefPort {
     pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
         let port = self.1.bind(py).borrow();
         let pins = port.select(py, index)?;
-        let reference = self.0.bind(py).borrow();
-        // TODO: make generic, not always `full`
-        let selection = reference.select(py, SliceOrIndex::full(py))?;
-        Ok(PySignature(pins, ComponentOrRef::Reference(selection)))
+        Ok(PySignature(
+            pins,
+            ComponentOrRef::Reference(self.0.borrow(py).clone()),
+        ))
     }
 
     pub fn __setitem__(
@@ -158,6 +163,9 @@ impl PyComponentRefPort {
         let sink = Bound::new(py, self.__getitem__(py, sink)?)?;
 
         self.0
+            .bind(py)
+            .borrow()
+            .0
             .bind(py)
             .borrow()
             .parent(py)?

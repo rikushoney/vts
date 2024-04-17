@@ -108,7 +108,7 @@ impl<'m> Component<'m> {
         self.data().class
     }
 
-    pub fn find_port(&self, name: &str) -> Option<Port<'_>> {
+    pub fn find_port(&self, name: &str) -> Option<Port<'m>> {
         self.data().ports.iter().find_map(|&port| {
             let port = Port::new(self.module(), port);
             (port.name() == name).then_some(port)

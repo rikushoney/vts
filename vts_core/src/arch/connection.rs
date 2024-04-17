@@ -25,6 +25,10 @@ impl ComponentRefSelection {
     pub fn new(reference: ComponentRefKey, range: ReferenceRange) -> Self {
         Self(reference.0, range)
     }
+
+    pub fn key(&self) -> ComponentRefKey {
+        ComponentRefKey::new(self.0)
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq)]

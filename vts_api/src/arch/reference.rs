@@ -2,10 +2,7 @@ use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 
-use vts_core::arch::{
-    connection::ComponentRefSelection,
-    reference::{ComponentRefKey, ReferenceRange},
-};
+use vts_core::arch::reference::{ComponentRefKey, ReferenceRange};
 
 use super::{IntoSignature, PyComponent, PyComponentRefPort, PyModule_, PyPort, SliceOrIndex};
 
@@ -84,23 +81,26 @@ impl PyComponentRef {
     }
 
     pub fn select(
-        &self,
+        slf: &Bound<'_, Self>,
         py: Python<'_>,
         index: SliceOrIndex<'_>,
     ) -> PyResult<PyComponentRefSelection> {
-        let n_instances = self.n_instances(py);
+        let n_instances = {
+            let slf = slf.borrow();
+            slf.n_instances(py)
+        };
+
         let mut range = ReferenceRange::Bound(index.to_range(n_instances)?);
         range.flatten(n_instances);
-        borrow_inner!(self + py => reference);
-        Ok(PyComponentRefSelection(reference.select(range)))
+        Ok(PyComponentRefSelection(slf.clone().unbind(), range))
     }
 
     pub fn __getitem__(
-        &self,
+        slf: &Bound<'_, Self>,
         py: Python<'_>,
         index: SliceOrIndex<'_>,
     ) -> PyResult<PyComponentRefSelection> {
-        self.select(py, index)
+        Self::select(slf, py, index)
     }
 
     pub fn __getattr__(
@@ -109,18 +109,23 @@ impl PyComponentRef {
     ) -> PyResult<PyComponentRefPort> {
         let py = slf.py();
         let reference = slf.borrow();
-        borrow_inner!(reference + py => reference);
-        let port = port.to_str()?;
 
-        if let Some(port) = reference.component().find_port(port) {
-            let port = PyPort::new(slf.borrow().module(py).as_borrowed(), port.key())?;
-            Ok(PyComponentRefPort(slf.clone().unbind(), port.unbind()))
-        } else {
-            let component = reference.component().name();
-            Err(PyAttributeError::new_err(format!(
-                r#"undefined port "{port}" referenced in "{component}""#
-            )))
-        }
+        let port = {
+            borrow_inner!(reference + py => reference);
+
+            reference
+                .component()
+                .find_port(port.to_str()?)
+                .ok_or(PyAttributeError::new_err(format!(
+                    r#"undefined port "{port}" referenced in "{component}""#,
+                    component = reference.component().name()
+                )))?
+                .key()
+        };
+
+        let reference = Self::select(slf, py, SliceOrIndex::full(py))?;
+        let port = PyPort::new(slf.borrow().module(py).as_borrowed(), port)?;
+        Ok(PyComponentRefPort(Py::new(py, reference)?, port.unbind()))
     }
 
     pub fn __setattr__(
@@ -147,4 +152,48 @@ impl PyComponentRef {
 
 #[derive(Clone, Debug)]
 #[pyclass(name = "ComponentRefSelection")]
-pub struct PyComponentRefSelection(pub(super) ComponentRefSelection);
+pub struct PyComponentRefSelection(pub(super) Py<PyComponentRef>, pub(super) ReferenceRange);
+
+#[pymethods]
+impl PyComponentRefSelection {
+    pub fn __getattr__<'py>(&self, port: &Bound<'py, PyString>) -> PyResult<PyComponentRefPort> {
+        let py = port.py();
+        let reference = self.0.bind(py);
+
+        let port = {
+            let reference = reference.borrow();
+            borrow_inner!(reference + py => reference);
+            reference
+                .component()
+                .find_port(port.to_str()?)
+                .ok_or(PyAttributeError::new_err(format!(
+                    r#"undefined port "{port}" referenced in "{component}""#,
+                    component = reference.component().name()
+                )))?
+                .key()
+        };
+
+        let port = PyPort::new(reference.borrow().module(py).as_borrowed(), port)?;
+        let reference = PyComponentRef::__getitem__(reference, py, SliceOrIndex::full(py))?;
+        Ok(PyComponentRefPort(Py::new(py, reference)?, port.unbind()))
+    }
+
+    pub fn __setattr__<'py>(
+        &self,
+        sink: &Bound<'py, PyString>,
+        source: IntoSignature<'_>,
+    ) -> PyResult<()> {
+        let py = sink.py();
+
+        let sink = {
+            let sink = self.__getattr__(sink)?;
+            Bound::new(py, sink.__getitem__(py, SliceOrIndex::full(py))?)?
+        };
+
+        let reference = self.0.bind(py).borrow();
+        let parent = reference.parent(py)?;
+        parent
+            .borrow_mut()
+            .add_connection(&source.into_signature()?, &sink, None)
+    }
+}

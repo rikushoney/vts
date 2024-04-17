@@ -235,9 +235,12 @@ pub enum ComponentOrRef {
 pub struct PySignature(pub(super) PyPortPins, pub(super) ComponentOrRef);
 
 impl PySignature {
-    pub fn get_reference_selection(&self) -> Option<&ComponentRefSelection> {
+    pub fn get_reference(&self, py: Python<'_>) -> Option<ComponentRefSelection> {
         match &self.1 {
-            ComponentOrRef::Reference(selection) => Some(&selection.0),
+            ComponentOrRef::Reference(selection) => Some(ComponentRefSelection::new(
+                selection.0.bind(py).borrow().key(),
+                selection.1.clone(),
+            )),
             _ => None,
         }
     }
@@ -353,10 +356,10 @@ impl PyComponent {
         let mut checker = module.checker.borrow_mut(py);
         let source = source.borrow();
         let source_pins = &source.0;
-        let source_selection = source.get_reference_selection().cloned();
+        let source_selection = source.get_reference(py);
         let sink = sink.borrow();
         let sink_pins = &sink.0;
-        let sink_selection = sink.get_reference_selection().cloned();
+        let sink_selection = sink.get_reference(py);
 
         let mut builder = ConnectionBuilder::new(&mut inner.0, &mut checker.0, self.key())
             .set_source(source_pins.0.clone(), source_selection)
