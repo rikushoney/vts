@@ -2,12 +2,12 @@ use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 
-use vts_core::arch::reference::ComponentRefKey;
-
-use super::port::SliceOrIndex;
-use super::{
-    PyComponent, PyComponentRefPort, PyConnectionKind, PyModule_, PyPort, PyPortSelection,
+use vts_core::arch::{
+    connection::ComponentRefSelection,
+    reference::{ComponentRefKey, ReferenceRange},
 };
+
+use super::{IntoSignature, PyComponent, PyComponentRefPort, PyModule_, PyPort, SliceOrIndex};
 
 #[pyclass(name = "ComponentRef")]
 pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
@@ -78,9 +78,29 @@ impl PyComponentRef {
         PyString::new_bound(py, reference.alias_or_name())
     }
 
-    pub fn n_instances(&self, py: Python<'_>) -> usize {
+    pub fn n_instances(&self, py: Python<'_>) -> u32 {
         borrow_inner!(self + py => reference);
         reference.n_instances()
+    }
+
+    pub fn select(
+        &self,
+        py: Python<'_>,
+        index: SliceOrIndex<'_>,
+    ) -> PyResult<PyComponentRefSelection> {
+        let n_instances = self.n_instances(py);
+        let mut range = ReferenceRange::Bound(index.to_range(n_instances)?);
+        range.flatten(n_instances);
+        borrow_inner!(self + py => reference);
+        Ok(PyComponentRefSelection(reference.select(range)))
+    }
+
+    pub fn __getitem__(
+        &self,
+        py: Python<'_>,
+        index: SliceOrIndex<'_>,
+    ) -> PyResult<PyComponentRefSelection> {
+        self.select(py, index)
     }
 
     pub fn __getattr__(
@@ -105,15 +125,15 @@ impl PyComponentRef {
 
     pub fn __setattr__(
         slf: &Bound<'_, Self>,
-        source: &Bound<'_, PyString>,
-        sink: &Bound<'_, PyPortSelection>,
+        sink: &Bound<'_, PyString>,
+        source: IntoSignature<'_>,
     ) -> PyResult<()> {
         let py = slf.py();
-        let port = Self::__getattr__(slf, source)?;
+        let sink = Self::__getattr__(slf, sink)?;
 
-        let source = {
-            let source = port.__getitem__(py, SliceOrIndex::full(py))?;
-            Bound::new(py, source)?
+        let sink = {
+            let sink = sink.__getitem__(py, SliceOrIndex::full(py))?;
+            Bound::new(py, sink)?
         };
 
         let reference = slf.borrow();
@@ -121,6 +141,10 @@ impl PyComponentRef {
 
         parent
             .borrow_mut()
-            .add_connection(&source, sink, Some(PyConnectionKind::DIRECT))
+            .add_connection(&source.into_signature()?, &sink, None)
     }
 }
+
+#[derive(Clone, Debug)]
+#[pyclass(name = "ComponentRefSelection")]
+pub struct PyComponentRefSelection(pub(super) ComponentRefSelection);

@@ -1,9 +1,12 @@
+use std::ops::Range;
+
 use serde::Serialize;
 use ustr::{ustr, Ustr};
 
 use super::{
     checker,
     component::ComponentKey,
+    connection::ComponentRefSelection,
     linker::{self, KnownComponents, Resolve},
     prelude::*,
 };
@@ -13,12 +16,19 @@ pub(super) const FIELDS: &[&str] = &["component", "n_instances"];
 pub(super) const COMPONENT: usize = 0;
 pub(super) const N_INSTANCES: usize = 1;
 
+pub(super) mod reference_range {
+    pub const FIELDS: &[&str] = &["reference_start", "reference_end"];
+
+    pub const REFERENCE_START: usize = 0;
+    pub const REFERENCE_END: usize = 1;
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentRefData {
     pub(crate) component: ComponentId,
     pub(crate) parent: ComponentId,
     pub(crate) alias: Option<Ustr>,
-    pub n_instances: usize,
+    pub n_instances: u32,
 }
 
 impl ComponentRefData {
@@ -26,7 +36,7 @@ impl ComponentRefData {
         component: ComponentId,
         parent: ComponentId,
         alias: Option<Ustr>,
-        n_instances: usize,
+        n_instances: u32,
     ) -> Self {
         Self {
             component,
@@ -90,8 +100,95 @@ impl<'m> ComponentRef<'m> {
         }
     }
 
-    pub fn n_instances(&self) -> usize {
+    pub fn n_instances(&self) -> u32 {
         self.data().n_instances
+    }
+
+    #[must_use]
+    pub fn select(&self, range: ReferenceRange) -> ComponentRefSelection {
+        ComponentRefSelection::new(self.key(), range)
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub enum ReferenceRange {
+    Start(u32),
+    End(u32),
+    Bound(Range<u32>),
+    #[default]
+    Full,
+}
+
+impl ReferenceRange {
+    pub fn new(start: Option<u32>, end: Option<u32>) -> Self {
+        match (start, end) {
+            (Some(start), Some(end)) => Self::Bound(Range { start, end }),
+            (Some(start), None) => Self::Start(start),
+            (None, Some(end)) => Self::End(end),
+            (None, None) => Self::Full,
+        }
+    }
+
+    pub fn get_start(&self) -> Option<u32> {
+        match self {
+            Self::Start(start) => Some(*start),
+            Self::Bound(Range { start, .. }) => Some(*start),
+            _ => None,
+        }
+    }
+
+    pub fn get_end(&self) -> Option<u32> {
+        match self {
+            Self::End(end) => Some(*end),
+            Self::Bound(Range { end, .. }) => Some(*end),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn expand(&self, n_instances: u32) -> Range<u32> {
+        match self {
+            Self::Start(start) => Range {
+                start: *start,
+                end: n_instances,
+            },
+            Self::End(end) => Range {
+                start: 0,
+                end: *end,
+            },
+            Self::Bound(range) => range.clone(),
+            Self::Full => Range {
+                start: 0,
+                end: n_instances,
+            },
+        }
+    }
+
+    pub fn flatten(&mut self, n_instances: u32) {
+        match self {
+            Self::Start(start) => {
+                if *start == 0 {
+                    *self = Self::Full;
+                }
+            }
+            Self::End(end) => {
+                if *end == n_instances {
+                    *self = Self::Full;
+                }
+            }
+            Self::Bound(range) => {
+                if range.start == 0 {
+                    *self = Self::End(range.end);
+                    return self.flatten(n_instances);
+                }
+
+                if range.end == n_instances {
+                    *self = Self::Start(range.start);
+                    self.flatten(n_instances)
+                }
+            }
+            Self::Full => {}
+        }
     }
 }
 
@@ -104,7 +201,7 @@ pub struct ComponentRefBuilder<'a, 'm, C> {
     parent: ComponentId,
     component: C,
     alias: Option<Ustr>,
-    n_instances: Option<usize>,
+    n_instances: Option<u32>,
 }
 
 impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentUnset> {
@@ -139,7 +236,7 @@ impl<'a, 'm, C> ComponentRefBuilder<'a, 'm, C> {
         self.alias = Some(ustr(alias));
     }
 
-    pub fn set_n_instances(&mut self, n_instances: usize) {
+    pub fn set_n_instances(&mut self, n_instances: u32) {
         self.n_instances = Some(n_instances);
     }
 
@@ -184,7 +281,7 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
     }
 }
 
-fn equals_one(x: &usize) -> bool {
+fn equals_one(x: &u32) -> bool {
     *x == 1
 }
 
@@ -194,7 +291,7 @@ pub struct ComponentWeakRef {
     #[serde(skip)]
     pub alias: Option<Ustr>,
     #[serde(skip_serializing_if = "equals_one")]
-    pub n_instances: usize,
+    pub n_instances: u32,
 }
 
 impl ComponentWeakRef {

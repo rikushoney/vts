@@ -3,14 +3,17 @@ mod module;
 mod port;
 mod reference;
 
-pub use component::{PyComponent, PyComponentClass, PyConnectionKind};
+pub use component::{PyComponent, PyComponentClass, PySignature};
 pub use module::PyModule_;
-pub use port::{PyComponentRefPort, PyPort, PyPortClass, PyPortKind, PyPortPins, PyPortSelection};
-pub use reference::PyComponentRef;
+pub use port::{PyComponentRefPort, PyPort, PyPortClass, PyPortKind, PyPortPins};
+pub use reference::{PyComponentRef, PyComponentRefSelection};
+
+use std::ops::Range;
 
 use pyo3::{
     exceptions::{PyException, PyValueError},
     prelude::*,
+    types::{PySlice, PySliceIndices},
 };
 use vts_core::arch::{checker, Error};
 
@@ -60,6 +63,97 @@ impl From<PyCheckerError> for PyErr {
     }
 }
 
+#[derive(FromPyObject)]
+pub enum SliceOrIndex<'py> {
+    #[pyo3(annotation = "slice")]
+    Slice(Bound<'py, PySlice>),
+    #[pyo3(annotation = "int")]
+    Index(u32),
+}
+
+impl<'py> SliceOrIndex<'py> {
+    pub fn full(py: Python<'py>) -> Self {
+        Self::Slice(PySlice::full_bound(py))
+    }
+
+    fn validate_slice(start: isize, stop: isize, step: isize) -> PyResult<()> {
+        if step != 1 {
+            return Err(PyValueError::new_err(
+                "only port slicing with step size 1 is supported",
+            ));
+        }
+
+        if start < 0 {
+            return Err(PyValueError::new_err("start should be non-negative"));
+        }
+
+        if stop < 0 {
+            return Err(PyValueError::new_err("stop should be non-negative"));
+        }
+
+        if start == stop {
+            return Err(PyValueError::new_err("empty slice"));
+        }
+
+        if start > stop {
+            return Err(PyValueError::new_err("stop should be greater than start"));
+        }
+
+        Ok(())
+    }
+
+    pub fn to_range(&self, n_pins: u32) -> PyResult<Range<u32>> {
+        match self {
+            Self::Slice(slice) => {
+                let PySliceIndices {
+                    start, stop, step, ..
+                } = slice.indices(n_pins as i64)?;
+
+                Self::validate_slice(start, stop, step)?;
+
+                Ok(Range {
+                    start: start as u32,
+                    end: stop as u32,
+                })
+            }
+            Self::Index(index) => Ok(Range {
+                start: *index,
+                end: *index + 1,
+            }),
+        }
+    }
+}
+
+#[derive(Clone, Debug, FromPyObject)]
+pub enum IntoSignature<'py> {
+    #[pyo3(annotation = "Signature")]
+    Signature(Bound<'py, PySignature>),
+    #[pyo3(annotation = "ComponentRefPort")]
+    PortRef(Bound<'py, PyComponentRefPort>),
+    #[pyo3(annotation = "Port")]
+    Port(Bound<'py, PyPort>),
+}
+
+impl<'py> IntoSignature<'py> {
+    pub fn into_signature(self) -> PyResult<Bound<'py, PySignature>> {
+        match self {
+            Self::Signature(signature) => Ok(signature),
+            Self::PortRef(reference) => {
+                let py = reference.py();
+
+                Bound::new(
+                    py,
+                    reference.borrow().__getitem__(py, SliceOrIndex::full(py))?,
+                )
+            }
+            Self::Port(port) => {
+                let py = port.py();
+                Bound::new(py, port.borrow().__getitem__(py, SliceOrIndex::full(py))?)
+            }
+        }
+    }
+}
+
 macro_rules! register_classes {
     ($arch:ident { $($class:path),* $(,)? }) => {
         $(
@@ -86,11 +180,12 @@ pub fn register_arch<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound<'py, 
         PyComponentClass,
         PyComponentRef,
         PyComponentRefPort,
+        PyComponentRefSelection,
         PyPort,
         PyPortClass,
         PyPortKind,
         PyPortPins,
-        PyPortSelection
+        PySignature,
     });
 
     register_functions!(arch {

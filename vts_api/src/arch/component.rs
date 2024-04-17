@@ -6,13 +6,16 @@ use pyo3::{
     types::{PyMapping, PyString},
 };
 use vts_core::arch::{
-    component::ComponentKey, connection::ConnectionBuilder, port::PortBuilder, prelude::*,
+    component::ComponentKey,
+    connection::{ComponentRefSelection, ConnectionBuilder},
+    port::PortBuilder,
+    prelude::*,
     reference::ComponentRefBuilder,
 };
 
 use super::{
-    port::{ComponentOrRef, SliceOrIndex},
-    PyCheckerError, PyComponentRef, PyModule_, PyPort, PyPortClass, PyPortKind, PyPortSelection,
+    port::PyPortPins, reference::PyComponentRefSelection, IntoSignature, PyCheckerError,
+    PyComponentRef, PyModule_, PyPort, PyPortClass, PyPortKind, SliceOrIndex,
 };
 
 wrap_enum!(
@@ -221,6 +224,25 @@ impl<'py> PortClassOrStr<'py> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum ComponentOrRef {
+    Component(ComponentKey),
+    Reference(PyComponentRefSelection),
+}
+
+#[derive(Clone, Debug)]
+#[pyclass(name = "Signature")]
+pub struct PySignature(pub(super) PyPortPins, pub(super) ComponentOrRef);
+
+impl PySignature {
+    pub fn get_reference_selection(&self) -> Option<&ComponentRefSelection> {
+        match &self.1 {
+            ComponentOrRef::Reference(selection) => Some(&selection.0),
+            _ => None,
+        }
+    }
+}
+
 #[pymethods]
 impl PyComponent {
     pub fn module<'py>(&self, py: Python<'py>) -> &Bound<'py, PyModule_> {
@@ -290,7 +312,7 @@ impl PyComponent {
         &mut self,
         component: &Bound<'py, PyComponent>,
         alias: Option<&Bound<'py, PyString>>,
-        n_instances: Option<usize>,
+        n_instances: Option<u32>,
     ) -> PyResult<Bound<'py, PyComponentRef>> {
         let py = component.py();
 
@@ -320,8 +342,8 @@ impl PyComponent {
     #[pyo3(signature = (source, sink, *, kind=None))]
     pub fn add_connection(
         &mut self,
-        source: &Bound<'_, PyPortSelection>,
-        sink: &Bound<'_, PyPortSelection>,
+        source: &Bound<'_, PySignature>,
+        sink: &Bound<'_, PySignature>,
         kind: Option<PyConnectionKind>,
     ) -> PyResult<()> {
         let py = source.py();
@@ -330,24 +352,15 @@ impl PyComponent {
         let mut inner = module.inner.borrow_mut(py);
         let mut checker = module.checker.borrow_mut(py);
         let source = source.borrow();
-        let source_pins = &source.1;
-
-        let source_component = match source.0 {
-            ComponentOrRef::Component(_) => None,
-            ComponentOrRef::Ref(reference) => Some(reference),
-        };
-
+        let source_pins = &source.0;
+        let source_selection = source.get_reference_selection().cloned();
         let sink = sink.borrow();
-        let sink_pins = &sink.1;
-
-        let sink_component = match sink.0 {
-            ComponentOrRef::Component(_) => None,
-            ComponentOrRef::Ref(reference) => Some(reference),
-        };
+        let sink_pins = &sink.0;
+        let sink_selection = sink.get_reference_selection().cloned();
 
         let mut builder = ConnectionBuilder::new(&mut inner.0, &mut checker.0, self.key())
-            .set_source(source_pins.0.clone(), source_component)
-            .set_sink(sink_pins.0.clone(), sink_component);
+            .set_source(source_pins.0.clone(), source_selection)
+            .set_sink(sink_pins.0.clone(), sink_selection);
 
         if let Some(kind) = kind {
             builder.set_kind(ConnectionKind::from(kind));
@@ -357,6 +370,7 @@ impl PyComponent {
         Ok(())
     }
 
+    // TODO: support getting references
     fn __getattr__<'py>(&self, port: &Bound<'py, PyString>) -> PyResult<Bound<'py, PyPort>> {
         let py = port.py();
 
@@ -379,18 +393,21 @@ impl PyComponent {
 
     fn __setattr__(
         slf: &Bound<'_, Self>,
-        source: &Bound<'_, PyString>,
-        sink: &Bound<'_, PyPortSelection>,
+        sink: &Bound<'_, PyString>,
+        source: IntoSignature<'_>,
     ) -> PyResult<()> {
         let py = slf.py();
 
-        let source = {
-            let port = slf.borrow().__getattr__(source)?.borrow();
-            let source = port.__getitem__(py, SliceOrIndex::full(py))?;
-            Bound::new(py, source)?
+        let sink = {
+            let port = slf.borrow().__getattr__(sink)?.borrow();
+            let sink = port.__getitem__(py, SliceOrIndex::full(py))?;
+            Bound::new(py, sink)?
         };
 
-        slf.borrow_mut()
-            .add_connection(&source, sink, Some(PyConnectionKind::DIRECT))
+        slf.borrow_mut().add_connection(
+            &source.into_signature()?,
+            &sink,
+            Some(PyConnectionKind::DIRECT),
+        )
     }
 }

@@ -10,7 +10,7 @@ use super::{
     module,
     port::{pin_range, PinRange, WeakPortPins},
     prelude::*,
-    reference::ComponentWeakRef,
+    reference::{reference_range, ComponentWeakRef, ReferenceRange},
 };
 
 struct SerializeComponents<'a, 'm> {
@@ -202,17 +202,33 @@ impl Serialize for SerializeConnections<'_, '_> {
                 range: connection.sink_pins.range.clone(),
             };
 
-            let source_component = connection
+            let (source_component, source_start, source_end) = connection
                 .source_component
-                .map(|component| ComponentRef::new(self.module, component).alias_or_name());
+                .as_ref()
+                .map(|component| {
+                    (
+                        Some(ComponentRef::new(self.module, component.0).alias_or_name()),
+                        component.1.get_start(),
+                        component.1.get_end(),
+                    )
+                })
+                .unwrap_or((None, None, None));
 
-            let sink_component = connection
+            let (sink_component, sink_start, sink_end) = connection
                 .sink_component
-                .map(|component| ComponentRef::new(self.module, component).alias_or_name());
+                .as_ref()
+                .map(|component| {
+                    (
+                        Some(ComponentRef::new(self.module, component.0).alias_or_name()),
+                        component.1.get_start(),
+                        component.1.get_end(),
+                    )
+                })
+                .unwrap_or((None, None, None));
 
             let mut builder = WeakConnectionBuilder::new()
-                .set_source(source_pins, source_component)
-                .set_sink(sink_pins, sink_component);
+                .set_source(source_pins, source_component, source_start, source_end)
+                .set_sink(sink_pins, sink_component, sink_start, sink_end);
 
             builder.set_kind(connection.kind);
             state.serialize_element(&builder.finish())?;
@@ -293,26 +309,59 @@ impl Serialize for PinRange {
     where
         S: Serializer,
     {
-        let port_start = self.get_start();
-        let port_end = self.get_end();
-        let mut len = 0;
+        let start = self.get_start();
+        let end = self.get_end();
 
-        if port_start.is_some() {
-            len += 1;
-        }
-
-        if port_end.is_some() {
-            len += 1;
-        }
+        let len = match (start, end) {
+            (Some(_), Some(_)) => 2,
+            (Some(_), None) => 1,
+            (None, Some(_)) => 1,
+            (None, None) => 0,
+        };
 
         let mut state = serializer.serialize_map(Some(len))?;
 
-        if let Some(port_start) = port_start {
-            state.serialize_entry(pin_range::FIELDS[pin_range::PORT_START], &port_start)?;
+        if let Some(start) = start {
+            state.serialize_entry(pin_range::FIELDS[pin_range::PORT_START], &start)?;
         }
 
-        if let Some(port_end) = port_end {
-            state.serialize_entry(pin_range::FIELDS[pin_range::PORT_START], &port_end)?;
+        if let Some(end) = end {
+            state.serialize_entry(pin_range::FIELDS[pin_range::PORT_END], &end)?;
+        }
+
+        state.end()
+    }
+}
+
+impl Serialize for ReferenceRange {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let start = self.get_start();
+        let end = self.get_end();
+
+        let len = match (start, end) {
+            (Some(_), Some(_)) => 2,
+            (Some(_), None) => 1,
+            (None, Some(_)) => 1,
+            (None, None) => 0,
+        };
+
+        let mut state = serializer.serialize_map(Some(len))?;
+
+        if let Some(start) = start {
+            state.serialize_entry(
+                reference_range::FIELDS[reference_range::REFERENCE_START],
+                &start,
+            )?;
+        }
+
+        if let Some(end) = end {
+            state.serialize_entry(
+                reference_range::FIELDS[reference_range::REFERENCE_END],
+                &end,
+            )?;
         }
 
         state.end()

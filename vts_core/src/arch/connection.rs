@@ -6,7 +6,7 @@ use super::{
     linker::{self, KnownComponents, Resolve},
     port::{PortPins, WeakPortPins},
     prelude::*,
-    reference::ComponentRefKey,
+    reference::{ComponentRefKey, ReferenceRange},
 };
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -18,12 +18,21 @@ pub enum ConnectionKind {
     Mux,
 }
 
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct ComponentRefSelection(pub(super) ComponentRefId, pub(super) ReferenceRange);
+
+impl ComponentRefSelection {
+    pub fn new(reference: ComponentRefKey, range: ReferenceRange) -> Self {
+        Self(reference.0, range)
+    }
+}
+
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub struct Connection {
     pub kind: ConnectionKind,
-    pub(crate) source_component: Option<ComponentRefId>,
+    pub(crate) source_component: Option<ComponentRefSelection>,
     pub(crate) source_pins: PortPins,
-    pub(crate) sink_component: Option<ComponentRefId>,
+    pub(crate) sink_component: Option<ComponentRefSelection>,
     pub(crate) sink_pins: PortPins,
 }
 
@@ -32,8 +41,8 @@ impl Connection {
         kind: ConnectionKind,
         source_pins: PortPins,
         sink_pins: PortPins,
-        source_component: Option<ComponentRefId>,
-        sink_component: Option<ComponentRefId>,
+        source_component: Option<ComponentRefSelection>,
+        sink_component: Option<ComponentRefSelection>,
     ) -> Self {
         Self {
             kind,
@@ -53,9 +62,9 @@ impl Connection {
     }
 }
 
-pub struct SourceSet(PortPins, Option<ComponentRefId>);
+pub struct SourceSet(PortPins, Option<ComponentRefSelection>);
 pub struct SourceUnset;
-pub struct SinkSet(PortPins, Option<ComponentRefId>);
+pub struct SinkSet(PortPins, Option<ComponentRefSelection>);
 pub struct SinkUnset;
 
 pub struct ConnectionBuilder<'a, 'm, Src, Snk> {
@@ -84,13 +93,13 @@ impl<'a, 'm, Snk> ConnectionBuilder<'a, 'm, SourceUnset, Snk> {
     pub fn set_source(
         self,
         pins: PortPins,
-        component: Option<ComponentRefKey>,
+        component: Option<ComponentRefSelection>,
     ) -> ConnectionBuilder<'a, 'm, SourceSet, Snk> {
         ConnectionBuilder {
             module: self.module,
             checker: self.checker,
             component: self.component,
-            source: SourceSet(pins, component.map(|c| c.0)),
+            source: SourceSet(pins, component),
             sink: self.sink,
             kind: self.kind,
         }
@@ -101,14 +110,14 @@ impl<'a, 'm, Src> ConnectionBuilder<'a, 'm, Src, SinkUnset> {
     pub fn set_sink(
         self,
         pins: PortPins,
-        component: Option<ComponentRefKey>,
+        component: Option<ComponentRefSelection>,
     ) -> ConnectionBuilder<'a, 'm, Src, SinkSet> {
         ConnectionBuilder {
             module: self.module,
             checker: self.checker,
             component: self.component,
             source: self.source,
-            sink: SinkSet(pins, component.map(|c| c.0)),
+            sink: SinkSet(pins, component),
             kind: self.kind,
         }
     }
@@ -138,12 +147,28 @@ impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceSet, SinkSet> {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+pub struct WeakReferenceSelection {
+    reference: Ustr,
+    #[serde(flatten)]
+    range: ReferenceRange,
+}
+
+impl WeakReferenceSelection {
+    pub fn new(reference: &str, start: Option<u32>, end: Option<u32>) -> Self {
+        Self {
+            reference: ustr(reference),
+            range: ReferenceRange::new(start, end),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct Signature {
     #[serde(flatten)]
     pub pins: WeakPortPins,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reference: Option<Ustr>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub reference: Option<WeakReferenceSelection>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -153,9 +178,9 @@ pub struct WeakConnection {
     pub sink: Signature,
 }
 
-pub struct WeakSourceSet(WeakPortPins, Option<Ustr>);
+pub struct WeakSourceSet(WeakPortPins, Option<WeakReferenceSelection>);
 pub struct WeakSourceUnset;
-pub struct WeakSinkSet(WeakPortPins, Option<Ustr>);
+pub struct WeakSinkSet(WeakPortPins, Option<WeakReferenceSelection>);
 pub struct WeakSinkUnset;
 
 #[derive(Default)]
@@ -180,9 +205,16 @@ impl<Snk> WeakConnectionBuilder<WeakSourceUnset, Snk> {
         self,
         pins: WeakPortPins,
         component: Option<&str>,
+        reference_start: Option<u32>,
+        reference_end: Option<u32>,
     ) -> WeakConnectionBuilder<WeakSourceSet, Snk> {
         WeakConnectionBuilder {
-            source: WeakSourceSet(pins, component.map(ustr)),
+            source: WeakSourceSet(
+                pins,
+                component.map(|component| {
+                    WeakReferenceSelection::new(component, reference_start, reference_end)
+                }),
+            ),
             sink: self.sink,
             kind: self.kind,
         }
@@ -194,10 +226,17 @@ impl<Src> WeakConnectionBuilder<Src, WeakSinkUnset> {
         self,
         pins: WeakPortPins,
         component: Option<&str>,
+        reference_start: Option<u32>,
+        reference_end: Option<u32>,
     ) -> WeakConnectionBuilder<Src, WeakSinkSet> {
         WeakConnectionBuilder {
             source: self.source,
-            sink: WeakSinkSet(pins, component.map(ustr)),
+            sink: WeakSinkSet(
+                pins,
+                component.map(|component| {
+                    WeakReferenceSelection::new(component, reference_start, reference_end)
+                }),
+            ),
             kind: self.kind,
         }
     }
@@ -230,7 +269,7 @@ impl WeakConnectionBuilder<WeakSourceSet, WeakSinkSet> {
 }
 
 impl<'a, 'm> Resolve<'a, 'm> for Signature {
-    type Output = (PortPins, Option<ComponentRefKey>);
+    type Output = (PortPins, Option<ComponentRefSelection>);
 
     fn resolve(
         self,
@@ -244,17 +283,29 @@ impl<'a, 'm> Resolve<'a, 'm> for Signature {
         let reference = self
             .reference
             .map(|ref reference| {
+                let start = reference.range.get_start();
+                let end = reference.range.get_end();
                 component
-                    .find_reference(reference)
+                    .find_reference(&reference.reference)
                     .ok_or(linker::Error::undefined_reference(
                         component.name(),
-                        reference,
+                        &reference.reference,
                     ))
-                    .map(|reference| reference.key())
+                    .map(|reference| {
+                        ComponentRefSelection::new(reference.key(), ReferenceRange::new(start, end))
+                    })
             })
             .transpose()?;
 
-        let pins = (self.pins, reference).resolve(module, checker, parent, components)?;
+        let resolver = (
+            self.pins,
+            reference
+                .as_ref()
+                .map(|reference| ComponentRefKey::new(reference.0)),
+        );
+
+        let pins = resolver.resolve(module, checker, parent, components)?;
+
         Ok((pins, reference))
     }
 }

@@ -135,11 +135,12 @@ impl<'m> Port<'m> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub enum PinRange {
     Start(u32),
     End(u32),
     Bound(Range<u32>),
+    #[default]
     Full,
 }
 
@@ -169,6 +170,7 @@ impl PinRange {
         }
     }
 
+    #[must_use]
     pub fn expand(&self, n_pins: u32) -> Range<u32> {
         match self {
             Self::Start(start) => Range {
@@ -191,22 +193,22 @@ impl PinRange {
         match self {
             Self::Start(start) => {
                 if *start == 0 {
-                    *self = PinRange::Full;
+                    *self = Self::Full;
                 }
             }
             Self::End(end) => {
                 if *end == n_pins {
-                    *self = PinRange::Full;
+                    *self = Self::Full;
                 }
             }
             Self::Bound(range) => {
                 if range.start == 0 {
-                    *self = PinRange::End(range.end);
+                    *self = Self::End(range.end);
                     return self.flatten(n_pins);
                 }
 
                 if range.end == n_pins {
-                    *self = PinRange::Start(range.start);
+                    *self = Self::Start(range.start);
                     self.flatten(n_pins)
                 }
             }
@@ -333,7 +335,7 @@ impl<'a, 'm> PortBuilder<'a, 'm, NameSet, KindSet> {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct WeakPortPins {
     pub port: Ustr,
     #[serde(flatten)]

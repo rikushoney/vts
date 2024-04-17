@@ -1,18 +1,13 @@
-use std::ops::Range;
+use pyo3::{prelude::*, types::PyString};
 
-use pyo3::{
-    exceptions::PyValueError,
-    prelude::*,
-    types::{PySlice, PySliceIndices, PyString},
-};
+use super::{IntoSignature, SliceOrIndex};
+
 use vts_core::arch::{
-    component::ComponentKey,
     port::{PinRange, PortKey, PortPins},
-    reference::ComponentRefKey,
     PortClass, PortKind,
 };
 
-use super::{PyComponent, PyComponentRef, PyConnectionKind, PyModule_};
+use super::{component::ComponentOrRef, PyComponent, PyComponentRef, PyModule_, PySignature};
 
 wrap_enum!(
     PyPortClass (name = "PortClass", help = "port class") => PortClass:
@@ -65,67 +60,6 @@ impl PyPort {
     }
 }
 
-#[derive(FromPyObject)]
-pub enum SliceOrIndex<'py> {
-    #[pyo3(annotation = "slice")]
-    Slice(Bound<'py, PySlice>),
-    #[pyo3(annotation = "int")]
-    Index(u32),
-}
-
-impl<'py> SliceOrIndex<'py> {
-    pub fn full(py: Python<'py>) -> Self {
-        Self::Slice(PySlice::full_bound(py))
-    }
-
-    fn validate_slice(start: isize, stop: isize, step: isize) -> PyResult<()> {
-        if step != 1 {
-            return Err(PyValueError::new_err(
-                "only port slicing with step size 1 is supported",
-            ));
-        }
-
-        if start < 0 {
-            return Err(PyValueError::new_err("start should be non-negative"));
-        }
-
-        if stop < 0 {
-            return Err(PyValueError::new_err("stop should be non-negative"));
-        }
-
-        if start == stop {
-            return Err(PyValueError::new_err("empty slice"));
-        }
-
-        if start > stop {
-            return Err(PyValueError::new_err("stop should be greater than start"));
-        }
-
-        Ok(())
-    }
-
-    pub fn to_range(&self, n_pins: u32) -> PyResult<Range<u32>> {
-        match self {
-            Self::Slice(slice) => {
-                let PySliceIndices {
-                    start, stop, step, ..
-                } = slice.indices(n_pins as i64)?;
-
-                Self::validate_slice(start, stop, step)?;
-
-                Ok(Range {
-                    start: start as u32,
-                    end: stop as u32,
-                })
-            }
-            Self::Index(index) => Ok(Range {
-                start: *index,
-                end: *index + 1,
-            }),
-        }
-    }
-}
-
 #[pymethods]
 impl PyPort {
     pub fn module<'py>(&self, py: Python<'py>) -> &Bound<'py, PyModule_> {
@@ -159,24 +93,34 @@ impl PyPort {
     }
 
     fn select(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyPortPins> {
-        let mut range = PinRange::Bound(index.to_range(self.n_pins(py))?);
-        range.flatten(self.n_pins(py));
+        let n_pins = self.n_pins(py);
+        let mut range = PinRange::Bound(index.to_range(n_pins)?);
+        range.flatten(n_pins);
         borrow_inner!(self + py => port);
         Ok(PyPortPins::new(port.select(range)))
     }
 
-    pub fn __getitem__(
+    pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
+        let pins = self.select(py, index)?;
+        let parent = {
+            borrow_inner!(self + py => port);
+            port.parent().key()
+        };
+
+        Ok(PySignature(pins, ComponentOrRef::Component(parent)))
+    }
+
+    pub fn __setitem__(
         &self,
         py: Python<'_>,
-        index: SliceOrIndex<'_>,
-    ) -> PyResult<PyPortSelection> {
-        let pins = self.select(py, index)?;
-        let parent = self.parent(py)?.borrow();
+        sink: SliceOrIndex<'_>,
+        source: IntoSignature<'_>,
+    ) -> PyResult<()> {
+        let sink = Bound::new(py, self.__getitem__(py, sink)?)?;
 
-        Ok(PyPortSelection(
-            ComponentOrRef::Component(parent.key()),
-            pins,
-        ))
+        self.parent(py)?
+            .borrow_mut()
+            .add_connection(&source.into_signature()?, &sink, None)
     }
 }
 
@@ -190,90 +134,35 @@ impl PyPortPins {
     }
 }
 
-fn extract_component_key(ob: &Bound<'_, PyAny>) -> PyResult<ComponentKey> {
-    ob.downcast::<PyComponent>()
-        .map(|component| component.borrow().key())
-        .map_err(PyErr::from)
-}
-
-fn extract_reference_key(ob: &Bound<'_, PyAny>) -> PyResult<ComponentRefKey> {
-    ob.downcast::<PyComponentRef>()
-        .map(|reference| reference.borrow().key())
-        .map_err(PyErr::from)
-}
-
-#[derive(Clone, Debug, FromPyObject)]
-pub enum ComponentOrRef {
-    #[pyo3(annotation = "Component")]
-    Component(#[pyo3(from_py_with = "extract_component_key")] ComponentKey),
-    #[pyo3(annotation = "ComponentRef")]
-    Ref(#[pyo3(from_py_with = "extract_reference_key")] ComponentRefKey),
-}
-
-#[pyclass(name = "PortSelection")]
-#[derive(Clone, Debug)]
-pub struct PyPortSelection(pub(crate) ComponentOrRef, pub(crate) PyPortPins);
-
 #[pyclass(name = "ComponentRefPort")]
 #[derive(Clone, Debug)]
 pub struct PyComponentRefPort(pub(crate) Py<PyComponentRef>, pub(crate) Py<PyPort>);
 
-#[derive(FromPyObject)]
-pub enum PortSelectionOrRef<'py> {
-    #[pyo3(annotation = "PortSelection")]
-    Selection(Bound<'py, PyPortSelection>),
-    #[pyo3(annotation = "ComponentRefPort")]
-    Ref(Bound<'py, PyComponentRefPort>),
-}
-
-impl<'py> PortSelectionOrRef<'py> {
-    pub fn get_selection(&self) -> PyResult<Bound<'py, PyPortSelection>> {
-        match self {
-            PortSelectionOrRef::Selection(selection) => Ok(selection.clone()),
-            PortSelectionOrRef::Ref(reference) => {
-                let py = reference.py();
-                let reference = reference.borrow();
-                let port = reference.1.bind(py).borrow();
-                let reference = ComponentOrRef::Ref(reference.0.borrow(py).key());
-                let selection = port.select(py, SliceOrIndex::full(py))?;
-                Bound::new(py, PyPortSelection(reference, selection))
-            }
-        }
-    }
-}
-
 #[pymethods]
 impl PyComponentRefPort {
-    pub fn __getitem__(
-        &self,
-        py: Python<'_>,
-        index: SliceOrIndex<'_>,
-    ) -> PyResult<PyPortSelection> {
+    pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
         let port = self.1.bind(py).borrow();
         let pins = port.select(py, index)?;
         let reference = self.0.bind(py).borrow();
-
-        Ok(PyPortSelection(ComponentOrRef::Ref(reference.key()), pins))
+        // TODO: make generic, not always `full`
+        let selection = reference.select(py, SliceOrIndex::full(py))?;
+        Ok(PySignature(pins, ComponentOrRef::Reference(selection)))
     }
 
     pub fn __setitem__(
         &self,
         py: Python<'_>,
-        index: SliceOrIndex<'_>,
-        sink: PortSelectionOrRef<'_>,
+        sink: SliceOrIndex<'_>,
+        source: IntoSignature<'_>,
     ) -> PyResult<()> {
-        let source = Bound::new(py, self.__getitem__(py, index)?)?;
+        let sink = Bound::new(py, self.__getitem__(py, sink)?)?;
 
         self.0
             .bind(py)
             .borrow()
             .parent(py)?
             .borrow_mut()
-            .add_connection(
-                &source,
-                &sink.get_selection()?,
-                Some(PyConnectionKind::DIRECT),
-            )?;
+            .add_connection(&source.into_signature()?, &sink, None)?;
 
         Ok(())
     }
