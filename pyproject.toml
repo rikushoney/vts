@@ -1,6 +1,6 @@
 [project]
 name = "vts"
-version = "0.1.0"
+version = "0.1.1"
 authors = [{ name = "Rikus Honey", email = "rikushoney2@gmail.com" }]
 requires-python = ">=3.10"
 
