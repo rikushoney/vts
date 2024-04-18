@@ -156,7 +156,7 @@ pub struct PyComponentRefSelection(pub(super) Py<PyComponentRef>, pub(super) Ref
 
 #[pymethods]
 impl PyComponentRefSelection {
-    pub fn __getattr__<'py>(&self, port: &Bound<'py, PyString>) -> PyResult<PyComponentRefPort> {
+    pub fn __getattr__(&self, port: &Bound<'_, PyString>) -> PyResult<PyComponentRefPort> {
         let py = port.py();
         let reference = self.0.bind(py);
 
@@ -179,9 +179,9 @@ impl PyComponentRefSelection {
         Ok(PyComponentRefPort(Py::new(py, reference)?, port.unbind()))
     }
 
-    pub fn __setattr__<'py>(
+    pub fn __setattr__(
         &self,
-        sink: &Bound<'py, PyString>,
+        sink: &Bound<'_, PyString>,
         source: IntoSignature<'_>,
     ) -> PyResult<()> {
         let py = sink.py();

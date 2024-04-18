@@ -2,7 +2,7 @@
 name = "vts"
 version = "0.1.2"
 authors = [{ name = "Rikus Honey", email = "rikushoney2@gmail.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 description = "A framework for SFPGA architecture exploration"
 readme = "README.md"
 classifiers = [
@@ -23,7 +23,6 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
-features = ["pyo3/extension-module"]
 manifest-path = "vts_api/Cargo.toml"
 python-source = "python"
 module-name = "vts._vts"

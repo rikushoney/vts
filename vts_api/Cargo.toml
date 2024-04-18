@@ -7,8 +7,13 @@ edition = "2021"
 fnv.workspace = true
 thiserror.workspace = true
 vts_core.workspace = true
-pyo3 = { version = "0.21.0", features = ["abi3-py310"] }
+pyo3 = "0.21.2"
 
 [lib]
 name = "_vts_api_rs"
 crate-type = ["cdylib"]
+
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
+abi3-py310 = ["pyo3/abi3-py310"]

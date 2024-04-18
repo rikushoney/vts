@@ -71,9 +71,9 @@ impl PyComponent {
         self.1
     }
 
-    fn find_port<'a, 'py>(
+    fn find_port<'py>(
         &self,
-        port: Borrowed<'a, 'py, PyString>,
+        port: Borrowed<'_, 'py, PyString>,
     ) -> PyResult<Option<Bound<'py, PyPort>>> {
         // TODO: cache
         let py = port.py();
@@ -87,9 +87,9 @@ impl PyComponent {
             .transpose()
     }
 
-    fn find_reference<'a, 'py>(
+    fn find_reference<'py>(
         &self,
-        reference: Borrowed<'a, 'py, PyString>,
+        reference: Borrowed<'_, 'py, PyString>,
     ) -> PyResult<Option<Bound<'py, PyComponentRef>>> {
         // TODO: cache
         let py = reference.py();
@@ -406,8 +406,8 @@ impl PyComponent {
     }
 
     fn __getattr__<'py>(
-        &'py self,
-        port_or_reference: &'py Bound<'py, PyString>,
+        &self,
+        port_or_reference: &Bound<'py, PyString>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let py = port_or_reference.py();
 
@@ -450,10 +450,7 @@ impl PyComponent {
             Bound::new(py, sink)?
         };
 
-        slf.borrow_mut().add_connection(
-            &source.into_signature()?,
-            &sink,
-            Some(PyConnectionKind::DIRECT),
-        )
+        slf.borrow_mut()
+            .add_connection(&source.into_signature()?, &sink, None)
     }
 }
