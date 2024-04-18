@@ -6,29 +6,20 @@ use pyo3::{
     types::{PyMapping, PyString},
 };
 use vts_core::arch::{
-    component::ComponentKey,
-    connection::{ComponentRefSelection, ConnectionBuilder},
-    port::PortBuilder,
-    prelude::*,
+    component::ComponentKey, connection::ConnectionBuilder, port::PortBuilder, prelude::*,
     reference::ComponentRefBuilder,
 };
 
 use super::{
-    port::PyPortPins, reference::PyComponentRefSelection, IntoSignature, PyCheckerError,
-    PyComponentRef, PyModule_, PyPort, PyPortClass, PyPortKind, SliceOrIndex,
+    connection::{Connector, IntoSignature, PyConnectionKind},
+    prelude::*,
+    PyCheckerError,
 };
 
 wrap_enum!(
     PyComponentClass (name = "ComponentClass", help = "component class") => ComponentClass:
         LUT = Lut (alias = "lut"),
         LATCH = Latch (alias = "latch" | "ff"),
-);
-
-wrap_enum!(
-    PyConnectionKind (name = "ConnectionKind", help = "connection kind") => ConnectionKind:
-        DIRECT = Direct (alias = "direct" | "d"),
-        COMPLETE = Complete (alias = "complete" | "c"),
-        MUX = Mux (alias = "mux" | "m")
 );
 
 macro_rules! borrow_inner {
@@ -256,28 +247,6 @@ impl<'py> PortClassOrStr<'py> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum ComponentOrRef {
-    Component(ComponentKey),
-    Reference(PyComponentRefSelection),
-}
-
-#[derive(Clone, Debug)]
-#[pyclass(name = "Signature")]
-pub struct PySignature(pub(super) PyPortPins, pub(super) ComponentOrRef);
-
-impl PySignature {
-    pub fn get_reference(&self, py: Python<'_>) -> Option<ComponentRefSelection> {
-        match &self.1 {
-            ComponentOrRef::Reference(selection) => Some(ComponentRefSelection::new(
-                selection.0.bind(py).borrow().key(),
-                selection.1.clone(),
-            )),
-            _ => None,
-        }
-    }
-}
-
 #[pymethods]
 impl PyComponent {
     pub fn module<'py>(&self, py: Python<'py>) -> &Bound<'py, PyModule_> {
@@ -386,9 +355,11 @@ impl PyComponent {
         let module = self.module(py).borrow_mut();
         let mut inner = module.inner.borrow_mut(py);
         let mut checker = module.checker.borrow_mut(py);
+
         let source = source.borrow();
         let source_pins = &source.0;
         let source_selection = source.get_reference(py);
+
         let sink = sink.borrow();
         let sink_pins = &sink.0;
         let sink_selection = sink.get_reference(py);
@@ -429,7 +400,7 @@ impl PyComponent {
     fn __setattr__(
         slf: &Bound<'_, Self>,
         sink: &Bound<'_, PyString>,
-        source: IntoSignature<'_>,
+        source: Connector<'_>,
     ) -> PyResult<()> {
         let py = slf.py();
 
@@ -450,7 +421,6 @@ impl PyComponent {
             Bound::new(py, sink)?
         };
 
-        slf.borrow_mut()
-            .add_connection(&source.into_signature()?, &sink, None)
+        source.connect(slf.as_borrowed(), IntoSignature::Signature(sink.unbind()))
     }
 }

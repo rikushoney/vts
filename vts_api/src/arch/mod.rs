@@ -1,12 +1,11 @@
 mod component;
+mod connection;
 mod module;
 mod port;
+mod prelude;
 mod reference;
 
-pub use component::{PyComponent, PyComponentClass, PySignature};
-pub use module::PyModule_;
-pub use port::{PyComponentRefPort, PyPort, PyPortClass, PyPortKind, PyPortPins};
-pub use reference::{PyComponentRef, PyComponentRefSelection};
+pub use prelude::*;
 
 use std::ops::Range;
 
@@ -124,36 +123,6 @@ impl<'py> SliceOrIndex<'py> {
     }
 }
 
-#[derive(Clone, Debug, FromPyObject)]
-pub enum IntoSignature<'py> {
-    #[pyo3(annotation = "Signature")]
-    Signature(Bound<'py, PySignature>),
-    #[pyo3(annotation = "ComponentRefPort")]
-    PortRef(Bound<'py, PyComponentRefPort>),
-    #[pyo3(annotation = "Port")]
-    Port(Bound<'py, PyPort>),
-}
-
-impl<'py> IntoSignature<'py> {
-    pub fn into_signature(self) -> PyResult<Bound<'py, PySignature>> {
-        match self {
-            Self::Signature(signature) => Ok(signature),
-            Self::PortRef(reference) => {
-                let py = reference.py();
-
-                Bound::new(
-                    py,
-                    reference.borrow().__getitem__(py, SliceOrIndex::full(py))?,
-                )
-            }
-            Self::Port(port) => {
-                let py = port.py();
-                Bound::new(py, port.borrow().__getitem__(py, SliceOrIndex::full(py))?)
-            }
-        }
-    }
-}
-
 macro_rules! register_classes {
     ($arch:ident { $($class:path),* $(,)? }) => {
         $(
@@ -175,12 +144,17 @@ pub fn register_arch<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound<'py, 
     let arch = PyModule::new_bound(py, "arch")?;
 
     register_classes!(arch {
-        PyModule_,
+        PyComplete,
         PyComponent,
         PyComponentClass,
         PyComponentRef,
         PyComponentRefPort,
         PyComponentRefSelection,
+        PyConcat,
+        PyConnectionKind,
+        PyDirect,
+        PyModule_,
+        PyMux,
         PyPort,
         PyPortClass,
         PyPortKind,
@@ -189,12 +163,16 @@ pub fn register_arch<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound<'py, 
     });
 
     register_functions!(arch {
+        connection::complete,
+        connection::concat,
+        connection::direct,
+        connection::mux,
         module::json_dumps,
         module::json_loads,
-        module::yaml_dumps,
-        module::yaml_loads,
         module::toml_dumps,
         module::toml_loads,
+        module::yaml_dumps,
+        module::yaml_loads,
         smoke_test,
     });
 

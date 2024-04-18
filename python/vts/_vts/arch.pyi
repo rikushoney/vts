@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, overload
+from typing import Any, Literal, TypeAlias, overload
 
 _ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
 
@@ -44,6 +44,14 @@ class ConnectionKind:
     COMPLETE = ...
     MUX = ...
 
+_ComponentClass: TypeAlias = _ComponentClassStr | ComponentClass
+
+_PortKind: TypeAlias = _PortKindStr | PortKind
+
+_PortClass: TypeAlias = _PortClassStr | PortClass
+
+_ConnectionKind: TypeAlias = _ConnectionKindStr | ConnectionKind
+
 class Module:
     def __new__(cls, name: str) -> Module: ...
     def name(self) -> str: ...
@@ -54,21 +62,21 @@ class Module:
         name: str,
         *,
         component: Component | None = None,
-        class_: ComponentClass | _ComponentClassStr | None = None,
+        class_: _ComponentClass | None = None,
     ) -> Component: ...
     @overload
     def add_component(
         self,
         name: Component,
         *,
-        class_: ComponentClass | _ComponentClassStr | None = None,
+        class_: _ComponentClass | None = None,
     ) -> Component: ...
     @overload
     def add_component(
         self,
         *,
         component: Component,
-        class_: ComponentClass | _ComponentClassStr | None = None,
+        class_: _ComponentClass | None = None,
     ) -> Component: ...
 
 class Component:
@@ -81,27 +89,27 @@ class Component:
         name: str,
         *,
         port: Port | None = None,
-        kind: PortKind | _PortKindStr | None = None,
+        kind: _PortKind | None = None,
         n_pins: int | None = None,
-        class_: PortClass | _PortClassStr | None = None,
+        class_: _PortClass | None = None,
     ) -> Port: ...
     @overload
     def add_port(
         self,
         name: Port,
         *,
-        kind: PortKind | _PortKindStr | None = None,
+        kind: _PortKind | None = None,
         n_pins: int | None = None,
-        class_: PortClass | _PortClassStr | None = None,
+        class_: _PortClass | None = None,
     ) -> Port: ...
     @overload
     def add_port(
         self,
         *,
         port: Port,
-        kind: PortKind | _PortKindStr | None = None,
+        kind: _PortKind | None = None,
         n_pins: int | None = None,
-        class_: PortClass | _PortClassStr | None = None,
+        class_: _PortClass | None = None,
     ) -> Port: ...
     def add_reference(
         self,
@@ -115,12 +123,10 @@ class Component:
         source: Signature,
         sink: Signature,
         *,
-        kind: ConnectionKind | _ConnectionKindStr | None = None,
+        kind: _ConnectionKind | None = None,
     ) -> None: ...
     def __getattr__(self, port_or_reference: str) -> Any: ...
-    def __setattr__(
-        self, sink: str, source: Signature | ComponentRefPort | Port
-    ) -> None: ...
+    def __setattr__(self, sink: str, source: Connector) -> None: ...
 
 class Port:
     def module(self) -> Module: ...
@@ -130,9 +136,7 @@ class Port:
     def class_(self) -> PortClass: ...
     def select(self, index: slice | int) -> PortPins: ...
     def __getitem__(self, index: slice | int) -> Signature: ...
-    def __setitem__(
-        self, sink: slice | int, source: Signature | ComponentRefPort
-    ) -> None: ...
+    def __setitem__(self, sink: slice | int, source: Connector) -> None: ...
 
 class ComponentRef:
     def module(self) -> Module: ...
@@ -143,28 +147,45 @@ class ComponentRef:
     def select(self, index: slice | int) -> ComponentRefSelection: ...
     def __getitem__(self, index: slice | int) -> ComponentRefSelection: ...
     def __getattr__(self, port: str) -> ComponentRefPort: ...
-    def __setattr__(
-        self, sink: str, source: Signature | ComponentRefPort | Port
-    ) -> None: ...
+    def __setattr__(self, sink: str, source: Connector) -> None: ...
 
 class PortPins:
     pass
 
 class ComponentRefPort:
     def __getitem__(self, index: slice | int) -> Signature: ...
-    def __setitem__(
-        self, sink: slice | int, source: Signature | ComponentRefPort | Port
-    ) -> None: ...
+    def __setitem__(self, sink: slice | int, source: Connector) -> None: ...
 
 class Signature:
     pass
 
 class ComponentRefSelection:
     def __getattr__(self, port: str) -> Signature: ...
-    def __setattr__(
-        self, sink: str, source: Signature | ComponentRefPort | Port
-    ) -> None: ...
+    def __setattr__(self, sink: str, source: Connector) -> None: ...
 
+IntoSignature: TypeAlias = Signature | ComponentRefPort | Port
+
+class Direct:
+    pass
+
+def direct(connector: Connector) -> Direct: ...
+
+class Complete:
+    pass
+
+def complete(connector: Connector) -> Complete: ...
+
+class Mux:
+    pass
+
+def mux(connector: Connector) -> Mux: ...
+
+class Concat:
+    pass
+
+Connector: TypeAlias = IntoSignature | Direct | Complete | Mux | Concat
+
+def concat(*connectors) -> Concat: ...
 def json_dumps(module: Module, pretty: bool) -> str: ...
 def json_loads(input: str) -> Module: ...
 def yaml_dumps(module: Module) -> str: ...

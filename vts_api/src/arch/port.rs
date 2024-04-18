@@ -1,15 +1,16 @@
 use pyo3::{prelude::*, types::PyString};
 
-use super::{IntoSignature, SliceOrIndex};
+use super::{
+    connection::{Connector, IntoSignature},
+    SliceOrIndex,
+};
 
 use vts_core::arch::{
     port::{PinRange, PortKey, PortPins},
     PortClass, PortKind,
 };
 
-use super::{
-    component::ComponentOrRef, PyComponent, PyComponentRefSelection, PyModule_, PySignature,
-};
+use super::{connection::ComponentOrRef, prelude::*};
 
 wrap_enum!(
     PyPortClass (name = "PortClass", help = "port class") => PortClass:
@@ -94,7 +95,7 @@ impl PyPort {
         port.class().map(PyPortClass::from)
     }
 
-    fn select(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyPortPins> {
+    pub(super) fn select(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyPortPins> {
         let n_pins = self.n_pins(py);
         let mut range = PinRange::Bound(index.to_range(n_pins)?);
         range.flatten(n_pins);
@@ -116,13 +117,14 @@ impl PyPort {
         &self,
         py: Python<'_>,
         sink: SliceOrIndex<'_>,
-        source: IntoSignature<'_>,
+        source: Connector<'_>,
     ) -> PyResult<()> {
         let sink = Bound::new(py, self.__getitem__(py, sink)?)?;
 
-        self.parent(py)?
-            .borrow_mut()
-            .add_connection(&source.into_signature()?, &sink, None)
+        source.connect(
+            self.parent(py)?.as_borrowed(),
+            IntoSignature::Signature(sink.unbind()),
+        )
     }
 }
 
@@ -133,44 +135,5 @@ pub struct PyPortPins(pub(crate) PortPins);
 impl PyPortPins {
     pub(crate) fn new(pins: PortPins) -> Self {
         Self(pins)
-    }
-}
-
-#[pyclass(name = "ComponentRefPort")]
-#[derive(Clone, Debug)]
-pub struct PyComponentRefPort(
-    pub(crate) Py<PyComponentRefSelection>,
-    pub(crate) Py<PyPort>,
-);
-
-#[pymethods]
-impl PyComponentRefPort {
-    pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
-        let port = self.1.bind(py).borrow();
-        let pins = port.select(py, index)?;
-
-        Ok(PySignature(
-            pins,
-            ComponentOrRef::Reference(self.0.borrow(py).clone()),
-        ))
-    }
-
-    pub fn __setitem__(
-        &self,
-        py: Python<'_>,
-        sink: SliceOrIndex<'_>,
-        source: IntoSignature<'_>,
-    ) -> PyResult<()> {
-        let sink = Bound::new(py, self.__getitem__(py, sink)?)?;
-        let selection = self.0.bind(py).borrow();
-        let reference = selection.0.bind(py).borrow();
-
-        reference.parent(py)?.borrow_mut().add_connection(
-            &source.into_signature()?,
-            &sink,
-            None,
-        )?;
-
-        Ok(())
     }
 }

@@ -15,7 +15,7 @@ use vts_core::arch::{
     toml, yaml, ComponentClass, Module,
 };
 
-use super::{PyCheckerError, PyComponent, PyComponentClass, PyComponentRef, PyPort};
+use super::{prelude::*, PyCheckerError};
 
 #[pyclass]
 pub(crate) struct PyModuleInner(pub(crate) Module);

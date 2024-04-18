@@ -4,7 +4,10 @@ use pyo3::types::PyString;
 
 use vts_core::arch::reference::{ComponentRefKey, ReferenceRange};
 
-use super::{IntoSignature, PyComponent, PyComponentRefPort, PyModule_, PyPort, SliceOrIndex};
+use super::{
+    connection::{Connector, IntoSignature},
+    prelude::*,
+};
 
 #[pyclass(name = "ComponentRef")]
 pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
@@ -45,6 +48,8 @@ macro_rules! borrow_inner {
             .expect("reference should be in module");
     };
 }
+
+pub(super) use borrow_inner;
 
 #[pymethods]
 impl PyComponentRef {
@@ -131,7 +136,7 @@ impl PyComponentRef {
     pub fn __setattr__(
         slf: &Bound<'_, Self>,
         sink: &Bound<'_, PyString>,
-        source: IntoSignature<'_>,
+        source: Connector<'_>,
     ) -> PyResult<()> {
         let py = slf.py();
         let sink = Self::__getattr__(slf, sink)?;
@@ -144,58 +149,9 @@ impl PyComponentRef {
         let reference = slf.borrow();
         let parent = reference.parent(py)?;
 
-        parent
-            .borrow_mut()
-            .add_connection(&source.into_signature()?, &sink, None)
-    }
-}
-
-#[derive(Clone, Debug)]
-#[pyclass(name = "ComponentRefSelection")]
-pub struct PyComponentRefSelection(pub(super) Py<PyComponentRef>, pub(super) ReferenceRange);
-
-#[pymethods]
-impl PyComponentRefSelection {
-    pub fn __getattr__(&self, port: &Bound<'_, PyString>) -> PyResult<PyComponentRefPort> {
-        let py = port.py();
-        let reference = self.0.bind(py);
-
-        let port = {
-            let reference = reference.borrow();
-            borrow_inner!(reference + py => reference);
-
-            reference
-                .component()
-                .find_port(port.to_str()?)
-                .ok_or(PyAttributeError::new_err(format!(
-                    r#"undefined port "{port}" referenced in "{component}""#,
-                    component = reference.component().name()
-                )))?
-                .key()
-        };
-
-        let port = PyPort::new(reference.borrow().module(py).as_borrowed(), port)?;
-        let reference = PyComponentRef::__getitem__(reference, py, SliceOrIndex::full(py))?;
-        Ok(PyComponentRefPort(Py::new(py, reference)?, port.unbind()))
-    }
-
-    pub fn __setattr__(
-        &self,
-        sink: &Bound<'_, PyString>,
-        source: IntoSignature<'_>,
-    ) -> PyResult<()> {
-        let py = sink.py();
-
-        let sink = {
-            let sink = self.__getattr__(sink)?;
-            Bound::new(py, sink.__getitem__(py, SliceOrIndex::full(py))?)?
-        };
-
-        let reference = self.0.bind(py).borrow();
-        let parent = reference.parent(py)?;
-
-        parent
-            .borrow_mut()
-            .add_connection(&source.into_signature()?, &sink, None)
+        source.connect(
+            parent.as_borrowed(),
+            IntoSignature::Signature(sink.unbind()),
+        )
     }
 }
