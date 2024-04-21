@@ -47,14 +47,20 @@ impl PyComponentRefPort {
 
 #[pymethods]
 impl PyComponentRefPort {
-    pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
+    pub fn __getitem__<'py>(
+        &self,
+        py: Python<'py>,
+        index: SliceOrIndex<'_>,
+    ) -> PyResult<Bound<'py, PySignature>> {
         let port = self.port.bind(py).borrow();
-        let pins = port.select(py, index)?;
+        let pins = port.select_py(py, index)?;
 
-        Ok(PySignature {
+        let signature = PySignature {
             component_or_reference: ComponentOrRef::Reference(self.components.borrow(py).clone()),
             pins,
-        })
+        };
+
+        Bound::new(py, signature)
     }
 
     pub fn __setitem__(
@@ -63,7 +69,7 @@ impl PyComponentRefPort {
         sink: SliceOrIndex<'_>,
         source: Connector<'_>,
     ) -> PyResult<()> {
-        let sink = Bound::new(py, self.__getitem__(py, sink)?)?;
+        let sink = self.__getitem__(py, sink)?;
         let selection = self.components.bind(py).borrow();
         let reference = selection.reference(py).borrow();
 
@@ -168,7 +174,7 @@ impl PyComponentRefs {
         };
 
         let port = PyPort::new(reference.borrow().module(py).as_borrowed(), port)?;
-        let reference = PyComponentRef::__getitem__(reference, py, SliceOrIndex::full(py))?;
+        let reference = reference.select_py(py, SliceOrIndex::full(py))?;
 
         Ok(PyComponentRefPort {
             components: Py::new(py, reference)?,
@@ -179,10 +185,9 @@ impl PyComponentRefs {
     pub fn __setattr__(&self, sink: &Bound<'_, PyString>, source: Connector<'_>) -> PyResult<()> {
         let py = sink.py();
 
-        let sink = {
-            let sink = self.__getattr__(sink)?;
-            Bound::new(py, sink.__getitem__(py, SliceOrIndex::full(py))?)?
-        };
+        let sink = self
+            .__getattr__(sink)?
+            .__getitem__(py, SliceOrIndex::full(py))?;
 
         let reference = self.reference.bind(py).borrow();
         let parent = reference.parent(py)?;
@@ -208,12 +213,10 @@ impl IntoSignature {
     pub fn into_signature(self, py: Python<'_>) -> PyResult<Py<PySignature>> {
         match self {
             Self::Signature(signature) => Ok(signature),
-            Self::PortRef(reference) => Py::new(
-                py,
-                reference
-                    .borrow(py)
-                    .__getitem__(py, SliceOrIndex::full(py))?,
-            ),
+            Self::PortRef(reference) => Ok(reference
+                .borrow(py)
+                .__getitem__(py, SliceOrIndex::full(py))?
+                .unbind()),
             Self::Port(port) => {
                 Py::new(py, port.borrow(py).__getitem__(py, SliceOrIndex::full(py))?)
             }

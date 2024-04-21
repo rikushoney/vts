@@ -96,7 +96,8 @@ impl PyPort {
         port.class().map(PyPortClass::from)
     }
 
-    pub(super) fn select(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyPortPins> {
+    #[pyo3(name = "select")]
+    pub fn select_py(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyPortPins> {
         let n_pins = self.n_pins(py);
         let mut range = PinRange::Bound(index.to_range(n_pins)?);
         range.flatten(n_pins);
@@ -109,7 +110,7 @@ impl PyPort {
     }
 
     pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
-        let pins = self.select(py, index)?;
+        let pins = self.select_py(py, index)?;
         let parent = {
             borrow_inner!(self + py => port);
             port.parent().unbind()

@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyString;
 
 use vts_core::arch::{
-    connection::ComponentRefs, module::ComponentRefId, reference::ReferenceRange,
+    connection::ComponentRefs, module::ComponentRefId, prelude::*, reference::ReferenceRange,
 };
 
 use super::{
@@ -40,8 +40,30 @@ impl PyComponentRef {
     }
 }
 
+pub(crate) trait PyComponentRefMethodsImpl {
+    fn try_with_inner<F, T>(&self, f: F) -> PyResult<T>
+    where
+        F: FnMut(ComponentRef<'_>) -> PyResult<T>;
+}
+
+impl PyComponentRefMethodsImpl for Bound<'_, PyComponentRef> {
+    fn try_with_inner<F, T>(&self, mut f: F) -> PyResult<T>
+    where
+        F: FnMut(ComponentRef<'_>) -> PyResult<T>,
+    {
+        let py = self.py();
+        let reference = self.borrow();
+        borrow_inner!(reference + py => reference);
+        f(reference)
+    }
+}
+
 pub trait PyComponentRefMethods {
     fn select(&self, py: Python<'_>, range: ReferenceRange) -> ComponentRefs;
+
+    fn n_instances(&self, py: Python<'_>) -> u32;
+
+    fn select_py(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyComponentRefs>;
 }
 
 impl PyComponentRefMethods for Bound<'_, PyComponentRef> {
@@ -49,6 +71,14 @@ impl PyComponentRefMethods for Bound<'_, PyComponentRef> {
         let reference = self.borrow();
         borrow_inner!(reference + py => reference);
         reference.select(range)
+    }
+
+    fn n_instances(&self, py: Python<'_>) -> u32 {
+        self.borrow().n_instances(py)
+    }
+
+    fn select_py(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PyComponentRefs> {
+        PyComponentRef::__getitem__(self, py, index)
     }
 }
 
@@ -105,11 +135,7 @@ impl PyComponentRef {
         py: Python<'_>,
         index: SliceOrIndex<'_>,
     ) -> PyResult<PyComponentRefs> {
-        let n_instances = {
-            let slf = slf.borrow();
-            slf.n_instances(py)
-        };
-
+        let n_instances = slf.n_instances(py);
         let mut range = ReferenceRange::Bound(index.to_range(n_instances)?);
         range.flatten(n_instances);
         Ok(PyComponentRefs::new(slf.as_borrowed(), range))
@@ -128,20 +154,17 @@ impl PyComponentRef {
         port: &Bound<'_, PyString>,
     ) -> PyResult<PyComponentRefPort> {
         let py = slf.py();
-        let reference = slf.borrow();
 
-        let port = {
-            borrow_inner!(reference + py => reference);
-
-            reference
+        let port = slf.try_with_inner(|reference| {
+            Ok(reference
                 .component()
                 .find_port(port.to_str()?)
                 .ok_or(PyAttributeError::new_err(format!(
                     r#"undefined port "{port}" referenced in "{component}""#,
                     component = reference.component().name()
                 )))?
-                .unbind()
-        };
+                .unbind())
+        })?;
 
         let reference = Py::new(py, Self::select_py(slf, py, SliceOrIndex::full(py))?)?;
         let port = PyPort::new(slf.borrow().module(py).as_borrowed(), port)?;
@@ -159,12 +182,7 @@ impl PyComponentRef {
     ) -> PyResult<()> {
         let py = slf.py();
         let sink = Self::__getattr__(slf, sink)?;
-
-        let sink = {
-            let sink = sink.__getitem__(py, SliceOrIndex::full(py))?;
-            Bound::new(py, sink)?
-        };
-
+        let sink = sink.__getitem__(py, SliceOrIndex::full(py))?;
         let reference = slf.borrow();
         let parent = reference.parent(py)?;
 
