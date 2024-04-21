@@ -3,10 +3,7 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use ustr::{ustr, Ustr};
 
-use super::{
-    component::ComponentKey, linker::ResolvedComponent, port::PortKey, prelude::*,
-    reference::ComponentRefKey, Component,
-};
+use super::{linker::ResolvedComponent, prelude::*};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -52,8 +49,8 @@ pub(super) struct CheckComponent {
 }
 
 impl CheckComponent {
-    pub fn new(module: &Module, component: ComponentKey) -> Self {
-        let component = Component::new(module, component.0);
+    pub fn new(module: &Module, component: ComponentId) -> Self {
+        let component = component.bind(module);
         let ports = HashSet::from_iter(component.ports().map(|port| ustr(port.name())));
 
         let references = HashSet::from_iter(
@@ -65,7 +62,7 @@ impl CheckComponent {
         // TODO: create connection checker
 
         Self {
-            component: component.1,
+            component: component.unbind(),
             ports,
             references,
         }
@@ -92,7 +89,7 @@ impl Checker {
         let components = HashMap::from_iter(module.components().map(|component| {
             (
                 ustr(component.name()),
-                CheckComponent::new(module, component.key()),
+                CheckComponent::new(module, component.unbind()),
             )
         }));
 
@@ -101,7 +98,7 @@ impl Checker {
 
     fn get_component_checker(&self, module: &Module, component: ComponentId) -> &CheckComponent {
         self.components
-            .get(&module[component].name)
+            .get(&module.lookup(component).name)
             .expect("component should be in checker")
     }
 
@@ -111,16 +108,17 @@ impl Checker {
         component: ComponentId,
     ) -> &mut CheckComponent {
         self.components
-            .get_mut(&module[component].name)
+            .get_mut(&module.lookup(component).name)
             .expect("component should be in checker")
     }
 
-    pub fn register_component(
+    pub fn register_component<C: ComponentAccess>(
         &mut self,
         module: &Module,
-        component: ComponentKey,
+        component: C,
     ) -> Result<(), Error> {
-        let name = module[component.0].name;
+        let component = component.id();
+        let name = module.lookup(component).name;
         let checker = CheckComponent::new(module, component);
 
         if self.components.insert(name, checker).is_none() {
@@ -130,36 +128,38 @@ impl Checker {
         }
     }
 
-    pub fn register_port(
+    pub fn register_port<C: ComponentAccess>(
         &mut self,
         module: &Module,
-        component: ComponentKey,
-        port: PortKey,
+        component: C,
+        port: PortId,
     ) -> Result<(), Error> {
-        let name = module[port.0].name;
-        let checker = self.get_component_checker_mut(module, component.0);
+        let component = component.id();
+        let name = port.bind(module).data().name;
+        let checker = self.get_component_checker_mut(module, component);
 
         if checker.ports.insert(name) {
             Ok(())
         } else {
-            let component = module[component.0].name;
+            let component = module.lookup(component).name;
             Err(Error::port_exists(&component, &name))
         }
     }
 
-    pub fn register_reference(
+    pub fn register_reference<C: ComponentAccess, R: ComponentRefAccess>(
         &mut self,
         module: &Module,
-        component: ComponentKey,
-        reference: ComponentRefKey,
+        component: C,
+        reference: R,
     ) -> Result<(), Error> {
-        let reference = ustr(ComponentRef::new(module, reference.0).alias_or_name());
-        let checker = self.get_component_checker_mut(module, component.0);
+        let component = component.id();
+        let reference = ustr(reference.bind(module).alias_or_name());
+        let checker = self.get_component_checker_mut(module, component);
 
         if checker.references.insert(reference) {
             Ok(())
         } else {
-            let component = module[component.0].name;
+            let component = module.lookup(component).name;
             Err(Error::reference_exists(&component, &reference))
         }
     }
@@ -181,14 +181,14 @@ impl Checker {
         }
     }
 
-    pub fn ensure_no_existing_port(
+    pub fn ensure_no_existing_port<C: ComponentAccess>(
         &self,
         module: &Module,
-        component: ComponentKey,
+        component: C,
         port: &str,
     ) -> Result<(), Error> {
-        let component = Component::new(module, component.0);
-        let checker = self.get_component_checker(module, component.1);
+        let component = component.bind(module);
+        let checker = self.get_component_checker(module, component.id());
 
         if checker.ports.contains(&ustr(port)) {
             Err(Error::port_exists(component.name(), port))
@@ -197,14 +197,14 @@ impl Checker {
         }
     }
 
-    pub fn ensure_no_existing_reference(
+    pub fn ensure_no_existing_reference<C: ComponentAccess>(
         &self,
         module: &Module,
-        component: ComponentKey,
+        component: C,
         reference: &str,
     ) -> Result<(), Error> {
-        let component = Component::new(module, component.0);
-        let checker = self.get_component_checker(module, component.1);
+        let component = component.bind(module);
+        let checker = self.get_component_checker(module, component.id());
 
         if checker.references.contains(&ustr(reference)) {
             Err(Error::reference_exists(component.name(), reference))

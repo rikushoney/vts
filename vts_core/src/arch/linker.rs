@@ -5,10 +5,8 @@ use ustr::{ustr, Ustr};
 
 use super::{
     checker::{self, CheckComponent, Checker},
-    component::ComponentKey,
     connection::WeakConnection,
     module::ComponentId,
-    port::PortKey,
     prelude::*,
     reference::ComponentWeakRef,
 };
@@ -56,11 +54,11 @@ pub struct KnownComponents(pub(super) HashMap<Ustr, ComponentId>);
 pub trait Resolve<'a, 'm> {
     type Output;
 
-    fn resolve(
+    fn resolve<C: ComponentAccess>(
         self,
         module: &'m mut Module,
         checker: &'a mut Checker,
-        parent: ComponentKey,
+        parent: C,
         components: &KnownComponents,
     ) -> Result<Self::Output, Error>;
 }
@@ -78,8 +76,8 @@ impl KnownComponents {
     }
 
     pub fn try_get<'m>(&self, module: &'m Module, component: &str) -> Option<Component<'m>> {
-        let make_component = |component| Component::new(module, component);
-        self.0.get(&ustr(component)).copied().map(make_component)
+        let make_component = |component| ComponentAccess::bind(component, module);
+        self.0.get(&ustr(component)).map(make_component)
     }
 }
 
@@ -130,7 +128,7 @@ impl Linker {
     pub fn register_component(
         &mut self,
         module: &Module,
-        component: ComponentKey,
+        component: ComponentId,
     ) -> Result<(), Error> {
         Ok(self.checker.register_component(module, component)?)
     }
@@ -138,23 +136,23 @@ impl Linker {
     pub fn register_port(
         &mut self,
         module: &Module,
-        component: ComponentKey,
-        port: PortKey,
+        component: ComponentId,
+        port: PortId,
     ) -> Result<(), Error> {
         Ok(self.checker.register_port(module, component, port)?)
     }
 
-    pub fn register_reference(
+    pub fn register_reference<C: ComponentAccess>(
         &mut self,
         module: &Module,
-        component: ComponentKey,
+        component: C,
         reference: ComponentWeakRef,
     ) -> Result<(), Error> {
         self.checker
             .ensure_no_existing_reference(module, component, reference.alias_or_name())?;
 
         self.unresolved
-            .entry(component.0)
+            .entry(component.id())
             .or_default()
             .references
             .push(reference);
@@ -162,15 +160,15 @@ impl Linker {
         Ok(())
     }
 
-    pub fn register_connection(
+    pub fn register_connection<C: ComponentAccess>(
         &mut self,
-        component: ComponentKey,
+        component: C,
         connection: WeakConnection,
     ) -> Result<(), Error> {
         self.checker_mut().register_connection()?;
 
         self.unresolved
-            .entry(component.0)
+            .entry(component.id())
             .or_default()
             .connections
             .push(connection);
@@ -188,24 +186,23 @@ impl Linker {
     }
 
     fn get_known_ports(module: &Module, component: ComponentId) -> HashSet<Ustr> {
-        let component = Component::new(module, component);
+        let component = component.bind(module);
         HashSet::from_iter(component.ports().map(|port| ustr(port.name())))
     }
 
-    fn resolve_impl(
+    fn resolve_impl<C: ComponentAccess>(
         module: &mut Module,
         checker: &mut Checker,
-        component: ComponentId,
+        component: C,
         unresolved: &mut LinkerItems,
         components: &KnownComponents,
     ) -> Result<ResolvedComponent, Error> {
         let references = unresolved.references.drain(..).try_fold(
             HashSet::default(),
             |mut resolved, reference| {
-                let reference =
-                    reference.resolve(module, checker, ComponentKey::new(component), components)?;
+                let reference = reference.resolve(module, checker, component.id(), components)?;
 
-                resolved.insert(ustr(ComponentRef::new(module, reference.0).alias_or_name()));
+                resolved.insert(ustr(reference.bind(module).alias_or_name()));
                 Ok::<_, Error>(resolved)
             },
         )?;
@@ -214,14 +211,14 @@ impl Linker {
             .connections
             .drain(..)
             .try_for_each(|connection| {
-                connection.resolve(module, checker, ComponentKey::new(component), components)?;
+                connection.resolve(module, checker, component.id(), components)?;
                 checker.register_connection()?;
                 Ok::<_, Error>(())
             })?;
 
         Ok(ResolvedComponent {
-            component,
-            ports: Self::get_known_ports(module, component),
+            component: component.id(),
+            ports: Self::get_known_ports(module, component.id()),
             references,
         })
     }
@@ -240,7 +237,7 @@ impl Linker {
                     &components,
                 )?;
 
-                resolved.insert(module[component].name, reference);
+                resolved.insert(module.lookup(component).name, reference);
                 Ok::<_, Error>(resolved)
             },
         )?;

@@ -8,10 +8,9 @@ use pyo3::{
 };
 use vts_core::arch::{
     checker::Checker,
-    component::{ComponentBuilder, ComponentKey},
+    component::ComponentBuilder,
     json,
-    port::PortKey,
-    reference::ComponentRefKey,
+    module::{ComponentId, ComponentRefId, PortId},
     toml, yaml, ComponentClass, Module,
 };
 
@@ -27,9 +26,9 @@ pub(crate) struct PyChecker(pub(crate) Checker);
 #[pyclass(name = "Module")]
 pub struct PyModule_ {
     pub(crate) inner: Py<PyModuleInner>,
-    pub(crate) components: HashMap<ComponentKey, Py<PyComponent>>,
-    pub(crate) ports: HashMap<PortKey, Py<PyPort>>,
-    pub(crate) references: HashMap<ComponentRefKey, Py<PyComponentRef>>,
+    pub(crate) components: HashMap<ComponentId, Py<PyComponent>>,
+    pub(crate) ports: HashMap<PortId, Py<PyPort>>,
+    pub(crate) references: HashMap<ComponentRefId, Py<PyComponentRef>>,
     pub(crate) checker: Py<PyChecker>,
 }
 
@@ -123,7 +122,7 @@ impl PyModule_ {
                 builder.set_class(ComponentClass::from(*class));
             }
 
-            builder.finish().map_err(PyCheckerError::from)?.key()
+            builder.finish().map_err(PyCheckerError::from)?.unbind()
         })
     }
 
@@ -138,7 +137,7 @@ impl PyModule_ {
         let (name, class) = {
             let (module, component) = {
                 let component = component.borrow();
-                (component.module(py).clone().unbind(), component.key())
+                (component.module(py).clone().unbind(), component.id())
             };
 
             let module = {

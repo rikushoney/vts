@@ -75,7 +75,7 @@ impl Serialize for SerializePorts<'_, '_> {
         let mut state = serializer.serialize_map(Some(self.ports.len()))?;
 
         for &port in self.ports {
-            let port = Port::new(self.module, port);
+            let port = port.bind(self.module);
             state.serialize_entry(port.name(), port.data())?;
         }
 
@@ -92,7 +92,7 @@ impl SerializeReferences<'_, '_> {
     pub fn iter_unnamed(&self) -> impl Clone + Iterator<Item = &ComponentRefId> {
         self.references
             .iter()
-            .filter(|&reference| self.module[*reference].alias.is_none())
+            .filter(|&reference| self.module.lookup(*reference).alias.is_none())
     }
 
     pub fn should_serialize(&self) -> bool {
@@ -137,7 +137,7 @@ impl SerializeNamedReferences<'_, '_> {
     pub fn iter_named(&self) -> impl Clone + Iterator<Item = &ComponentRefId> {
         self.references
             .iter()
-            .filter(|&reference| self.module[*reference].alias.is_some())
+            .filter(|&reference| self.module.lookup(*reference).alias.is_some())
     }
 
     pub fn should_serialize(&self) -> bool {
@@ -207,9 +207,9 @@ impl Serialize for SerializeConnections<'_, '_> {
                 .as_ref()
                 .map(|component| {
                     (
-                        Some(ComponentRef::new(self.module, component.0).alias_or_name()),
-                        component.1.get_start(),
-                        component.1.get_end(),
+                        Some(component.reference(self.module).alias_or_name()),
+                        component.get_start(),
+                        component.get_end(),
                     )
                 })
                 .unwrap_or((None, None, None));
@@ -219,9 +219,9 @@ impl Serialize for SerializeConnections<'_, '_> {
                 .as_ref()
                 .map(|component| {
                     (
-                        Some(ComponentRef::new(self.module, component.0).alias_or_name()),
-                        component.1.get_start(),
-                        component.1.get_end(),
+                        Some(component.reference(self.module).alias_or_name()),
+                        component.get_start(),
+                        component.get_end(),
                     )
                 })
                 .unwrap_or((None, None, None));
@@ -245,7 +245,7 @@ struct SerializeComponent<'m> {
 impl<'m> SerializeComponent<'m> {
     pub(crate) fn new(module: &'m Module, component: ComponentId) -> Self {
         Self {
-            component: Component::new(module, component),
+            component: component.bind(module),
         }
     }
 }

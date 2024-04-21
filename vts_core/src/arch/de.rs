@@ -7,10 +7,10 @@ use serde::{
 use ustr::ustr;
 
 use super::{
-    component::{self, ComponentBuilder, ComponentKey},
+    component::{self, ComponentBuilder},
     connection::{Signature, WeakConnection, WeakReferenceSelection},
     module,
-    port::{self, pin_range, PinRange, PortBuilder, PortKey, WeakPortPins},
+    port::{self, pin_range, PinRange, PortBuilder, WeakPortPins},
     prelude::*,
     reference::{self, reference_range, ComponentWeakRef},
 };
@@ -179,7 +179,7 @@ impl<'a, 'de, 'm> Visitor<'de> for DeserializeReferences<'a, 'm> {
     {
         while let Some(reference) = seq.next_element_seed(DeserializeComponentWeakRef::Unnamed)? {
             self.linker
-                .register_reference(self.module, ComponentKey::new(self.parent), reference)
+                .register_reference(self.module, self.parent, reference)
                 .map_err(de::Error::custom)?;
         }
 
@@ -223,7 +223,7 @@ impl<'a, 'de, 'm> Visitor<'de> for DeserializeNamedReferences<'a, 'm> {
             let reference = map.next_value_seed(DeserializeComponentWeakRef::Named(alias))?;
 
             self.linker
-                .register_reference(self.module, ComponentKey::new(self.parent), reference)
+                .register_reference(self.module, self.parent, reference)
                 .map_err(de::Error::custom)?;
         }
 
@@ -260,7 +260,7 @@ impl<'a, 'de> Visitor<'de> for DeserializeConnections<'a> {
     {
         while let Some(connection) = seq.next_element::<WeakConnection>()? {
             self.linker
-                .register_connection(ComponentKey::new(self.parent), connection)
+                .register_connection(self.parent, connection)
                 .map_err(de::Error::custom)?;
         }
 
@@ -296,7 +296,7 @@ impl<'a, 'b, 'm> ComponentSeed<'a, 'b, 'm> {
 }
 
 impl<'a, 'b, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'b, 'm> {
-    type Value = ComponentKey;
+    type Value = ComponentId;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "a component description")
@@ -320,7 +320,7 @@ impl<'a, 'b, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'b, 'm> {
             .set_name(self.name)
             .finish()
             .map_err(de::Error::custom)?
-            .1;
+            .unbind();
 
         let mut ports = false;
         let mut references = false;
@@ -401,13 +401,13 @@ impl<'a, 'b, 'de, 'm> Visitor<'de> for ComponentSeed<'a, 'b, 'm> {
             }
         }
 
-        self.module[component].class = class;
-        Ok(ComponentKey::new(component))
+        self.module.lookup_mut(component).class = class;
+        Ok(component)
     }
 }
 
 impl<'a, 'b, 'de, 'm> DeserializeSeed<'de> for ComponentSeed<'a, 'b, 'm> {
-    type Value = ComponentKey;
+    type Value = ComponentId;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -441,7 +441,7 @@ impl<'a, 'b, 'm> PortSeed<'a, 'b, 'm> {
 }
 
 impl<'a, 'b, 'de, 'm> Visitor<'de> for PortSeed<'a, 'b, 'm> {
-    type Value = PortKey;
+    type Value = PortId;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "a port description")
@@ -491,7 +491,7 @@ impl<'a, 'b, 'de, 'm> Visitor<'de> for PortSeed<'a, 'b, 'm> {
 
         let kind = kind.ok_or(de::Error::missing_field(port::FIELDS[port::KIND]))?;
 
-        let mut builder = PortBuilder::new(self.module, self.checker, ComponentKey(self.parent))
+        let mut builder = PortBuilder::new(self.module, self.checker, self.parent)
             .set_name(self.name)
             .set_kind(kind);
 
@@ -503,12 +503,12 @@ impl<'a, 'b, 'de, 'm> Visitor<'de> for PortSeed<'a, 'b, 'm> {
             builder.set_class(class);
         }
 
-        Ok(builder.finish().map_err(de::Error::custom)?.key())
+        Ok(builder.finish().map_err(de::Error::custom)?.unbind())
     }
 }
 
 impl<'a, 'b, 'de, 'm> DeserializeSeed<'de> for PortSeed<'a, 'b, 'm> {
-    type Value = PortKey;
+    type Value = PortId;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where

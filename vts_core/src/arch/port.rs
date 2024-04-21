@@ -5,10 +5,8 @@ use ustr::{ustr, Ustr};
 
 use super::{
     checker,
-    component::ComponentKey,
     linker::{self, KnownComponents, Resolve},
     prelude::*,
-    reference::ComponentRefKey,
 };
 
 pub(super) const FIELDS: &[&str] = &["kind", "n_pins", "class"];
@@ -76,16 +74,28 @@ impl PortData {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct PortKey(pub(crate) PortId);
+mod port_access {
+    use super::*;
 
-impl PortKey {
-    pub(crate) fn new(port: PortId) -> Self {
-        Self(port)
+    pub trait Sealed {}
+
+    impl Sealed for PortId {}
+
+    impl Sealed for Port<'_> {}
+}
+
+pub trait PortAccess: port_access::Sealed {
+    fn id(&self) -> PortId;
+    fn bind<'m>(&self, module: &'m Module) -> Port<'m>;
+}
+
+impl PortAccess for PortId {
+    fn id(&self) -> PortId {
+        *self
     }
 
-    pub fn bind(self, module: &Module) -> Port<'_> {
-        Port::new(module, self.0)
+    fn bind<'m>(&self, module: &'m Module) -> Port<'m> {
+        Port::new(module, self.id())
     }
 }
 
@@ -93,7 +103,7 @@ impl PortKey {
 pub struct Port<'m>(&'m Module, PortId);
 
 impl<'m> Port<'m> {
-    pub(crate) fn new(module: &'m Module, port: PortId) -> Self {
+    fn new(module: &'m Module, port: PortId) -> Self {
         Self(module, port)
     }
 
@@ -101,16 +111,16 @@ impl<'m> Port<'m> {
         self.0
     }
 
-    pub fn key(&self) -> PortKey {
-        PortKey::new(self.1)
+    pub fn unbind(self) -> PortId {
+        self.1
     }
 
     pub fn parent(&self) -> Component<'_> {
-        Component::new(self.0, self.data().parent)
+        self.data().parent.bind(self.0)
     }
 
     pub fn name(&self) -> &str {
-        &self.module()[self.1].name
+        &self.module().lookup(self.1).name
     }
 
     pub(crate) fn data(&self) -> &'m PortData {
@@ -132,6 +142,24 @@ impl<'m> Port<'m> {
     #[must_use]
     pub fn select(&self, range: PinRange) -> PortPins {
         PortPins::new(self.1, range)
+    }
+
+    pub fn select_all(&self) -> PortPins {
+        self.select(PinRange::Full)
+    }
+
+    pub fn select_range(&self, start: Option<u32>, end: Option<u32>) -> PortPins {
+        self.select(PinRange::new(start, end))
+    }
+}
+
+impl PortAccess for Port<'_> {
+    fn id(&self) -> PortId {
+        self.1
+    }
+
+    fn bind<'m>(&self, module: &'m Module) -> Port<'m> {
+        self.1.bind(module)
     }
 }
 
@@ -231,6 +259,34 @@ impl PortPins {
     pub fn port<'m>(&self, module: &'m Module) -> Port<'m> {
         Port::new(module, self.port)
     }
+
+    pub fn len<'m>(&self, module: &'m Module) -> u32 {
+        let n_pins = self.port(module).n_pins();
+        let Range { start, end } = self.range.expand(n_pins);
+        debug_assert!(end >= start);
+        end - start
+    }
+
+    pub fn mask(&mut self, start: Option<u32>, end: Option<u32>) {
+        self.range = match self.range {
+            PinRange::Start(start) => PinRange::new(Some(start), end),
+            PinRange::End(end) => PinRange::new(start, Some(end)),
+            PinRange::Bound(ref range) => {
+                let mut range = range.clone();
+
+                if let Some(start) = start {
+                    range.start = start;
+                }
+
+                if let Some(end) = end {
+                    range.end = end;
+                }
+
+                PinRange::Bound(range)
+            }
+            PinRange::Full => PinRange::new(start, end),
+        };
+    }
 }
 
 pub struct NameSet(Ustr);
@@ -249,11 +305,15 @@ pub struct PortBuilder<'a, 'm, N, K> {
 }
 
 impl<'a, 'm> PortBuilder<'a, 'm, NameUnset, KindUnset> {
-    pub fn new(module: &'m mut Module, checker: &'a mut Checker, component: ComponentKey) -> Self {
+    pub fn new<C: ComponentAccess>(
+        module: &'m mut Module,
+        checker: &'a mut Checker,
+        component: C,
+    ) -> Self {
         Self {
             module,
             checker,
-            parent: component.0,
+            parent: component.id(),
             name: NameUnset,
             kind: KindUnset,
             n_pins: None,
@@ -311,7 +371,7 @@ impl<'a, 'm, N, K> PortBuilder<'a, 'm, N, K> {
 impl<'a, 'm> PortBuilder<'a, 'm, NameSet, KindSet> {
     fn insert(&mut self) -> PortId {
         let port = PortData::new(
-            self.parent,
+            self.parent.id(),
             &self.name.0,
             self.kind.0,
             self.n_pins.unwrap_or(1),
@@ -323,14 +383,8 @@ impl<'a, 'm> PortBuilder<'a, 'm, NameSet, KindSet> {
 
     pub fn finish(mut self) -> Result<Port<'m>, checker::Error> {
         let port = self.insert();
-
-        self.checker.register_port(
-            self.module,
-            ComponentKey::new(self.parent),
-            PortKey::new(port),
-        )?;
-
-        self.module[self.parent].ports.push(port);
+        self.checker.register_port(self.module, self.parent, port)?;
+        self.module.lookup_mut(self.parent).ports.push(port);
         Ok(Port::new(self.module, port))
     }
 }
@@ -342,29 +396,30 @@ pub struct WeakPortPins {
     pub range: PinRange,
 }
 
-impl<'a, 'm> Resolve<'a, 'm> for (WeakPortPins, Option<ComponentRefKey>) {
+impl<'a, 'm> Resolve<'a, 'm> for (WeakPortPins, Option<ComponentRefId>) {
     type Output = PortPins;
 
-    fn resolve(
+    fn resolve<C: ComponentAccess>(
         self,
         module: &'m mut Module,
         checker: &'a mut Checker,
-        parent: ComponentKey,
+        parent: C,
         _components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
-        let component = Component::new(module, parent.0);
+        let component = parent.bind(module);
 
         let parent = if let Some(reference) = self.1 {
-            ComponentRef::new(module, reference.0).component()
+            reference.bind(module).component()
         } else {
             component
         };
 
         let port = parent
             .find_port(&self.0.port)
-            .ok_or(linker::Error::undefined_port(parent.name(), &self.0.port))?;
+            .ok_or(linker::Error::undefined_port(parent.name(), &self.0.port))?
+            .unbind();
 
         checker.register_connection()?;
-        Ok(PortPins::new(port.key().0, self.0.range))
+        Ok(PortPins::new(port, self.0.range))
     }
 }

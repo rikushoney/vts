@@ -5,7 +5,6 @@ use ustr::{ustr, Ustr};
 
 use super::{
     checker,
-    component::ComponentKey,
     connection::ComponentRefSelection,
     linker::{self, KnownComponents, Resolve},
     prelude::*,
@@ -47,20 +46,35 @@ impl ComponentRefData {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ComponentRefKey(pub(crate) ComponentRefId);
+pub(crate) mod component_ref_access {
+    use super::*;
 
-impl ComponentRefKey {
-    pub(crate) fn new(reference: ComponentRefId) -> Self {
-        Self(reference)
+    pub trait Sealed {}
+
+    impl Sealed for ComponentRefId {}
+
+    impl Sealed for ComponentRef<'_> {}
+
+    impl Sealed for ComponentRefSelection {}
+}
+
+pub trait ComponentRefAccess: Clone + component_ref_access::Sealed {
+    fn id(&self) -> ComponentRefId;
+
+    fn bind<'m>(&self, module: &'m Module) -> ComponentRef<'m>;
+}
+
+impl ComponentRefAccess for ComponentRefId {
+    fn id(&self) -> ComponentRefId {
+        *self
     }
 
-    pub fn bind(self, module: &Module) -> ComponentRef<'_> {
-        ComponentRef::new(module, self.0)
+    fn bind<'m>(&self, module: &'m Module) -> ComponentRef<'m> {
+        ComponentRef::new(module, *self)
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ComponentRef<'m>(&'m Module, ComponentRefId);
 
 impl<'m> ComponentRef<'m> {
@@ -72,20 +86,20 @@ impl<'m> ComponentRef<'m> {
         self.0
     }
 
-    pub fn key(&self) -> ComponentRefKey {
-        ComponentRefKey::new(self.1)
+    pub fn unbind(self) -> ComponentRefId {
+        self.1
     }
 
     pub(crate) fn data(&self) -> &'m ComponentRefData {
-        &self.module()[self.1]
+        &self.module().lookup(self.1)
     }
 
     pub fn component(&self) -> Component<'m> {
-        Component::new(self.module(), self.data().component)
+        self.data().component.bind(self.0)
     }
 
     pub fn parent(&self) -> Component<'m> {
-        Component::new(self.module(), self.data().parent)
+        self.data().parent.bind(self.0)
     }
 
     pub fn alias(&self) -> Option<&'m str> {
@@ -106,7 +120,17 @@ impl<'m> ComponentRef<'m> {
 
     #[must_use]
     pub fn select(&self, range: ReferenceRange) -> ComponentRefSelection {
-        ComponentRefSelection::new(self.key(), range)
+        ComponentRefSelection::new(self.id(), range)
+    }
+}
+
+impl ComponentRefAccess for ComponentRef<'_> {
+    fn id(&self) -> ComponentRefId {
+        self.1
+    }
+
+    fn bind<'m>(&self, module: &'m Module) -> ComponentRef<'m> {
+        self.1.bind(module)
     }
 }
 
@@ -205,11 +229,15 @@ pub struct ComponentRefBuilder<'a, 'm, C> {
 }
 
 impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentUnset> {
-    pub fn new(module: &'m mut Module, checker: &'a mut Checker, parent: ComponentKey) -> Self {
+    pub fn new<C: ComponentAccess>(
+        module: &'m mut Module,
+        checker: &'a mut Checker,
+        parent: C,
+    ) -> Self {
         Self {
             module,
             checker,
-            parent: parent.0,
+            parent: parent.id(),
             component: ComponentUnset,
             alias: None,
             n_instances: None,
@@ -218,13 +246,13 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentUnset> {
 
     pub fn set_component(
         self,
-        component: ComponentKey,
+        component: ComponentId,
     ) -> ComponentRefBuilder<'a, 'm, ComponentSet> {
         ComponentRefBuilder {
             module: self.module,
             checker: self.checker,
             parent: self.parent,
-            component: ComponentSet(component.0),
+            component: ComponentSet(component),
             alias: self.alias,
             n_instances: self.n_instances,
         }
@@ -253,8 +281,8 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
     fn insert(&mut self) -> ComponentRefId {
         let n_instances = self.n_instances.unwrap_or(1);
         let reference = ComponentRefData::new(
-            self.component.0,
-            self.parent,
+            self.component.0.id(),
+            self.parent.id(),
             self.alias.take(),
             n_instances,
         );
@@ -268,15 +296,15 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
                 ComponentRef::new(self.module, reference)
             };
 
-            self.checker.register_reference(
-                self.module,
-                reference.component().key(),
-                reference.key(),
-            )?;
+            self.checker
+                .register_reference(self.module, reference.component(), reference)?;
             reference.1
         };
 
-        self.module[self.parent].references.push(reference);
+        self.module
+            .lookup_mut(self.parent)
+            .references
+            .push(reference);
         Ok(ComponentRef::new(self.module, reference))
     }
 }
@@ -306,18 +334,18 @@ impl ComponentWeakRef {
 }
 
 impl<'a, 'm> Resolve<'a, 'm> for ComponentWeakRef {
-    type Output = ComponentRefKey;
+    type Output = ComponentRefId;
 
-    fn resolve(
+    fn resolve<C: ComponentAccess>(
         self,
         module: &mut Module,
         checker: &mut Checker,
-        component: ComponentKey,
+        component: C,
         components: &KnownComponents,
     ) -> Result<Self::Output, linker::Error> {
         let referenced_component = {
             let component = self.component.as_str();
-            components.get(module, component)?.key()
+            components.get(module, component)?.unbind()
         };
 
         let mut builder = ComponentRefBuilder::new(module, checker, component)
@@ -327,6 +355,6 @@ impl<'a, 'm> Resolve<'a, 'm> for ComponentWeakRef {
             builder.set_alias(alias);
         }
 
-        Ok(builder.finish().map_err(linker::Error::from)?.key())
+        Ok(builder.finish().map_err(linker::Error::from)?.unbind())
     }
 }

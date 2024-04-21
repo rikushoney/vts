@@ -1,10 +1,12 @@
-pub use super::component::{PyComponent, PyComponentClass};
-pub use super::connection::{
-    PyComplete, PyComponentRefPort, PyComponentRefSelection, PyConcat, PyConnectionKind, PyDirect,
-    PyMux, PySignature,
+pub use super::{
+    component::{PyComponent, PyComponentClass},
+    connection::{
+        PyComplete, PyComponentRefPort, PyComponentRefSelection, PyConcat, PyConnectionKind,
+        PyDirect, PyMux, PySignature,
+    },
+    module::PyModule_,
+    port::{PyPort, PyPortClass, PyPortKind, PyPortPins},
+    reference::PyComponentRef,
 };
-pub use super::module::PyModule_;
-pub use super::port::{PyPort, PyPortClass, PyPortKind, PyPortPins};
-pub use super::reference::PyComponentRef;
 
 pub(crate) use super::SliceOrIndex;

@@ -2,7 +2,7 @@ use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 
-use vts_core::arch::reference::{ComponentRefKey, ReferenceRange};
+use vts_core::arch::{module::ComponentRefId, reference::ReferenceRange};
 
 use super::{
     connection::{Connector, IntoSignature},
@@ -10,12 +10,12 @@ use super::{
 };
 
 #[pyclass(name = "ComponentRef")]
-pub struct PyComponentRef(Py<PyModule_>, ComponentRefKey);
+pub struct PyComponentRef(Py<PyModule_>, ComponentRefId);
 
 impl PyComponentRef {
     pub(crate) fn new<'py>(
         module: Borrowed<'_, 'py, PyModule_>,
-        reference: ComponentRefKey,
+        reference: ComponentRefId,
     ) -> PyResult<Bound<'py, Self>> {
         let py = module.py();
 
@@ -33,7 +33,7 @@ impl PyComponentRef {
         Ok(py_reference.bind(py).clone())
     }
 
-    pub(crate) fn key(&self) -> ComponentRefKey {
+    pub(crate) fn id(&self) -> ComponentRefId {
         self.1
     }
 }
@@ -44,7 +44,7 @@ macro_rules! borrow_inner {
         let inner = module.inner.borrow($py);
         let $ref = inner
             .0
-            .get_reference($slf.key())
+            .get_reference($slf.id())
             .expect("reference should be in module");
     };
 }
@@ -59,12 +59,12 @@ impl PyComponentRef {
 
     pub fn component<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
         borrow_inner!(self + py => reference);
-        PyComponent::new(self.module(py).into(), reference.component().key())
+        PyComponent::new(self.module(py).into(), reference.component().unbind())
     }
 
     pub fn parent<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
         borrow_inner!(self + py => reference);
-        PyComponent::new(self.module(py).into(), reference.parent().key())
+        PyComponent::new(self.module(py).into(), reference.parent().unbind())
     }
 
     pub fn alias<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyString>> {
@@ -97,7 +97,7 @@ impl PyComponentRef {
 
         let mut range = ReferenceRange::Bound(index.to_range(n_instances)?);
         range.flatten(n_instances);
-        Ok(PyComponentRefSelection(slf.clone().unbind(), range))
+        Ok(PyComponentRefSelection::new(slf.as_borrowed(), range))
     }
 
     pub fn __getitem__(
@@ -125,12 +125,16 @@ impl PyComponentRef {
                     r#"undefined port "{port}" referenced in "{component}""#,
                     component = reference.component().name()
                 )))?
-                .key()
+                .unbind()
         };
 
-        let reference = Self::select(slf, py, SliceOrIndex::full(py))?;
+        let reference = Py::new(py, Self::select(slf, py, SliceOrIndex::full(py))?)?;
         let port = PyPort::new(slf.borrow().module(py).as_borrowed(), port)?;
-        Ok(PyComponentRefPort(Py::new(py, reference)?, port.unbind()))
+
+        Ok(PyComponentRefPort::new(
+            reference.bind_borrowed(py),
+            port.as_borrowed(),
+        ))
     }
 
     pub fn __setattr__(

@@ -6,11 +6,12 @@ use super::{
 };
 
 use vts_core::arch::{
-    port::{PinRange, PortKey, PortPins},
+    module::PortId,
+    port::{PinRange, PortPins},
     PortClass, PortKind,
 };
 
-use super::{connection::ComponentOrRef, prelude::*};
+use super::prelude::*;
 
 wrap_enum!(
     PyPortClass (name = "PortClass", help = "port class") => PortClass:
@@ -29,7 +30,7 @@ wrap_enum!(
 
 #[pyclass(name = "Port")]
 #[derive(Clone, Debug)]
-pub struct PyPort(Py<PyModule_>, PortKey);
+pub struct PyPort(Py<PyModule_>, PortId);
 
 macro_rules! borrow_inner {
     ($slf:ident + $py:ident => $port:ident) => {
@@ -37,7 +38,7 @@ macro_rules! borrow_inner {
         let inner = module.inner.borrow($py);
         let $port = inner
             .0
-            .get_port($slf.key())
+            .get_port($slf.id())
             .expect("port should be in module");
     };
 }
@@ -45,7 +46,7 @@ macro_rules! borrow_inner {
 impl PyPort {
     pub(crate) fn new<'py>(
         module: Borrowed<'_, 'py, PyModule_>,
-        port: PortKey,
+        port: PortId,
     ) -> PyResult<Bound<'py, Self>> {
         let py = module.py();
 
@@ -58,7 +59,7 @@ impl PyPort {
         Ok(py_port.bind(py).clone())
     }
 
-    pub(crate) fn key(&self) -> PortKey {
+    pub(crate) fn id(&self) -> PortId {
         self.1
     }
 }
@@ -71,7 +72,7 @@ impl PyPort {
 
     pub fn parent<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyComponent>> {
         borrow_inner!(self + py => port);
-        PyComponent::new(self.module(py).into(), port.parent().key())
+        PyComponent::new(self.module(py).into(), port.parent().unbind())
     }
 
     pub fn name<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
@@ -100,17 +101,21 @@ impl PyPort {
         let mut range = PinRange::Bound(index.to_range(n_pins)?);
         range.flatten(n_pins);
         borrow_inner!(self + py => port);
-        Ok(PyPortPins::new(port.select(range)))
+
+        Ok(PyPortPins::new(
+            self.module(py).as_borrowed(),
+            port.select(range),
+        ))
     }
 
     pub fn __getitem__(&self, py: Python<'_>, index: SliceOrIndex<'_>) -> PyResult<PySignature> {
         let pins = self.select(py, index)?;
         let parent = {
             borrow_inner!(self + py => port);
-            port.parent().key()
+            port.parent().unbind()
         };
 
-        Ok(PySignature(pins, ComponentOrRef::Component(parent)))
+        Ok(PySignature::new_component(parent, pins))
     }
 
     pub fn __setitem__(
@@ -130,10 +135,16 @@ impl PyPort {
 
 #[pyclass(name = "PortPins")]
 #[derive(Clone, Debug)]
-pub struct PyPortPins(pub(crate) PortPins);
+pub struct PyPortPins(Py<PyModule_>, pub(crate) PortPins);
 
 impl PyPortPins {
-    pub(crate) fn new(pins: PortPins) -> Self {
-        Self(pins)
+    pub(crate) fn new(module: Borrowed<'_, '_, PyModule_>, pins: PortPins) -> Self {
+        Self(module.to_owned().unbind(), pins)
+    }
+
+    pub fn len(&self, py: Python<'_>) -> u32 {
+        let module = self.0.borrow(py);
+        let inner = module.inner.borrow(py);
+        self.1.len(&inner.0)
     }
 }

@@ -1,9 +1,7 @@
-use std::ops::{Index, IndexMut};
-
 use slotmap::{new_key_type, SlotMap};
 use ustr::{ustr, Ustr};
 
-use super::{component::ComponentKey, port::PortKey, prelude::*, reference::ComponentRefKey};
+use super::prelude::*;
 
 pub(super) const FIELDS: &[&str] = &["name", "components"];
 
@@ -11,9 +9,9 @@ pub(super) const NAME: usize = 0;
 pub(super) const COMPONENTS: usize = 1;
 
 new_key_type! {
-    pub(crate) struct ComponentId;
-    pub(crate) struct ComponentRefId;
-    pub(crate) struct PortId;
+    pub struct ComponentId;
+    pub struct ComponentRefId;
+    pub struct PortId;
 }
 
 #[derive(Clone, Debug)]
@@ -49,52 +47,50 @@ impl Module {
         }
     }
 
-    pub fn get_component(&self, component: ComponentKey) -> Option<Component<'_>> {
-        let component = component.0;
-
-        self.components
-            .get(component)
-            .map(|_| Component::new(self, component))
+    pub fn get_component(&self, component: ComponentId) -> Option<Component<'_>> {
+        self.components.get(component).map(|_| component.bind(self))
     }
 
-    pub fn get_component_data(&mut self, component: ComponentKey) -> Option<&mut ComponentData> {
-        self.components.get_mut(component.0)
+    pub fn get_component_data(&mut self, component: ComponentId) -> Option<&mut ComponentData> {
+        self.components.get_mut(component)
     }
 
-    pub fn get_port(&self, port: PortKey) -> Option<Port<'_>> {
-        let port = port.0;
-        self.ports.get(port).map(|_| Port::new(self, port))
+    pub fn get_port(&self, port: PortId) -> Option<Port<'_>> {
+        self.ports.get(port).map(|_| port.bind(self))
     }
 
-    pub fn get_reference(&self, reference: ComponentRefKey) -> Option<ComponentRef<'_>> {
-        let reference = reference.0;
-
+    pub fn get_reference(&self, reference: ComponentRefId) -> Option<ComponentRef<'_>> {
         self.references
-            .get(reference)
-            .map(|_| ComponentRef::new(self, reference))
+            .get(reference.id())
+            .map(|_| reference.bind(self))
     }
 
     pub fn find_component(&self, name: &str) -> Option<Component<'_>> {
         self.components
             .iter()
             .find(|(_, component)| component.name == name)
-            .map(|(component, _)| Component::new(self, component))
+            .map(|(component, _)| component.bind(self))
     }
 }
 
-macro_rules! impl_module_index_ops {
+pub(crate) trait ModuleLookup<I> {
+    type Output;
+
+    fn lookup(&self, id: I) -> &Self::Output;
+    fn lookup_mut(&mut self, id: I) -> &mut Self::Output;
+}
+
+macro_rules! impl_module_lookup_ops {
     ($($id:ident => $data:ident in $db:ident),+ $(,)?) => {
         $(
-            impl Index<$id> for Module {
+            impl ModuleLookup<$id> for Module {
                 type Output = $data;
 
-                fn index(&self, id: $id) -> &Self::Output {
+                fn lookup(&self, id: $id) -> &Self::Output {
                     &self.$db[id]
                 }
-            }
 
-            impl IndexMut<$id> for Module {
-                fn index_mut(&mut self, id: $id) -> &mut Self::Output {
+                fn lookup_mut(&mut self, id: $id) -> &mut Self::Output {
                     &mut self.$db[id]
                 }
             }
@@ -102,7 +98,7 @@ macro_rules! impl_module_index_ops {
     }
 }
 
-impl_module_index_ops!(
+impl_module_lookup_ops!(
     ComponentId => ComponentData in components,
     PortId => PortData in ports,
     ComponentRefId => ComponentRefData in references,
@@ -119,7 +115,7 @@ impl<'m> Iterator for ComponentIter<'m> {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|component| Component::new(self.module, component))
+            .map(|component| component.bind(self.module))
     }
 }
 

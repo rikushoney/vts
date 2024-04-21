@@ -75,10 +75,10 @@ impl<'py> SliceOrIndex<'py> {
         Self::Slice(PySlice::full_bound(py))
     }
 
-    fn validate_slice(start: isize, stop: isize, step: isize) -> PyResult<()> {
+    fn slice_to_range(start: isize, stop: isize, step: isize) -> PyResult<Range<u32>> {
         if step != 1 {
             return Err(PyValueError::new_err(
-                "only port slicing with step size 1 is supported",
+                "only slicing with step size 1 is supported",
             ));
         }
 
@@ -98,7 +98,10 @@ impl<'py> SliceOrIndex<'py> {
             return Err(PyValueError::new_err("stop should be greater than start"));
         }
 
-        Ok(())
+        Ok(Range {
+            start: start as u32,
+            end: stop as u32,
+        })
     }
 
     pub fn to_range(&self, n_pins: u32) -> PyResult<Range<u32>> {
@@ -108,12 +111,7 @@ impl<'py> SliceOrIndex<'py> {
                     start, stop, step, ..
                 } = slice.indices(n_pins as i64)?;
 
-                Self::validate_slice(start, stop, step)?;
-
-                Ok(Range {
-                    start: start as u32,
-                    end: stop as u32,
-                })
+                Self::slice_to_range(start, stop, step)
             }
             Self::Index(index) => Ok(Range {
                 start: *index,

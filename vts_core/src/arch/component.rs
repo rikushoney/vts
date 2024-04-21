@@ -47,24 +47,36 @@ impl ComponentData {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ComponentKey(pub(crate) ComponentId);
+pub(crate) mod component_access {
+    use super::*;
 
-impl ComponentKey {
-    pub(crate) fn new(component: ComponentId) -> Self {
-        Self(component)
+    pub trait Sealed {}
+
+    impl Sealed for ComponentId {}
+
+    impl Sealed for Component<'_> {}
+}
+
+pub trait ComponentAccess: Copy + component_access::Sealed {
+    fn id(&self) -> ComponentId;
+    fn bind<'m>(&self, module: &'m Module) -> Component<'m>;
+}
+
+impl ComponentAccess for ComponentId {
+    fn id(&self) -> ComponentId {
+        *self
     }
 
-    pub fn bind(self, module: &Module) -> Component<'_> {
-        Component::new(module, self.0)
+    fn bind<'m>(&self, module: &'m Module) -> Component<'m> {
+        Component::new(module, *self)
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Component<'m>(&'m Module, pub(super) ComponentId);
+pub struct Component<'m>(&'m Module, ComponentId);
 
 impl<'m> Component<'m> {
-    pub(crate) fn new(module: &'m Module, component: ComponentId) -> Self {
+    fn new(module: &'m Module, component: ComponentId) -> Self {
         Self(module, component)
     }
 
@@ -72,12 +84,12 @@ impl<'m> Component<'m> {
         self.0
     }
 
-    pub fn key(&self) -> ComponentKey {
-        ComponentKey::new(self.1)
+    pub fn unbind(self) -> ComponentId {
+        self.1
     }
 
     pub(crate) fn data(&self) -> &'m ComponentData {
-        &self.module()[self.1]
+        &self.module().lookup(self.1)
     }
 
     pub fn name(&self) -> &'m str {
@@ -110,7 +122,7 @@ impl<'m> Component<'m> {
 
     pub fn find_port(&self, name: &str) -> Option<Port<'m>> {
         self.data().ports.iter().find_map(|&port| {
-            let port = Port::new(self.module(), port);
+            let port = port.bind(self.module());
             (port.name() == name).then_some(port)
         })
     }
@@ -123,6 +135,16 @@ impl<'m> Component<'m> {
     }
 }
 
+impl ComponentAccess for Component<'_> {
+    fn id(&self) -> ComponentId {
+        self.1
+    }
+
+    fn bind<'m>(&self, module: &'m Module) -> Component<'m> {
+        self.1.bind(module)
+    }
+}
+
 pub struct PortIter<'m> {
     module: &'m Module,
     iter: slice::Iter<'m, PortId>,
@@ -132,7 +154,7 @@ impl<'m> Iterator for PortIter<'m> {
     type Item = Port<'m>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|&port| Port::new(self.module, port))
+        self.iter.next().map(|&port| port.bind(self.module))
     }
 }
 
@@ -215,10 +237,7 @@ impl<'m> ComponentBuilder<'_, 'm, NameSet> {
 
     pub fn finish(mut self) -> Result<Component<'m>, checker::Error> {
         let component = self.insert();
-
-        self.checker
-            .register_component(self.module, ComponentKey::new(component))?;
-
+        self.checker.register_component(self.module, component)?;
         Ok(Component::new(self.module, component))
     }
 }
