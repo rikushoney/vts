@@ -32,6 +32,28 @@ pub struct PyModule_ {
     pub(crate) checker: Py<PyChecker>,
 }
 
+macro_rules! borrow_inner {
+    ($slf:ident + $py:ident => $module:ident $(+ $checker:ident)?) => {
+        let module = $slf.borrow();
+        $(
+            let $checker = module.checker.borrow($py);
+        )?
+        let $module = module.inner.borrow($py);
+    };
+}
+
+macro_rules! borrow_inner_mut {
+    ($slf:ident + $py:ident => $module:ident $(+ $checker:ident)?) => {
+        let module = $slf.borrow();
+        $(
+            let mut $checker = module.checker.borrow_mut($py);
+        )?
+        let mut $module = module.inner.borrow_mut($py);
+    };
+}
+
+pub(crate) use {borrow_inner, borrow_inner_mut};
+
 #[derive(FromPyObject)]
 enum NameOrComponent<'py> {
     #[pyo3(annotation = "str")]
@@ -137,15 +159,10 @@ impl PyModule_ {
         let (name, class) = {
             let (module, component) = {
                 let component = component.borrow();
-                (component.module(py).clone().unbind(), component.id())
+                (component.module(py).clone(), component.id())
             };
 
-            let module = {
-                let module = module.bind(py);
-                module.borrow()
-            };
-
-            let inner = module.inner.borrow(py);
+            borrow_inner!(module + py => inner);
 
             let component = &inner
                 .0
@@ -183,13 +200,9 @@ impl PyModule_ {
         PyString::new_bound(py, self.inner.borrow(py).0.name())
     }
 
-    fn copy(&self, name: Option<&Bound<'_, PyString>>) -> PyResult<Self> {
-        let module = self.inner.clone();
-
-        if let Some(name) = name {
-            let py = name.py();
-            module.borrow_mut(py).0.rename(name.to_str()?);
-        }
+    fn copy(&self, py: Python<'_>, name: Option<&Bound<'_, PyString>>) -> PyResult<Self> {
+        let name = name.cloned().unwrap_or_else(|| self.name(py));
+        let _module = Self::new(&name)?;
 
         // TODO: rebuild module
         todo!()

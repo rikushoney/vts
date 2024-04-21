@@ -16,20 +16,6 @@ use pyo3::{
 };
 use vts_core::arch::{checker, Error};
 
-#[pyfunction]
-fn smoke_test(py: Python<'_>) -> PyResult<()> {
-    use pyo3::types::PyString;
-
-    let name = PyString::new_bound(py, "mod");
-    let module = Bound::new(py, PyModule_::new(&name)?)?;
-
-    let module_ref = module.borrow();
-    let inner = &module_ref.inner;
-    println!("{}", inner.borrow(py).0.name());
-
-    Ok(())
-}
-
 struct PyError(Error);
 
 impl From<Error> for PyError {
@@ -171,7 +157,6 @@ pub fn register_arch<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound<'py, 
         module::toml_loads,
         module::yaml_dumps,
         module::yaml_loads,
-        smoke_test,
     });
 
     module.add_submodule(&arch)?;

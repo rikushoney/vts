@@ -9,7 +9,7 @@ use vts_core::arch::{
     reference::ReferenceRange,
 };
 
-use super::{prelude::*, reference};
+use super::{module, prelude::*, reference};
 
 wrap_enum!(
     PyConnectionKind (name = "ConnectionKind", help = "connection kind") => ConnectionKind:
@@ -357,11 +357,8 @@ impl<'py> Connector<'py> {
 
                 parts.try_for_each(|signature| {
                     signature.to_signature(py).and_then(|signature| {
-                        let module = module.borrow();
-                        let inner = module.inner.bind(py);
-                        let inner = inner.borrow();
-                        let source = signature.bind(py);
-                        let source = source.borrow();
+                        module::borrow_inner!(module + py => inner);
+                        let source = signature.borrow(py);
 
                         match source.component_or_reference {
                             ComponentOrRef::Component(component) => {
@@ -386,11 +383,7 @@ impl<'py> Connector<'py> {
                     })
                 })?;
 
-                let module = module.borrow();
-                let inner = module.inner.bind(py);
-                let mut inner = inner.borrow_mut();
-                let checker = module.checker.bind(py);
-                let mut checker = checker.borrow_mut();
+                module::borrow_inner_mut!(module + py => inner + checker);
                 concat.make_connections(&mut inner.0, &mut checker.0);
                 return Ok(());
             }
