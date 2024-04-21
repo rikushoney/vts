@@ -262,7 +262,7 @@ impl ComponentOrRefs {
         }
     }
 
-    pub fn into_masked(self, start: Option<u32>, end: Option<u32>) -> Option<Self> {
+    pub fn try_into_masked(self, start: Option<u32>, end: Option<u32>) -> Option<Self> {
         match self {
             Self::Component(component) => match (start, end) {
                 (Some(0), Some(1)) | (Some(0), None) | (None, Some(1)) | (None, None) => {
@@ -460,7 +460,7 @@ impl Concat {
             let source_component = source
                 .component
                 .clone()
-                .into_masked(Some(source_port_i), Some(source_port_i + 1))
+                .try_into_masked(Some(source_port_i), Some(source_port_i + 1))
                 .expect("should be a valid mask");
 
             let sink_pins = self.sink_port.clone_masked(part.sink_pins);
@@ -468,7 +468,7 @@ impl Concat {
             let sink_component = self
                 .sink_component
                 .clone()
-                .into_masked(Some(part.sink_port_i), Some(part.sink_port_i + 1))
+                .try_into_masked(Some(part.sink_port_i), Some(part.sink_port_i + 1))
                 .expect("should be a valid mask");
 
             ConnectionBuilder::new(module, checker, parent)
