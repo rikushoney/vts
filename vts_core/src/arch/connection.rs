@@ -21,13 +21,13 @@ pub enum ConnectionKind {
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct ComponentRefSelection {
+pub struct ComponentRefs {
     reference: ComponentRefId,
     range: ReferenceRange,
 }
 
-impl ComponentRefSelection {
-    pub fn new(reference: ComponentRefId, range: ReferenceRange) -> Self {
+impl ComponentRefs {
+    pub(crate) fn new(reference: ComponentRefId, range: ReferenceRange) -> Self {
         Self {
             reference: reference.id(),
             range,
@@ -39,7 +39,7 @@ impl ComponentRefSelection {
     }
 
     pub fn reference<'m>(&self, module: &'m Module) -> ComponentRef<'m> {
-        ComponentRef::new(module, self.reference)
+        self.bind(module)
     }
 
     pub fn get_start(&self) -> Option<u32> {
@@ -74,9 +74,14 @@ impl ComponentRefSelection {
             ReferenceRange::Full => ReferenceRange::new(start, end),
         };
     }
+
+    pub fn simplify(&mut self, module: &Module) {
+        self.range
+            .flatten(module.lookup(self.reference).n_instances);
+    }
 }
 
-impl ComponentRefAccess for ComponentRefSelection {
+impl ComponentRefAccess for &ComponentRefs {
     fn id(&self) -> ComponentRefId {
         self.reference
     }
@@ -89,9 +94,9 @@ impl ComponentRefAccess for ComponentRefSelection {
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub struct Connection {
     pub kind: ConnectionKind,
-    pub(crate) source_component: Option<ComponentRefSelection>,
+    pub(crate) source_component: Option<ComponentRefs>,
     pub(crate) source_pins: PortPins,
-    pub(crate) sink_component: Option<ComponentRefSelection>,
+    pub(crate) sink_component: Option<ComponentRefs>,
     pub(crate) sink_pins: PortPins,
 }
 
@@ -100,8 +105,8 @@ impl Connection {
         kind: ConnectionKind,
         source_pins: PortPins,
         sink_pins: PortPins,
-        source_component: Option<ComponentRefSelection>,
-        sink_component: Option<ComponentRefSelection>,
+        source_component: Option<ComponentRefs>,
+        sink_component: Option<ComponentRefs>,
     ) -> Self {
         Self {
             kind,
@@ -121,9 +126,9 @@ impl Connection {
     }
 }
 
-pub struct SourceSet(PortPins, Option<ComponentRefSelection>);
+pub struct SourceSet(PortPins, Option<ComponentRefs>);
 pub struct SourceUnset;
-pub struct SinkSet(PortPins, Option<ComponentRefSelection>);
+pub struct SinkSet(PortPins, Option<ComponentRefs>);
 pub struct SinkUnset;
 
 pub struct ConnectionBuilder<'a, 'm, Src, Snk> {
@@ -155,9 +160,15 @@ impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceUnset, SinkUnset> {
 impl<'a, 'm, Snk> ConnectionBuilder<'a, 'm, SourceUnset, Snk> {
     pub fn set_source(
         self,
-        pins: PortPins,
-        component: Option<ComponentRefSelection>,
+        mut pins: PortPins,
+        mut component: Option<ComponentRefs>,
     ) -> ConnectionBuilder<'a, 'm, SourceSet, Snk> {
+        pins.simplify(self.module);
+
+        component
+            .as_mut()
+            .map(|component| component.simplify(self.module));
+
         ConnectionBuilder {
             module: self.module,
             checker: self.checker,
@@ -172,9 +183,15 @@ impl<'a, 'm, Snk> ConnectionBuilder<'a, 'm, SourceUnset, Snk> {
 impl<'a, 'm, Src> ConnectionBuilder<'a, 'm, Src, SinkUnset> {
     pub fn set_sink(
         self,
-        pins: PortPins,
-        component: Option<ComponentRefSelection>,
+        mut pins: PortPins,
+        mut component: Option<ComponentRefs>,
     ) -> ConnectionBuilder<'a, 'm, Src, SinkSet> {
+        pins.simplify(self.module);
+
+        component
+            .as_mut()
+            .map(|component| component.simplify(self.module));
+
         ConnectionBuilder {
             module: self.module,
             checker: self.checker,
@@ -211,20 +228,20 @@ impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceSet, SinkSet> {
 }
 
 #[derive(Clone, Debug)]
-enum ComponentOrRefSelection {
+enum ComponentOrRefs {
     Component(ComponentId),
-    Reference(ComponentRefSelection),
+    Reference(ComponentRefs),
 }
 
-impl ComponentOrRefSelection {
-    pub fn get_reference(&self) -> Option<&ComponentRefSelection> {
+impl ComponentOrRefs {
+    pub fn get_reference(&self) -> Option<&ComponentRefs> {
         match self {
             Self::Component(_) => None,
             Self::Reference(reference) => Some(reference),
         }
     }
 
-    pub fn into_reference(self) -> Option<ComponentRefSelection> {
+    pub fn into_reference(self) -> Option<ComponentRefs> {
         match self {
             Self::Component(_) => None,
             Self::Reference(reference) => Some(reference),
@@ -245,7 +262,7 @@ impl ComponentOrRefSelection {
         }
     }
 
-    pub fn mask(self, start: Option<u32>, end: Option<u32>) -> Option<Self> {
+    pub fn into_masked(self, start: Option<u32>, end: Option<u32>) -> Option<Self> {
         match self {
             Self::Component(component) => match (start, end) {
                 (Some(0), Some(1)) | (Some(0), None) | (None, Some(1)) | (None, None) => {
@@ -267,8 +284,9 @@ struct SourceToSink {
     sink_pins: Range<u32>,
 }
 
+#[derive(Debug)]
 struct ConcatSource {
-    component: ComponentOrRefSelection,
+    component: ComponentOrRefs,
     pins: PortPins,
     sink_pins: Range<u32>,
 }
@@ -283,19 +301,20 @@ impl ConcatSource {
     }
 
     pub fn needs_multiple_connections(&self, sink_n_pins: u32) -> bool {
-        self.sink_start_i(sink_n_pins) == self.sink_last_i(sink_n_pins)
+        self.sink_start_i(sink_n_pins) < self.sink_last_i(sink_n_pins)
     }
 }
 
+#[derive(Debug)]
 pub struct Concat {
-    sink_component: ComponentOrRefSelection,
+    sink_component: ComponentOrRefs,
     sink_port: PortPins,
     pin_index: u32,
     sources: Vec<ConcatSource>,
 }
 
 impl Concat {
-    fn new(sink_component: ComponentOrRefSelection, sink_port: PortPins) -> Self {
+    fn new(sink_component: ComponentOrRefs, sink_port: PortPins) -> Self {
         Self {
             sink_component,
             sink_port,
@@ -305,19 +324,19 @@ impl Concat {
     }
 
     pub fn new_component(sink_component: ComponentId, sink_port: PortPins) -> Self {
-        let sink_component = ComponentOrRefSelection::Component(sink_component);
+        let sink_component = ComponentOrRefs::Component(sink_component);
         Self::new(sink_component, sink_port)
     }
 
-    pub fn new_reference(sink_component: ComponentRefSelection, sink_port: PortPins) -> Self {
-        let sink_component = ComponentOrRefSelection::Reference(sink_component);
+    pub fn new_reference(sink_component: ComponentRefs, sink_port: PortPins) -> Self {
+        let sink_component = ComponentOrRefs::Reference(sink_component);
         Self::new(sink_component, sink_port)
     }
 
     fn append_source(
         &mut self,
         module: &Module,
-        source_component: ComponentOrRefSelection,
+        source_component: ComponentOrRefs,
         source_pins: PortPins,
     ) {
         let source_pin_count = source_component.len(module) * source_pins.len(module);
@@ -341,17 +360,17 @@ impl Concat {
         source_component: ComponentId,
         source_pins: PortPins,
     ) {
-        let source_component = ComponentOrRefSelection::Component(source_component);
+        let source_component = ComponentOrRefs::Component(source_component);
         self.append_source(module, source_component, source_pins)
     }
 
     pub fn append_reference_source(
         &mut self,
         module: &Module,
-        source_component: ComponentRefSelection,
+        source_component: ComponentRefs,
         source_pins: PortPins,
     ) {
-        let source_component = ComponentOrRefSelection::Reference(source_component);
+        let source_component = ComponentOrRefs::Reference(source_component);
         self.append_source(module, source_component, source_pins)
     }
 
@@ -410,6 +429,7 @@ impl Concat {
         splits
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn split_and_connect(
         self,
         module: &mut Module,
@@ -435,28 +455,20 @@ impl Concat {
         );
 
         for (source_port_i, part) in zip(0.., splits.into_iter()) {
-            let source_pins = {
-                let mut pins = source.pins.clone();
-                pins.mask(Some(part.source_pins.start), Some(part.source_pins.end));
-                pins
-            };
+            let source_pins = source.pins.clone_masked(part.source_pins);
 
             let source_component = source
                 .component
                 .clone()
-                .mask(Some(source_port_i), Some(source_port_i + 1))
+                .into_masked(Some(source_port_i), Some(source_port_i + 1))
                 .expect("should be a valid mask");
 
-            let sink_pins = {
-                let mut pins = self.sink_port.clone();
-                pins.mask(Some(part.sink_pins.start), Some(part.sink_pins.end));
-                pins
-            };
+            let sink_pins = self.sink_port.clone_masked(part.sink_pins);
 
             let sink_component = self
                 .sink_component
                 .clone()
-                .mask(Some(part.sink_port_i), Some(part.sink_port_i + 1))
+                .into_masked(Some(part.sink_port_i), Some(part.sink_port_i + 1))
                 .expect("should be a valid mask");
 
             ConnectionBuilder::new(module, checker, parent)
@@ -506,13 +518,13 @@ impl Concat {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
-pub struct WeakReferenceSelection {
+pub struct WeakReferences {
     reference: Ustr,
     #[serde(flatten)]
     range: ReferenceRange,
 }
 
-impl WeakReferenceSelection {
+impl WeakReferences {
     pub fn new(reference: &str, start: Option<u32>, end: Option<u32>) -> Self {
         Self {
             reference: ustr(reference),
@@ -526,7 +538,7 @@ pub struct Signature {
     #[serde(flatten)]
     pub pins: WeakPortPins,
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub reference: Option<WeakReferenceSelection>,
+    pub reference: Option<WeakReferences>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -536,9 +548,9 @@ pub struct WeakConnection {
     pub sink: Signature,
 }
 
-pub struct WeakSourceSet(WeakPortPins, Option<WeakReferenceSelection>);
+pub struct WeakSourceSet(WeakPortPins, Option<WeakReferences>);
 pub struct WeakSourceUnset;
-pub struct WeakSinkSet(WeakPortPins, Option<WeakReferenceSelection>);
+pub struct WeakSinkSet(WeakPortPins, Option<WeakReferences>);
 pub struct WeakSinkUnset;
 
 #[derive(Default)]
@@ -570,7 +582,7 @@ impl<Snk> WeakConnectionBuilder<WeakSourceUnset, Snk> {
             source: WeakSourceSet(
                 pins,
                 component.map(|component| {
-                    WeakReferenceSelection::new(component, reference_start, reference_end)
+                    WeakReferences::new(component, reference_start, reference_end)
                 }),
             ),
             sink: self.sink,
@@ -592,7 +604,7 @@ impl<Src> WeakConnectionBuilder<Src, WeakSinkUnset> {
             sink: WeakSinkSet(
                 pins,
                 component.map(|component| {
-                    WeakReferenceSelection::new(component, reference_start, reference_end)
+                    WeakReferences::new(component, reference_start, reference_end)
                 }),
             ),
             kind: self.kind,
@@ -627,7 +639,7 @@ impl WeakConnectionBuilder<WeakSourceSet, WeakSinkSet> {
 }
 
 impl<'a, 'm> Resolve<'a, 'm> for Signature {
-    type Output = (PortPins, Option<ComponentRefSelection>);
+    type Output = (PortPins, Option<ComponentRefs>);
 
     fn resolve<C: ComponentAccess>(
         self,
@@ -650,7 +662,7 @@ impl<'a, 'm> Resolve<'a, 'm> for Signature {
                         &reference.reference,
                     ))
                     .map(|reference| {
-                        ComponentRefSelection::new(reference.id(), ReferenceRange::new(start, end))
+                        ComponentRefs::new(reference.id(), ReferenceRange::new(start, end))
                     })
             })
             .transpose()?;

@@ -6,7 +6,7 @@ use slotmap::SlotMap;
 
 use super::{
     component::{self, ComponentData},
-    connection::WeakConnectionBuilder,
+    connection::{ComponentRefs, WeakConnectionBuilder},
     module,
     port::{pin_range, PinRange, WeakPortPins},
     prelude::*,
@@ -115,7 +115,7 @@ impl Serialize for SerializeReferences<'_, '_> {
         }
 
         for &reference in unnamed_references {
-            let reference = ComponentRef::new(self.module, reference);
+            let reference = reference.bind(self.module);
 
             state.serialize_element(&ComponentWeakRef {
                 component: reference.component().data().name,
@@ -156,7 +156,7 @@ impl Serialize for SerializeNamedReferences<'_, '_> {
         let mut state = serializer.serialize_map(Some(len))?;
 
         for &reference in named_references {
-            let reference = ComponentRef::new(self.module, reference);
+            let reference = reference.bind(self.module);
             let alias = reference.alias().expect("reference should have an alias");
 
             state.serialize_entry(
@@ -202,28 +202,24 @@ impl Serialize for SerializeConnections<'_, '_> {
                 range: connection.sink_pins.range.clone(),
             };
 
+            let select_component = |component: &ComponentRefs| {
+                (
+                    Some(component.reference(self.module).alias_or_name()),
+                    component.get_start(),
+                    component.get_end(),
+                )
+            };
+
             let (source_component, source_start, source_end) = connection
                 .source_component
                 .as_ref()
-                .map(|component| {
-                    (
-                        Some(component.reference(self.module).alias_or_name()),
-                        component.get_start(),
-                        component.get_end(),
-                    )
-                })
+                .map(select_component)
                 .unwrap_or((None, None, None));
 
             let (sink_component, sink_start, sink_end) = connection
                 .sink_component
                 .as_ref()
-                .map(|component| {
-                    (
-                        Some(component.reference(self.module).alias_or_name()),
-                        component.get_start(),
-                        component.get_end(),
-                    )
-                })
+                .map(select_component)
                 .unwrap_or((None, None, None));
 
             let mut builder = WeakConnectionBuilder::new()

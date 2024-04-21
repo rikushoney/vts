@@ -2,7 +2,9 @@ use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 
-use vts_core::arch::{module::ComponentRefId, reference::ReferenceRange};
+use vts_core::arch::{
+    connection::ComponentRefs, module::ComponentRefId, reference::ReferenceRange,
+};
 
 use super::{
     connection::{Connector, IntoSignature},
@@ -35,6 +37,18 @@ impl PyComponentRef {
 
     pub(crate) fn id(&self) -> ComponentRefId {
         self.1
+    }
+}
+
+pub trait PyComponentRefMethods {
+    fn select(&self, py: Python<'_>, range: ReferenceRange) -> ComponentRefs;
+}
+
+impl PyComponentRefMethods for Bound<'_, PyComponentRef> {
+    fn select(&self, py: Python<'_>, range: ReferenceRange) -> ComponentRefs {
+        let reference = self.borrow();
+        borrow_inner!(reference + py => reference);
+        reference.select(range)
     }
 }
 
@@ -85,11 +99,13 @@ impl PyComponentRef {
         reference.n_instances()
     }
 
-    pub fn select(
+    #[must_use]
+    #[pyo3(name = "select")]
+    pub fn select_py(
         slf: &Bound<'_, Self>,
         py: Python<'_>,
         index: SliceOrIndex<'_>,
-    ) -> PyResult<PyComponentRefSelection> {
+    ) -> PyResult<PyComponentRefs> {
         let n_instances = {
             let slf = slf.borrow();
             slf.n_instances(py)
@@ -97,15 +113,15 @@ impl PyComponentRef {
 
         let mut range = ReferenceRange::Bound(index.to_range(n_instances)?);
         range.flatten(n_instances);
-        Ok(PyComponentRefSelection::new(slf.as_borrowed(), range))
+        Ok(PyComponentRefs::new(slf.as_borrowed(), range))
     }
 
     pub fn __getitem__(
         slf: &Bound<'_, Self>,
         py: Python<'_>,
         index: SliceOrIndex<'_>,
-    ) -> PyResult<PyComponentRefSelection> {
-        Self::select(slf, py, index)
+    ) -> PyResult<PyComponentRefs> {
+        Self::select_py(slf, py, index)
     }
 
     pub fn __getattr__(
@@ -128,7 +144,7 @@ impl PyComponentRef {
                 .unbind()
         };
 
-        let reference = Py::new(py, Self::select(slf, py, SliceOrIndex::full(py))?)?;
+        let reference = Py::new(py, Self::select_py(slf, py, SliceOrIndex::full(py))?)?;
         let port = PyPort::new(slf.borrow().module(py).as_borrowed(), port)?;
 
         Ok(PyComponentRefPort::new(

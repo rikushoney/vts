@@ -44,7 +44,7 @@ fn equals_one(x: &u32) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct PortData {
+pub(crate) struct PortData {
     #[serde(skip)]
     pub name: Ustr,
     #[serde(skip)]
@@ -57,7 +57,7 @@ pub struct PortData {
 }
 
 impl PortData {
-    pub(crate) fn new(
+    fn new(
         parent: ComponentId,
         name: &str,
         kind: PortKind,
@@ -82,10 +82,13 @@ mod port_access {
     impl Sealed for PortId {}
 
     impl Sealed for Port<'_> {}
+
+    impl Sealed for &PortPins {}
 }
 
-pub trait PortAccess: port_access::Sealed {
+pub trait PortAccess: Copy + port_access::Sealed {
     fn id(&self) -> PortId;
+
     fn bind<'m>(&self, module: &'m Module) -> Port<'m>;
 }
 
@@ -99,7 +102,7 @@ impl PortAccess for PortId {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Port<'m>(&'m Module, PortId);
 
 impl<'m> Port<'m> {
@@ -144,10 +147,12 @@ impl<'m> Port<'m> {
         PortPins::new(self.1, range)
     }
 
+    #[must_use]
     pub fn select_all(&self) -> PortPins {
         self.select(PinRange::Full)
     }
 
+    #[must_use]
     pub fn select_range(&self, start: Option<u32>, end: Option<u32>) -> PortPins {
         self.select(PinRange::new(start, end))
     }
@@ -260,7 +265,7 @@ impl PortPins {
         Port::new(module, self.port)
     }
 
-    pub fn len<'m>(&self, module: &'m Module) -> u32 {
+    pub fn len(&self, module: &Module) -> u32 {
         let n_pins = self.port(module).n_pins();
         let Range { start, end } = self.range.expand(n_pins);
         debug_assert!(end >= start);
@@ -286,6 +291,26 @@ impl PortPins {
             }
             PinRange::Full => PinRange::new(start, end),
         };
+    }
+
+    pub fn clone_masked(&self, range: Range<u32>) -> Self {
+        let mut pins = self.clone();
+        pins.mask(Some(range.start), Some(range.end));
+        pins
+    }
+
+    pub fn simplify(&mut self, module: &Module) {
+        self.range.flatten(module.lookup(self.port).n_pins);
+    }
+}
+
+impl PortAccess for &PortPins {
+    fn id(&self) -> PortId {
+        self.port
+    }
+
+    fn bind<'m>(&self, module: &'m Module) -> Port<'m> {
+        self.port.bind(module)
     }
 }
 
@@ -391,7 +416,7 @@ impl<'a, 'm> PortBuilder<'a, 'm, NameSet, KindSet> {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct WeakPortPins {
-    pub port: Ustr,
+    pub(crate) port: Ustr,
     #[serde(flatten)]
     pub range: PinRange,
 }

@@ -5,7 +5,7 @@ use ustr::{ustr, Ustr};
 
 use super::{
     checker,
-    connection::ComponentRefSelection,
+    connection::ComponentRefs,
     linker::{self, KnownComponents, Resolve},
     prelude::*,
 };
@@ -23,15 +23,15 @@ pub(super) mod reference_range {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ComponentRefData {
-    pub(crate) component: ComponentId,
-    pub(crate) parent: ComponentId,
-    pub(crate) alias: Option<Ustr>,
+pub(crate) struct ComponentRefData {
+    pub component: ComponentId,
+    pub parent: ComponentId,
+    pub alias: Option<Ustr>,
     pub n_instances: u32,
 }
 
 impl ComponentRefData {
-    pub(crate) fn new(
+    fn new(
         component: ComponentId,
         parent: ComponentId,
         alias: Option<Ustr>,
@@ -46,7 +46,7 @@ impl ComponentRefData {
     }
 }
 
-pub(crate) mod component_ref_access {
+mod component_ref_access {
     use super::*;
 
     pub trait Sealed {}
@@ -55,10 +55,10 @@ pub(crate) mod component_ref_access {
 
     impl Sealed for ComponentRef<'_> {}
 
-    impl Sealed for ComponentRefSelection {}
+    impl Sealed for &ComponentRefs {}
 }
 
-pub trait ComponentRefAccess: Clone + component_ref_access::Sealed {
+pub trait ComponentRefAccess: Copy + component_ref_access::Sealed {
     fn id(&self) -> ComponentRefId;
 
     fn bind<'m>(&self, module: &'m Module) -> ComponentRef<'m>;
@@ -78,11 +78,11 @@ impl ComponentRefAccess for ComponentRefId {
 pub struct ComponentRef<'m>(&'m Module, ComponentRefId);
 
 impl<'m> ComponentRef<'m> {
-    pub(crate) fn new(module: &'m Module, reference: ComponentRefId) -> Self {
+    fn new(module: &'m Module, reference: ComponentRefId) -> Self {
         Self(module, reference)
     }
 
-    pub(crate) fn module(&self) -> &'m Module {
+    pub fn module(&self) -> &'m Module {
         self.0
     }
 
@@ -91,7 +91,7 @@ impl<'m> ComponentRef<'m> {
     }
 
     pub(crate) fn data(&self) -> &'m ComponentRefData {
-        &self.module().lookup(self.1)
+        self.module().lookup(self.1)
     }
 
     pub fn component(&self) -> Component<'m> {
@@ -119,8 +119,8 @@ impl<'m> ComponentRef<'m> {
     }
 
     #[must_use]
-    pub fn select(&self, range: ReferenceRange) -> ComponentRefSelection {
-        ComponentRefSelection::new(self.id(), range)
+    pub fn select(&self, range: ReferenceRange) -> ComponentRefs {
+        ComponentRefs::new(self.id(), range)
     }
 }
 
@@ -280,12 +280,14 @@ impl<'a, 'm, C> ComponentRefBuilder<'a, 'm, C> {
 impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
     fn insert(&mut self) -> ComponentRefId {
         let n_instances = self.n_instances.unwrap_or(1);
+
         let reference = ComponentRefData::new(
             self.component.0.id(),
             self.parent.id(),
             self.alias.take(),
             n_instances,
         );
+
         self.module.references.insert(reference)
     }
 
@@ -298,6 +300,7 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
 
             self.checker
                 .register_reference(self.module, reference.component(), reference)?;
+
             reference.1
         };
 
@@ -305,6 +308,7 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
             .lookup_mut(self.parent)
             .references
             .push(reference);
+
         Ok(ComponentRef::new(self.module, reference))
     }
 }
@@ -315,9 +319,9 @@ fn equals_one(x: &u32) -> bool {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct ComponentWeakRef {
-    pub component: Ustr,
+    pub(crate) component: Ustr,
     #[serde(skip)]
-    pub alias: Option<Ustr>,
+    pub(crate) alias: Option<Ustr>,
     #[serde(skip_serializing_if = "equals_one")]
     pub n_instances: u32,
 }

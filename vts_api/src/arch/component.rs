@@ -313,7 +313,7 @@ impl PyComponent {
 
     #[pyo3(signature = (component, *, alias=None, n_instances=None))]
     pub fn add_reference<'py>(
-        &mut self,
+        &self,
         component: &Bound<'py, PyComponent>,
         alias: Option<&Bound<'py, PyString>>,
         n_instances: Option<u32>,
@@ -345,22 +345,22 @@ impl PyComponent {
 
     #[pyo3(signature = (source, sink, *, kind=None))]
     pub fn add_connection(
-        &mut self,
+        &self,
         source: &Bound<'_, PySignature>,
         sink: &Bound<'_, PySignature>,
         kind: Option<PyConnectionKind>,
     ) -> PyResult<()> {
         let py = source.py();
 
-        let module = self.module(py).borrow_mut();
-        let mut inner = module.inner.borrow_mut(py);
-        let mut checker = module.checker.borrow_mut(py);
-
         let source = source.borrow();
         let source_selection = source.get_reference(py);
 
         let sink = sink.borrow();
         let sink_selection = sink.get_reference(py);
+
+        let module = self.module(py).borrow_mut();
+        let mut inner = module.inner.borrow_mut(py);
+        let mut checker = module.checker.borrow_mut(py);
 
         let mut builder = ConnectionBuilder::new(&mut inner.0, &mut checker.0, self.id())
             .set_source(source.pins.1.clone(), source_selection)

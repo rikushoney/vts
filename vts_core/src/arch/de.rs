@@ -8,7 +8,7 @@ use ustr::ustr;
 
 use super::{
     component::{self, ComponentBuilder},
-    connection::{Signature, WeakConnection, WeakReferenceSelection},
+    connection::{Signature, WeakConnection, WeakReferences},
     module,
     port::{self, pin_range, PinRange, PortBuilder, WeakPortPins},
     prelude::*,
@@ -518,65 +518,6 @@ impl<'a, 'b, 'de, 'm> DeserializeSeed<'de> for PortSeed<'a, 'b, 'm> {
     }
 }
 
-// impl<'de> Deserialize<'de> for PinRange {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         struct PinRangeVisitor;
-
-//         impl<'de> Visitor<'de> for PinRangeVisitor {
-//             type Value = PinRange;
-
-//             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//                 write!(f, "a pin range")
-//             }
-
-//             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-//             where
-//                 A: MapAccess<'de>,
-//             {
-//                 #[derive(Deserialize)]
-//                 #[serde(rename_all = "snake_case")]
-//                 enum Field {
-//                     PortStart,
-//                     PortEnd,
-//                 }
-
-//                 let mut port_start: Option<u32> = None;
-//                 let mut port_end: Option<u32> = None;
-
-//                 while let Some(field) = map.next_key()? {
-//                     match field {
-//                         Field::PortStart => {
-//                             if port_start.is_some() {
-//                                 return Err(de::Error::duplicate_field(
-//                                     pin_range::FIELDS[pin_range::PORT_START],
-//                                 ));
-//                             }
-
-//                             port_start = Some(map.next_value()?);
-//                         }
-//                         Field::PortEnd => {
-//                             if port_end.is_some() {
-//                                 return Err(de::Error::duplicate_field(
-//                                     pin_range::FIELDS[pin_range::PORT_END],
-//                                 ));
-//                             }
-
-//                             port_end = Some(map.next_value()?);
-//                         }
-//                     }
-//                 }
-
-//                 Ok(PinRange::new(port_start, port_end))
-//             }
-//         }
-
-//         deserializer.deserialize_map(PinRangeVisitor)
-//     }
-// }
-
 enum DeserializeComponentWeakRef {
     Named(String),
     Unnamed,
@@ -655,65 +596,6 @@ impl<'de> DeserializeSeed<'de> for DeserializeComponentWeakRef {
         deserializer.deserialize_struct("ComponentRef", reference::FIELDS, self)
     }
 }
-
-// impl<'de> Deserialize<'de> for ReferenceRange {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         struct ReferenceRangeVisitor;
-
-//         impl<'de> Visitor<'de> for ReferenceRangeVisitor {
-//             type Value = ReferenceRange;
-
-//             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//                 write!(f, "a reference range")
-//             }
-
-//             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-//             where
-//                 A: MapAccess<'de>,
-//             {
-//                 #[derive(Deserialize)]
-//                 #[serde(rename_all = "snake_case")]
-//                 enum Field {
-//                     ReferenceStart,
-//                     ReferenceEnd,
-//                 }
-
-//                 let mut reference_start: Option<u32> = None;
-//                 let mut reference_end: Option<u32> = None;
-
-//                 while let Some(field) = map.next_key()? {
-//                     match field {
-//                         Field::ReferenceStart => {
-//                             if reference_start.is_some() {
-//                                 return Err(de::Error::duplicate_field(
-//                                     reference_range::FIELDS[reference_range::REFERENCE_START],
-//                                 ));
-//                             }
-
-//                             reference_start = Some(map.next_value()?);
-//                         }
-//                         Field::ReferenceEnd => {
-//                             if reference_end.is_some() {
-//                                 return Err(de::Error::duplicate_field(
-//                                     reference_range::FIELDS[reference_range::REFERENCE_END],
-//                                 ));
-//                             }
-
-//                             reference_end = Some(map.next_value()?);
-//                         }
-//                     }
-//                 }
-
-//                 Ok(ReferenceRange::new(reference_start, reference_end))
-//             }
-//         }
-
-//         deserializer.deserialize_map(ReferenceRangeVisitor)
-//     }
-// }
 
 impl<'de> Deserialize<'de> for Signature {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -807,13 +689,11 @@ impl<'de> Deserialize<'de> for Signature {
                 }
 
                 let reference = reference.map(|reference| {
-                    WeakReferenceSelection::new(&reference, reference_start, reference_end)
+                    WeakReferences::new(&reference, reference_start, reference_end)
                 });
 
                 if reference.is_none() && (reference_start.is_some() || reference_end.is_some()) {
-                    return Err(de::Error::custom(
-                        "reference_start or reference_end without reference",
-                    ));
+                    return Err(de::Error::missing_field("reference"));
                 }
 
                 let port = port.ok_or(de::Error::missing_field("port"))?;

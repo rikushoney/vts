@@ -1,6 +1,7 @@
 from math import floor, log10
 
 from vts import arch
+from vts.arch import concat
 
 m = arch.Module("test_mod")
 
@@ -24,6 +25,10 @@ c4.add_port("test_port_4", kind="o")
 c1.add_reference(c4, alias="c4")
 
 c1.c4.test_port_4 = c1.c3.test_port_3[1]
+
+c1.add_port("test_output", kind="o", n_pins=2)
+
+c1.test_output = concat(c1.c4.test_port_4, c1.c3.test_port_3[0])
 
 
 def print_with_linum(s: str) -> None:

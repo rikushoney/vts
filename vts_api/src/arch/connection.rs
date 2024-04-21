@@ -1,12 +1,10 @@
-use std::ops::Range;
-
 use pyo3::{
     exceptions::{PyAttributeError, PyTypeError},
     prelude::*,
     types::{PyString, PyTuple},
 };
 use vts_core::arch::{
-    connection::{ComponentRefSelection, ConnectionKind},
+    connection::{ComponentRefs, Concat, ConnectionKind},
     module::ComponentId,
     reference::ReferenceRange,
 };
@@ -23,13 +21,13 @@ wrap_enum!(
 #[pyclass(name = "ComponentRefPort")]
 #[derive(Clone, Debug)]
 pub struct PyComponentRefPort {
-    components: Py<PyComponentRefSelection>,
+    components: Py<PyComponentRefs>,
     port: Py<PyPort>,
 }
 
 impl PyComponentRefPort {
     pub fn new(
-        components: Borrowed<'_, '_, PyComponentRefSelection>,
+        components: Borrowed<'_, '_, PyComponentRefs>,
         port: Borrowed<'_, '_, PyPort>,
     ) -> Self {
         Self {
@@ -38,7 +36,7 @@ impl PyComponentRefPort {
         }
     }
 
-    pub fn components<'py>(&self, py: Python<'py>) -> &Bound<'py, PyComponentRefSelection> {
+    pub fn components<'py>(&self, py: Python<'py>) -> &Bound<'py, PyComponentRefs> {
         self.components.bind(py)
     }
 
@@ -79,22 +77,7 @@ impl PyComponentRefPort {
 #[derive(Clone, Debug)]
 pub enum ComponentOrRef {
     Component(ComponentId),
-    Reference(PyComponentRefSelection),
-}
-
-impl ComponentOrRef {
-    pub fn len(&self, py: Python<'_>) -> usize {
-        match self {
-            Self::Component(_) => 1,
-            Self::Reference(selection) => {
-                let Range { start, end } = selection
-                    .range
-                    .expand(selection.reference(py).borrow().n_instances(py));
-
-                (end - start) as usize
-            }
-        }
-    }
+    Reference(PyComponentRefs),
 }
 
 #[derive(Clone, Debug)]
@@ -112,19 +95,20 @@ impl PySignature {
         }
     }
 
-    pub fn new_reference(reference: PyComponentRefSelection, pins: PyPortPins) -> Self {
+    pub fn new_reference(reference: PyComponentRefs, pins: PyPortPins) -> Self {
         Self {
             component_or_reference: ComponentOrRef::Reference(reference),
             pins,
         }
     }
 
-    pub fn get_reference(&self, py: Python<'_>) -> Option<ComponentRefSelection> {
+    pub fn get_reference(&self, py: Python<'_>) -> Option<ComponentRefs> {
         match &self.component_or_reference {
-            ComponentOrRef::Reference(selection) => Some(ComponentRefSelection::new(
-                selection.reference(py).borrow().id(),
-                selection.range.clone(),
-            )),
+            ComponentOrRef::Reference(selection) => Some({
+                let reference = selection.reference(py).borrow();
+                reference::borrow_inner!(reference + py => reference);
+                reference.select(selection.range.clone())
+            }),
             _ => None,
         }
     }
@@ -144,13 +128,13 @@ impl PySignature {
 }
 
 #[derive(Clone, Debug)]
-#[pyclass(name = "ComponentRefSelection")]
-pub struct PyComponentRefSelection {
+#[pyclass(name = "ComponentRefs")]
+pub struct PyComponentRefs {
     reference: Py<PyComponentRef>,
     pub range: ReferenceRange,
 }
 
-impl PyComponentRefSelection {
+impl PyComponentRefs {
     pub fn new(reference: Borrowed<'_, '_, PyComponentRef>, range: ReferenceRange) -> Self {
         Self {
             reference: reference.to_owned().unbind(),
@@ -164,7 +148,7 @@ impl PyComponentRefSelection {
 }
 
 #[pymethods]
-impl PyComponentRefSelection {
+impl PyComponentRefs {
     pub fn __getattr__(&self, port: &Bound<'_, PyString>) -> PyResult<PyComponentRefPort> {
         let py = port.py();
         let reference = self.reference.bind(py);
@@ -237,6 +221,16 @@ impl IntoSignature {
     }
 }
 
+pub trait ToSignature {
+    fn to_signature<'py>(&self, py: Python<'py>) -> PyResult<Py<PySignature>>;
+}
+
+impl ToSignature for IntoSignature {
+    fn to_signature<'py>(&self, py: Python<'py>) -> PyResult<Py<PySignature>> {
+        self.clone().into_signature(py)
+    }
+}
+
 #[pyclass(name = "Direct")]
 pub struct PyDirect(IntoSignature);
 
@@ -267,14 +261,16 @@ pub struct PyConcat(Vec<IntoSignature>);
 #[pyfunction]
 #[pyo3(signature = (*connectors))]
 pub fn concat(connectors: &Bound<'_, PyTuple>) -> PyResult<PyConcat> {
+    let extract_signature = |mut signatures: Vec<IntoSignature>, signature: Bound<'_, PyAny>| {
+        signature.extract::<IntoSignature>().map(|signature| {
+            signatures.push(signature);
+            signatures
+        })
+    };
+
     connectors
         .iter()
-        .try_fold(Vec::new(), |mut signatures, signature| {
-            signature.extract::<IntoSignature>().map(|signature| {
-                signatures.push(signature);
-                signatures
-            })
-        })
+        .try_fold(Vec::new(), extract_signature)
         .map(PyConcat)
 }
 
@@ -315,31 +311,6 @@ impl<'py> Connector<'py> {
         }
     }
 
-    fn connect_part(
-        component: Borrowed<'_, 'py, PyComponent>,
-        source: &IntoSignature,
-        sink: &Bound<'py, PySignature>,
-        component_index: &mut usize,
-        pin_index: &mut usize,
-    ) -> PyResult<()> {
-        let py = component.py();
-        let source = source.clone().into_signature(py)?;
-
-        let ((component_budget, pin_budget), sink_n_pins) = {
-            let sink = sink.borrow();
-            (sink.counts(py), sink.pins.len(py))
-        };
-
-        let source = source.bind(py);
-
-        let ((mut components_to_connect, mut pins_to_connect), source_n_pins) = {
-            let source = source.borrow();
-            (source.counts(py), source.pins.len(py))
-        };
-
-        Ok(())
-    }
-
     pub fn connect(
         self,
         component: Borrowed<'_, 'py, PyComponent>,
@@ -363,23 +334,70 @@ impl<'py> Connector<'py> {
                 Some(PyConnectionKind::MUX),
             ),
             Connector::Concat(concat) => {
+                let component = component.borrow();
+                let module = component.module(py);
                 let sink = sink.bind(py);
-                let (mut component_index, mut pin_index) = (0, 0);
+                let concat = concat.borrow();
+                let mut parts = concat.0.iter();
 
-                return concat.borrow().0.iter().try_for_each(|source| {
-                    Self::connect_part(
-                        component.as_borrowed(),
-                        source,
-                        sink,
-                        &mut component_index,
-                        &mut pin_index,
-                    )
-                });
+                let mut concat = {
+                    let sink = sink.borrow();
+
+                    match sink.component_or_reference {
+                        ComponentOrRef::Component(component) => {
+                            Concat::new_component(component, sink.pins.1.clone())
+                        }
+                        ComponentOrRef::Reference(ref reference) => {
+                            let range = reference.range.clone();
+                            let reference = reference.reference.bind(py);
+                            Concat::new_reference(reference.select(py, range), sink.pins.1.clone())
+                        }
+                    }
+                };
+
+                parts.try_for_each(|signature| {
+                    signature.to_signature(py).and_then(|signature| {
+                        let module = module.borrow();
+                        let inner = module.inner.bind(py);
+                        let inner = inner.borrow();
+                        let source = signature.bind(py);
+                        let source = source.borrow();
+
+                        match source.component_or_reference {
+                            ComponentOrRef::Component(component) => {
+                                concat.append_component_source(
+                                    &inner.0,
+                                    component,
+                                    source.pins.1.clone(),
+                                );
+                            }
+                            ComponentOrRef::Reference(ref reference) => {
+                                let range = reference.range.clone();
+                                let reference = reference.reference.bind(py);
+                                concat.append_reference_source(
+                                    &inner.0,
+                                    reference.select(py, range),
+                                    source.pins.1.clone(),
+                                );
+                            }
+                        }
+
+                        Ok(())
+                    })
+                })?;
+
+                let module = module.borrow();
+                let inner = module.inner.bind(py);
+                let mut inner = inner.borrow_mut();
+                let checker = module.checker.bind(py);
+                let mut checker = checker.borrow_mut();
+                concat.make_connections(&mut inner.0, &mut checker.0);
+                return Ok(());
             }
         };
 
         component
-            .borrow_mut()
+            .borrow()
             .add_connection(source.bind(py), sink.bind(py), kind)
     }
 }

@@ -51,10 +51,6 @@ impl Module {
         self.components.get(component).map(|_| component.bind(self))
     }
 
-    pub fn get_component_data(&mut self, component: ComponentId) -> Option<&mut ComponentData> {
-        self.components.get_mut(component)
-    }
-
     pub fn get_port(&self, port: PortId) -> Option<Port<'_>> {
         self.ports.get(port).map(|_| port.bind(self))
     }

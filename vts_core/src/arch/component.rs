@@ -27,11 +27,11 @@ pub enum ComponentClass {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ComponentData {
+pub(crate) struct ComponentData {
     pub name: Ustr,
-    pub(crate) ports: Vec<PortId>,
-    pub(crate) references: Vec<ComponentRefId>,
-    pub(crate) connections: Vec<Connection>,
+    pub ports: Vec<PortId>,
+    pub references: Vec<ComponentRefId>,
+    pub connections: Vec<Connection>,
     pub class: Option<ComponentClass>,
 }
 
@@ -47,7 +47,7 @@ impl ComponentData {
     }
 }
 
-pub(crate) mod component_access {
+mod component_access {
     use super::*;
 
     pub trait Sealed {}
@@ -89,7 +89,7 @@ impl<'m> Component<'m> {
     }
 
     pub(crate) fn data(&self) -> &'m ComponentData {
-        &self.module().lookup(self.1)
+        self.module().lookup(self.1)
     }
 
     pub fn name(&self) -> &'m str {
@@ -121,15 +121,15 @@ impl<'m> Component<'m> {
     }
 
     pub fn find_port(&self, name: &str) -> Option<Port<'m>> {
-        self.data().ports.iter().find_map(|&port| {
+        self.data().ports.iter().find_map(|port| {
             let port = port.bind(self.module());
             (port.name() == name).then_some(port)
         })
     }
 
     pub fn find_reference(&self, alias_or_name: &str) -> Option<ComponentRef<'_>> {
-        self.data().references.iter().find_map(|&reference| {
-            let reference = ComponentRef::new(self.module(), reference);
+        self.data().references.iter().find_map(|reference| {
+            let reference = reference.bind(self.module());
             (reference.alias_or_name() == alias_or_name).then_some(reference)
         })
     }
@@ -154,7 +154,7 @@ impl<'m> Iterator for PortIter<'m> {
     type Item = Port<'m>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|&port| port.bind(self.module))
+        self.iter.next().map(|port| port.bind(self.module))
     }
 }
 
@@ -169,7 +169,7 @@ impl<'m> Iterator for ComponentRefIter<'m> {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|&reference| ComponentRef::new(self.module, reference))
+            .map(|reference| reference.bind(self.module))
     }
 }
 
@@ -193,7 +193,7 @@ pub struct NameSet(String);
 pub struct NameUnset;
 
 pub struct ComponentBuilder<'a, 'm, N> {
-    pub(crate) module: &'m mut Module,
+    module: &'m mut Module,
     checker: &'a mut Checker,
     name: N,
     class: Option<ComponentClass>,

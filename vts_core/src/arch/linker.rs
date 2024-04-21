@@ -49,7 +49,7 @@ impl Error {
     }
 }
 
-pub struct KnownComponents(pub(super) HashMap<Ustr, ComponentId>);
+pub struct KnownComponents(HashMap<Ustr, ComponentId>);
 
 pub trait Resolve<'a, 'm> {
     type Output;
@@ -67,6 +67,45 @@ pub trait Resolve<'a, 'm> {
 struct LinkerItems {
     references: Vec<ComponentWeakRef>,
     connections: Vec<WeakConnection>,
+}
+
+impl<'a, 'm> Resolve<'a, 'm> for LinkerItems {
+    type Output = ResolvedComponent;
+
+    fn resolve<C: ComponentAccess>(
+        mut self,
+        module: &'m mut Module,
+        checker: &'a mut Checker,
+        parent: C,
+        components: &KnownComponents,
+    ) -> Result<Self::Output, Error> {
+        let resolve_reference = |mut resolved: HashSet<Ustr>, reference: ComponentWeakRef| {
+            let reference = reference.resolve(module, checker, parent, components)?;
+            resolved.insert(ustr(reference.bind(module).alias_or_name()));
+            Ok::<_, Error>(resolved)
+        };
+
+        let references = self
+            .references
+            .drain(..)
+            .try_fold(HashSet::default(), resolve_reference)?;
+
+        let resolve_connection = |connection: WeakConnection| {
+            connection.resolve(module, checker, parent, components)?;
+            checker.register_connection()?;
+            Ok::<_, Error>(())
+        };
+
+        self.connections
+            .drain(..)
+            .try_for_each(resolve_connection)?;
+
+        Ok(ResolvedComponent {
+            component: parent.id(),
+            ports: Linker::get_known_ports(module, parent.id()),
+            references,
+        })
+    }
 }
 
 impl KnownComponents {
@@ -87,7 +126,7 @@ pub(super) struct ResolvedComponent {
     pub(super) references: HashSet<Ustr>,
 }
 
-pub struct ResolvedComponents(pub(super) HashMap<Ustr, ResolvedComponent>);
+pub struct ResolvedComponents(HashMap<Ustr, ResolvedComponent>);
 
 impl ResolvedComponents {
     pub fn into_checker(self, module: &Module) -> Checker {
@@ -190,57 +229,23 @@ impl Linker {
         HashSet::from_iter(component.ports().map(|port| ustr(port.name())))
     }
 
-    fn resolve_impl<C: ComponentAccess>(
-        module: &mut Module,
-        checker: &mut Checker,
-        component: C,
-        unresolved: &mut LinkerItems,
-        components: &KnownComponents,
-    ) -> Result<ResolvedComponent, Error> {
-        let references = unresolved.references.drain(..).try_fold(
-            HashSet::default(),
-            |mut resolved, reference| {
-                let reference = reference.resolve(module, checker, component.id(), components)?;
-
-                resolved.insert(ustr(reference.bind(module).alias_or_name()));
-                Ok::<_, Error>(resolved)
-            },
-        )?;
-
-        unresolved
-            .connections
-            .drain(..)
-            .try_for_each(|connection| {
-                connection.resolve(module, checker, component.id(), components)?;
-                checker.register_connection()?;
-                Ok::<_, Error>(())
-            })?;
-
-        Ok(ResolvedComponent {
-            component: component.id(),
-            ports: Self::get_known_ports(module, component.id()),
-            references,
-        })
-    }
-
     pub fn resolve(&mut self, module: &mut Module) -> Result<ResolvedComponents, Error> {
         let components = Self::get_known_components(module);
 
-        let resolved = self.unresolved.drain().try_fold(
-            HashMap::default(),
-            |mut resolved, (component, mut unresolved)| {
-                let reference = Self::resolve_impl(
-                    module,
-                    &mut self.checker,
-                    component,
-                    &mut unresolved,
-                    &components,
-                )?;
+        let resolve_one =
+            |mut resolved: HashMap<Ustr, ResolvedComponent>,
+             (component, unresolved): (ComponentId, LinkerItems)| {
+                let reference =
+                    unresolved.resolve(module, &mut self.checker, component, &components)?;
 
                 resolved.insert(module.lookup(component).name, reference);
                 Ok::<_, Error>(resolved)
-            },
-        )?;
+            };
+
+        let resolved = self
+            .unresolved
+            .drain()
+            .try_fold(HashMap::default(), resolve_one)?;
 
         Ok(ResolvedComponents(resolved))
     }
