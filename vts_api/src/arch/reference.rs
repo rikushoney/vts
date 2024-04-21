@@ -99,7 +99,6 @@ impl PyComponentRef {
         reference.n_instances()
     }
 
-    #[must_use]
     #[pyo3(name = "select")]
     pub fn select_py(
         slf: &Bound<'_, Self>,

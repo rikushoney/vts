@@ -222,11 +222,11 @@ impl IntoSignature {
 }
 
 pub trait ToSignature {
-    fn to_signature<'py>(&self, py: Python<'py>) -> PyResult<Py<PySignature>>;
+    fn to_signature(&self, py: Python<'_>) -> PyResult<Py<PySignature>>;
 }
 
 impl ToSignature for IntoSignature {
-    fn to_signature<'py>(&self, py: Python<'py>) -> PyResult<Py<PySignature>> {
+    fn to_signature(&self, py: Python<'_>) -> PyResult<Py<PySignature>> {
         self.clone().into_signature(py)
     }
 }
@@ -356,7 +356,7 @@ impl<'py> Connector<'py> {
                 };
 
                 parts.try_for_each(|signature| {
-                    signature.to_signature(py).and_then(|signature| {
+                    signature.to_signature(py).map(|signature| {
                         module::borrow_inner!(module + py => inner);
                         let source = signature.borrow(py);
 
@@ -371,6 +371,7 @@ impl<'py> Connector<'py> {
                             ComponentOrRef::Reference(ref reference) => {
                                 let range = reference.range.clone();
                                 let reference = reference.reference.bind(py);
+
                                 concat.append_reference_source(
                                     &inner.0,
                                     reference.select(py, range),
@@ -378,8 +379,6 @@ impl<'py> Connector<'py> {
                                 );
                             }
                         }
-
-                        Ok(())
                     })
                 })?;
 

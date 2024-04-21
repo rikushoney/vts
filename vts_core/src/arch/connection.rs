@@ -165,9 +165,9 @@ impl<'a, 'm, Snk> ConnectionBuilder<'a, 'm, SourceUnset, Snk> {
     ) -> ConnectionBuilder<'a, 'm, SourceSet, Snk> {
         pins.simplify(self.module);
 
-        component
-            .as_mut()
-            .map(|component| component.simplify(self.module));
+        if let Some(component) = component.as_mut() {
+            component.simplify(self.module)
+        }
 
         ConnectionBuilder {
             module: self.module,
@@ -188,9 +188,9 @@ impl<'a, 'm, Src> ConnectionBuilder<'a, 'm, Src, SinkUnset> {
     ) -> ConnectionBuilder<'a, 'm, Src, SinkSet> {
         pins.simplify(self.module);
 
-        component
-            .as_mut()
-            .map(|component| component.simplify(self.module));
+        if let Some(component) = component.as_mut() {
+            component.simplify(self.module)
+        }
 
         ConnectionBuilder {
             module: self.module,
