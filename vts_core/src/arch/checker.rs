@@ -3,7 +3,14 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use ustr::{ustr, Ustr};
 
-use super::{linker::ResolvedComponent, prelude::*};
+use super::{
+    connection::{ComponentRefs, ConnectionName},
+    linker::ResolvedComponent,
+    port::PortPins,
+    prelude::*,
+};
+
+impl std::error::Error for ConnectionName {}
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -15,6 +22,16 @@ pub enum Error {
     ReferenceExists {
         component: String,
         reference: String,
+    },
+    #[error(r#""{source}" already driving "{sink}""#)]
+    SourceCollision {
+        source: ConnectionName,
+        sink: ConnectionName,
+    },
+    #[error(r#""{sink}" already driven by "{source}""#)]
+    SinkCollision {
+        source: ConnectionName,
+        sink: ConnectionName,
     },
 }
 
@@ -39,11 +56,17 @@ impl Error {
             reference: reference.to_string(),
         }
     }
+
+    pub fn source_collision(source: ConnectionName, sink: ConnectionName) -> Self {
+        Self::SourceCollision { source, sink }
+    }
+
+    pub fn sink_collision(source: ConnectionName, sink: ConnectionName) -> Self {
+        Self::SinkCollision { source, sink }
+    }
 }
 
 pub(super) struct CheckComponent {
-    #[allow(unused)] // TODO: remove!
-    component: ComponentId,
     ports: HashSet<Ustr>,
     references: HashSet<Ustr>,
 }
@@ -59,29 +82,179 @@ impl CheckComponent {
                 .map(|reference| ustr(reference.alias_or_name())),
         );
 
-        // TODO: create connection checker
-
-        Self {
-            component: component.unbind(),
-            ports,
-            references,
-        }
+        Self { ports, references }
     }
 }
 
 impl From<ResolvedComponent> for CheckComponent {
     fn from(component: ResolvedComponent) -> Self {
         Self {
-            component: component.component,
             ports: component.ports,
             references: component.references,
         }
     }
 }
 
+#[derive(Eq, Hash, PartialEq)]
+struct PinRecord {
+    port: PortId,
+    pin: u32,
+    reference: Option<(ComponentRefId, u32)>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct PinUsage {
+    source: Option<ConnectionId>,
+    sink: Option<ConnectionId>,
+}
+
+#[derive(Default)]
+struct Connectivity {
+    pin_indices: HashMap<PinRecord, u64>,
+    pin_usage: Vec<PinUsage>,
+    pin_index_end: u64,
+}
+
+impl Connectivity {
+    fn get_record(&mut self, record: PinRecord) -> u64 {
+        *self.pin_indices.entry(record).or_insert_with(|| {
+            let index = self.pin_index_end;
+            self.pin_index_end += 1;
+            index
+        })
+    }
+
+    #[allow(dead_code)] // TODO: remove this!
+    fn index_of(
+        &mut self,
+        port: PortId,
+        pin: u32,
+        reference: Option<(ComponentRefId, u32)>,
+    ) -> u64 {
+        self.get_record(PinRecord {
+            port,
+            pin,
+            reference,
+        })
+    }
+
+    fn ensure_usage(&mut self) {
+        self.pin_usage
+            .resize_with((self.pin_index_end - 1) as usize, PinUsage::default);
+    }
+
+    #[allow(dead_code)] // TODO: remove this!
+    fn get_usage(&mut self, pin: u64) -> &PinUsage {
+        assert!(pin < self.pin_index_end);
+        self.ensure_usage();
+        &self.pin_usage[pin as usize]
+    }
+
+    fn get_usage_mut(&mut self, pin: u64) -> &mut PinUsage {
+        assert!(pin < self.pin_index_end);
+        self.ensure_usage();
+        &mut self.pin_usage[pin as usize]
+    }
+
+    fn collect_pins(
+        &mut self,
+        module: &Module,
+        port: &PortPins,
+        reference: Option<&ComponentRefs>,
+    ) -> Vec<PinRecord> {
+        if let Some(reference) = reference {
+            reference
+                .range(module)
+                .flat_map(|reference_i| {
+                    port.range(module).map(move |pin| PinRecord {
+                        port: port.id(),
+                        pin,
+                        reference: Some((reference.id(), reference_i)),
+                    })
+                })
+                .collect()
+        } else {
+            port.range(module)
+                .map(|pin| PinRecord {
+                    port: (&port).id(),
+                    pin,
+                    reference: None,
+                })
+                .collect()
+        }
+    }
+
+    fn collect_records(
+        &mut self,
+        module: &Module,
+        connection: ConnectionId,
+    ) -> (Vec<PinRecord>, Vec<PinRecord>) {
+        let connection = module.lookup(connection);
+
+        (
+            self.collect_pins(
+                module,
+                &connection.source_pins,
+                connection.source_component.as_ref(),
+            ),
+            self.collect_pins(
+                module,
+                &connection.sink_pins,
+                connection.sink_component.as_ref(),
+            ),
+        )
+    }
+
+    fn insert_connection(
+        &mut self,
+        module: &Module,
+        connection: ConnectionId,
+    ) -> Result<(), Error> {
+        let (source_pins, sink_pins) = self.collect_records(module, connection);
+
+        for pin in source_pins {
+            let record = self.get_record(pin);
+            let mut usage = self.get_usage_mut(record);
+            if let Some(existing) = usage.source {
+                let source = existing.bind(module).source_name_or_default();
+                let sink = connection.bind(module).sink_name_or_default();
+                return Err(Error::source_collision(source, sink));
+            } else {
+                usage.source = Some(connection);
+            }
+        }
+
+        for pin in sink_pins {
+            let record = self.get_record(pin);
+            let mut usage = self.get_usage_mut(record);
+            if let Some(existing) = usage.sink {
+                todo!()
+            } else {
+                usage.sink = Some(connection);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn new(module: &Module) -> Self {
+        let mut connections = Self::default();
+
+        module
+            .components()
+            .flat_map(|component| component.connections())
+            .for_each(|connection| {
+                connections.insert_connection(module, connection.id());
+            });
+
+        connections
+    }
+}
+
 #[derive(Default)]
 pub struct Checker {
     pub(super) components: HashMap<Ustr, CheckComponent>,
+    connections: Connectivity,
 }
 
 impl Checker {
@@ -93,7 +266,12 @@ impl Checker {
             )
         }));
 
-        Self { components }
+        let connections = Connectivity::new(module);
+
+        Self {
+            components,
+            connections,
+        }
     }
 
     fn get_component_checker(&self, module: &Module, component: ComponentId) -> &CheckComponent {

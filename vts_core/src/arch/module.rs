@@ -12,6 +12,7 @@ new_key_type! {
     pub struct ComponentId;
     pub struct ComponentRefId;
     pub struct PortId;
+    pub struct ConnectionId;
 }
 
 #[derive(Clone, Debug)]
@@ -20,6 +21,7 @@ pub struct Module {
     pub(crate) components: SlotMap<ComponentId, ComponentData>,
     pub(crate) ports: SlotMap<PortId, PortData>,
     pub(crate) references: SlotMap<ComponentRefId, ComponentRefData>,
+    pub(crate) connections: SlotMap<ConnectionId, ConnectionData>,
 }
 
 impl Module {
@@ -29,6 +31,7 @@ impl Module {
             components: SlotMap::default(),
             ports: SlotMap::default(),
             references: SlotMap::default(),
+            connections: SlotMap::default(),
         }
     }
 
@@ -98,6 +101,7 @@ impl_module_lookup_ops!(
     ComponentId => ComponentData in components,
     PortId => PortData in ports,
     ComponentRefId => ComponentRefData in references,
+    ConnectionId => ConnectionData in connections,
 );
 
 pub struct ComponentIter<'m> {

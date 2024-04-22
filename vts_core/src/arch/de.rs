@@ -703,7 +703,11 @@ impl<'de> Deserialize<'de> for Signature {
                     range: PinRange::new(port_start, port_end),
                 };
 
-                Ok(Signature { pins, reference })
+                Ok(Signature {
+                    parent: None,
+                    pins,
+                    reference,
+                })
             }
         }
 

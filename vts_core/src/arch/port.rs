@@ -5,6 +5,7 @@ use ustr::{ustr, Ustr};
 
 use super::{
     checker,
+    connection::PrintStyle,
     linker::{self, KnownComponents, Resolve},
     prelude::*,
 };
@@ -118,7 +119,7 @@ impl<'m> Port<'m> {
         self.1
     }
 
-    pub fn parent(&self) -> Component<'_> {
+    pub fn parent(&self) -> Component<'m> {
         self.data().parent.bind(self.0)
     }
 
@@ -253,7 +254,7 @@ impl PinRange {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PortPins {
     port: PortId,
-    pub range: PinRange,
+    range: PinRange,
 }
 
 impl PortPins {
@@ -263,6 +264,10 @@ impl PortPins {
 
     pub fn port<'m>(&self, module: &'m Module) -> Port<'m> {
         Port::new(module, self.port)
+    }
+
+    pub fn range(&self, module: &Module) -> Range<u32> {
+        self.range.expand(module.lookup(self.port).n_pins)
     }
 
     pub fn len(&self, module: &Module) -> u32 {
@@ -301,6 +306,13 @@ impl PortPins {
 
     pub fn simplify(&mut self, module: &Module) {
         self.range.flatten(module.lookup(self.port).n_pins);
+    }
+
+    pub fn to_weak(&self, module: &Module) -> WeakPortPins {
+        WeakPortPins {
+            port: self.port(module).data().name,
+            range: self.range.clone(),
+        }
     }
 }
 
@@ -419,6 +431,27 @@ pub struct WeakPortPins {
     pub(crate) port: Ustr,
     #[serde(flatten)]
     pub range: PinRange,
+}
+
+impl WeakPortPins {
+    pub fn to_string(&self, style: PrintStyle) -> String {
+        let port = &self.port;
+
+        let suffix = match (self.range.get_start(), self.range.get_end()) {
+            (None, None) => "".to_string(),
+            (start, end) => {
+                let start = start
+                    .map(|start| start.to_string())
+                    .unwrap_or("".to_string());
+
+                let end = end.map(|end| end.to_string()).unwrap_or("".to_string());
+                let sep = style.range_sep();
+                format!("{start}{sep}{end}")
+            }
+        };
+
+        format!("{port}{suffix}")
+    }
 }
 
 impl<'a, 'm> Resolve<'a, 'm> for (WeakPortPins, Option<ComponentRefId>) {

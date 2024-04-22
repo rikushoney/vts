@@ -31,7 +31,7 @@ pub(crate) struct ComponentData {
     pub name: Ustr,
     pub ports: Vec<PortId>,
     pub references: Vec<ComponentRefId>,
-    pub connections: Vec<Connection>,
+    pub connections: Vec<ConnectionId>,
     pub class: Option<ComponentClass>,
 }
 
@@ -112,6 +112,7 @@ impl<'m> Component<'m> {
 
     pub fn connections(&self) -> ConnectionIter<'m> {
         ConnectionIter {
+            module: self.module(),
             iter: self.data().connections.iter(),
         }
     }
@@ -174,14 +175,17 @@ impl<'m> Iterator for ComponentRefIter<'m> {
 }
 
 pub struct ConnectionIter<'m> {
-    iter: slice::Iter<'m, Connection>,
+    module: &'m Module,
+    iter: slice::Iter<'m, ConnectionId>,
 }
 
 impl<'m> Iterator for ConnectionIter<'m> {
-    type Item = &'m Connection;
+    type Item = Connection<'m>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
+        self.iter
+            .next()
+            .map(|connection| connection.bind(self.module))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

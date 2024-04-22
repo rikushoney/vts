@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
@@ -42,6 +43,10 @@ impl ComponentRefs {
         self.bind(module)
     }
 
+    pub fn range(&self, module: &Module) -> Range<u32> {
+        self.range.expand(module.lookup(self.reference).n_instances)
+    }
+
     pub fn get_start(&self) -> Option<u32> {
         self.range.get_start()
     }
@@ -79,6 +84,21 @@ impl ComponentRefs {
         self.range
             .flatten(module.lookup(self.reference).n_instances);
     }
+
+    pub fn to_weak(&self, module: &Module) -> WeakReferences {
+        WeakReferences {
+            reference: self.reference(module).component().data().name,
+            range: self.range.clone(),
+        }
+    }
+
+    pub fn print<'m>(&self, module: &'m Module, style: PrintStyle) -> PrintComponentRefs<'_, 'm> {
+        PrintComponentRefs {
+            module,
+            reference: self,
+            style,
+        }
+    }
 }
 
 impl ComponentRefAccess for &ComponentRefs {
@@ -91,17 +111,87 @@ impl ComponentRefAccess for &ComponentRefs {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq)]
-pub struct Connection {
-    pub kind: ConnectionKind,
-    pub(crate) source_component: Option<ComponentRefs>,
-    pub(crate) source_pins: PortPins,
-    pub(crate) sink_component: Option<ComponentRefs>,
-    pub(crate) sink_pins: PortPins,
+#[derive(Clone, Copy, Default, Eq, Hash, PartialEq)]
+pub enum PrintStyle {
+    Python,
+    #[default]
+    Rust,
 }
 
-impl Connection {
+impl PrintStyle {
+    pub fn range_sep(&self) -> &'static str {
+        match self {
+            Self::Python => ":",
+            Self::Rust => "..",
+        }
+    }
+}
+
+pub struct PrintComponentRefs<'a, 'm> {
+    module: &'m Module,
+    reference: &'a ComponentRefs,
+    style: PrintStyle,
+}
+
+impl<'a, 'm> fmt::Display for PrintComponentRefs<'a, 'm> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let component = self.reference.reference(self.module).component().name();
+
+        let suffix = if self.reference.len(self.module) > 1 {
+            let Range { start, end } = self
+                .reference
+                .range
+                .expand(self.reference.reference(self.module).n_instances());
+
+            let sep = self.style.range_sep();
+            format!("[{start}{sep}{end}]")
+        } else {
+            String::new()
+        };
+
+        write!(f, "{component}{suffix}")
+    }
+}
+
+mod connection_access {
+    use super::*;
+
+    pub trait Sealed {}
+
+    impl Sealed for ConnectionId {}
+
+    impl Sealed for Connection<'_> {}
+}
+
+pub trait ConnectionAccess: Copy + connection_access::Sealed {
+    fn id(&self) -> ConnectionId;
+
+    fn bind<'m>(&self, module: &'m Module) -> Connection<'m>;
+}
+
+impl ConnectionAccess for ConnectionId {
+    fn id(&self) -> ConnectionId {
+        *self
+    }
+
+    fn bind<'m>(&self, module: &'m Module) -> Connection<'m> {
+        Connection::new(module, *self)
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq)]
+pub(crate) struct ConnectionData {
+    pub name: Option<Ustr>,
+    pub kind: ConnectionKind,
+    pub source_component: Option<ComponentRefs>,
+    pub source_pins: PortPins,
+    pub sink_component: Option<ComponentRefs>,
+    pub sink_pins: PortPins,
+}
+
+impl ConnectionData {
     pub(crate) fn new(
+        name: Option<Ustr>,
         kind: ConnectionKind,
         source_pins: PortPins,
         sink_pins: PortPins,
@@ -109,6 +199,7 @@ impl Connection {
         sink_component: Option<ComponentRefs>,
     ) -> Self {
         Self {
+            name,
             kind,
             source_component,
             source_pins,
@@ -116,13 +207,111 @@ impl Connection {
             sink_pins,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum ConnectionName {
+    Named(String),
+    Signature(Signature),
+}
+
+impl fmt::Display for ConnectionName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Named(name) => {
+                write!(f, "{name}")
+            }
+            Self::Signature(signature) => {
+                write!(f, "{signature}")
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Connection<'m>(&'m Module, ConnectionId);
+
+impl<'m> Connection<'m> {
+    fn new(module: &'m Module, connection: ConnectionId) -> Self {
+        Self(module, connection)
+    }
+
+    pub(crate) fn data(&self) -> &'m ConnectionData {
+        self.0.lookup(self.1)
+    }
+
+    pub fn source_parent(&self) -> Component<'m> {
+        if let Some(reference) = &self.data().source_component {
+            reference.reference(self.0).parent()
+        } else {
+            self.source_pins().port(self.0).parent()
+        }
+    }
+
+    pub fn source_name_or_default(&self) -> ConnectionName {
+        if let Some(name) = self.data().name {
+            ConnectionName::Named(name.to_string())
+        } else {
+            ConnectionName::Signature(Signature {
+                parent: Some(self.source_parent().data().name.to_string()),
+                reference: self
+                    .source_component()
+                    .map(|reference| reference.to_weak(self.0)),
+                pins: self.source_pins().to_weak(self.0),
+            })
+        }
+    }
+
+    pub fn sink_parent(&self) -> Component<'m> {
+        if let Some(reference) = &self.data().sink_component {
+            reference.reference(self.0).parent()
+        } else {
+            self.sink_pins().port(self.0).parent()
+        }
+    }
+
+    pub fn sink_name_or_default(&self) -> ConnectionName {
+        if let Some(name) = self.data().name {
+            ConnectionName::Named(name.to_string())
+        } else {
+            ConnectionName::Signature(Signature {
+                parent: Some(self.sink_parent().data().name.to_string()),
+                reference: self
+                    .sink_component()
+                    .map(|reference| reference.to_weak(self.0)),
+                pins: self.sink_pins().to_weak(self.0),
+            })
+        }
+    }
+
+    pub fn source_component(&self) -> Option<&ComponentRefs> {
+        self.0.lookup(self.1).source_component.as_ref()
+    }
 
     pub fn source_pins(&self) -> &PortPins {
-        &self.source_pins
+        &self.0.lookup(self.1).source_pins
+    }
+
+    pub fn sink_component(&self) -> Option<&ComponentRefs> {
+        self.0.lookup(self.1).sink_component.as_ref()
     }
 
     pub fn sink_pins(&self) -> &PortPins {
-        &self.sink_pins
+        &self.0.lookup(self.1).sink_pins
+    }
+
+    pub fn kind(&self) -> ConnectionKind {
+        self.0.lookup(self.1).kind
+    }
+}
+
+impl ConnectionAccess for Connection<'_> {
+    fn id(&self) -> ConnectionId {
+        self.1
+    }
+
+    fn bind<'m>(&self, module: &'m Module) -> Connection<'m> {
+        self.1.bind(module)
     }
 }
 
@@ -135,6 +324,7 @@ pub struct ConnectionBuilder<'a, 'm, Src, Snk> {
     module: &'m mut Module,
     checker: &'a mut Checker,
     component: ComponentId,
+    name: Option<Ustr>,
     source: Src,
     sink: Snk,
     kind: Option<ConnectionKind>,
@@ -150,6 +340,7 @@ impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceUnset, SinkUnset> {
             module,
             checker,
             component: component.id(),
+            name: None,
             source: SourceUnset,
             sink: SinkUnset,
             kind: None,
@@ -173,6 +364,7 @@ impl<'a, 'm, Snk> ConnectionBuilder<'a, 'm, SourceUnset, Snk> {
             module: self.module,
             checker: self.checker,
             component: self.component,
+            name: self.name,
             source: SourceSet(pins, component),
             sink: self.sink,
             kind: self.kind,
@@ -196,6 +388,7 @@ impl<'a, 'm, Src> ConnectionBuilder<'a, 'm, Src, SinkUnset> {
             module: self.module,
             checker: self.checker,
             component: self.component,
+            name: self.name,
             source: self.source,
             sink: SinkSet(pins, component),
             kind: self.kind,
@@ -211,19 +404,39 @@ impl<'a, 'm, Src, Snk> ConnectionBuilder<'a, 'm, Src, Snk> {
     pub fn kind_is_set(&self) -> bool {
         self.kind.is_some()
     }
+
+    pub fn set_name(&mut self, name: &str) {
+        self.name = Some(ustr(name));
+    }
+
+    pub fn name_is_set(&self) -> bool {
+        self.name.is_some()
+    }
 }
 
 impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceSet, SinkSet> {
-    pub fn finish(self) -> &'m Connection {
+    fn insert(self) -> (&'m mut Module, ComponentId, ConnectionId) {
         let kind = self.kind.unwrap_or(ConnectionKind::Direct);
 
-        let connection =
-            Connection::new(kind, self.source.0, self.sink.0, self.source.1, self.sink.1);
+        let SourceSet(source_pins, source_component) = self.source;
+        let SinkSet(sink_pins, sink_component) = self.sink;
 
-        let connections = &mut self.module.lookup_mut(self.component).connections;
-        let idx = connections.len();
-        connections.push(connection);
-        &connections[idx]
+        let connection = self.module.connections.insert(ConnectionData::new(
+            self.name,
+            kind,
+            source_pins,
+            sink_pins,
+            source_component,
+            sink_component,
+        ));
+
+        (self.module, self.component, connection)
+    }
+
+    pub fn finish(self) -> Connection<'m> {
+        let (module, component, connection) = self.insert();
+        module.lookup_mut(component).connections.push(connection);
+        connection.bind(module)
     }
 }
 
@@ -531,14 +744,82 @@ impl WeakReferences {
             range: ReferenceRange::new(start, end),
         }
     }
+
+    pub fn to_string(&self, style: PrintStyle) -> String {
+        let reference = &self.reference;
+
+        let suffix = match (self.range.get_start(), self.range.get_end()) {
+            (None, None) => "".to_string(),
+            (start, end) => {
+                let start = start
+                    .map(|start| start.to_string())
+                    .unwrap_or("".to_string());
+
+                let end = end.map(|end| end.to_string()).unwrap_or("".to_string());
+                let sep = style.range_sep();
+                format!("{start}{sep}{end}")
+            }
+        };
+
+        format!("{reference}{suffix}")
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct Signature {
+    #[serde(skip)]
+    pub parent: Option<String>,
     #[serde(flatten)]
     pub pins: WeakPortPins,
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub reference: Option<WeakReferences>,
+}
+
+impl Signature {
+    pub fn new(
+        module: &Module,
+        source_pins: &PortPins,
+        source_reference: Option<&ComponentRefs>,
+    ) -> Self {
+        let pins = source_pins.to_weak(module);
+
+        if let Some(reference) = source_reference {
+            let parent = reference.reference(module).parent().data().name;
+            let reference = reference.to_weak(module);
+
+            Self {
+                parent: Some(parent.to_string()),
+                reference: Some(reference),
+                pins,
+            }
+        } else {
+            let parent = source_pins.port(module).parent().data().name;
+
+            Self {
+                parent: Some(parent.to_string()),
+                reference: None,
+                pins,
+            }
+        }
+    }
+
+    pub fn to_string(&self, style: PrintStyle) -> String {
+        let reference = self
+            .reference
+            .as_ref()
+            .map(|reference| format!(".{}", reference.to_string(style)))
+            .unwrap_or("".to_string());
+
+        let pins = format!(".{}", self.pins.to_string(style));
+        let root = self.parent.as_ref().map(|name| name.as_str()).unwrap_or("");
+        format!("{root}{reference}{pins}")
+    }
+}
+
+impl fmt::Display for Signature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string(PrintStyle::default()))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -555,6 +836,7 @@ pub struct WeakSinkUnset;
 
 #[derive(Default)]
 pub struct WeakConnectionBuilder<Src, Snk> {
+    parent: Option<String>,
     source: Src,
     sink: Snk,
     kind: Option<ConnectionKind>,
@@ -563,6 +845,7 @@ pub struct WeakConnectionBuilder<Src, Snk> {
 impl WeakConnectionBuilder<WeakSourceUnset, WeakSinkUnset> {
     pub fn new() -> Self {
         Self {
+            parent: None,
             source: WeakSourceUnset,
             sink: WeakSinkUnset,
             kind: None,
@@ -579,6 +862,7 @@ impl<Snk> WeakConnectionBuilder<WeakSourceUnset, Snk> {
         reference_end: Option<u32>,
     ) -> WeakConnectionBuilder<WeakSourceSet, Snk> {
         WeakConnectionBuilder {
+            parent: self.parent,
             source: WeakSourceSet(
                 pins,
                 component.map(|component| {
@@ -600,6 +884,7 @@ impl<Src> WeakConnectionBuilder<Src, WeakSinkUnset> {
         reference_end: Option<u32>,
     ) -> WeakConnectionBuilder<Src, WeakSinkSet> {
         WeakConnectionBuilder {
+            parent: self.parent,
             source: self.source,
             sink: WeakSinkSet(
                 pins,
@@ -613,6 +898,14 @@ impl<Src> WeakConnectionBuilder<Src, WeakSinkUnset> {
 }
 
 impl<Src, Snk> WeakConnectionBuilder<Src, Snk> {
+    pub fn set_parent(&mut self, parent: String) {
+        self.parent = Some(parent);
+    }
+
+    pub fn parent_is_set(&self) -> bool {
+        self.parent.is_some()
+    }
+
     pub fn set_kind(&mut self, kind: ConnectionKind) {
         self.kind = Some(kind);
     }
@@ -626,10 +919,12 @@ impl WeakConnectionBuilder<WeakSourceSet, WeakSinkSet> {
     pub fn finish(self) -> WeakConnection {
         WeakConnection {
             source: Signature {
+                parent: self.parent.clone(),
                 pins: self.source.0,
                 reference: self.source.1,
             },
             sink: Signature {
+                parent: self.parent,
                 pins: self.sink.0,
                 reference: self.sink.1,
             },
@@ -678,7 +973,7 @@ impl<'a, 'm> Resolve<'a, 'm> for Signature {
 }
 
 impl<'a, 'm> Resolve<'a, 'm> for WeakConnection {
-    type Output = &'m Connection;
+    type Output = Connection<'m>;
 
     fn resolve<C: ComponentAccess>(
         self,

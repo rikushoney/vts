@@ -8,7 +8,7 @@ use super::{
     component::{self, ComponentData},
     connection::{ComponentRefs, WeakConnectionBuilder},
     module,
-    port::{pin_range, PinRange, WeakPortPins},
+    port::{pin_range, PinRange},
     prelude::*,
     reference::{reference_range, ComponentWeakRef, ReferenceRange},
 };
@@ -175,7 +175,7 @@ impl Serialize for SerializeNamedReferences<'_, '_> {
 
 struct SerializeConnections<'a, 'm> {
     module: &'m Module,
-    connections: &'a Vec<Connection>,
+    connections: &'a Vec<ConnectionId>,
 }
 
 impl SerializeConnections<'_, '_> {
@@ -190,17 +190,14 @@ impl Serialize for SerializeConnections<'_, '_> {
         S: Serializer,
     {
         let mut state = serializer.serialize_seq(Some(self.connections.len()))?;
+        let connections = self
+            .connections
+            .iter()
+            .map(|connection| connection.bind(self.module));
 
-        for connection in self.connections {
-            let source_pins = WeakPortPins {
-                port: connection.source_pins.port(self.module).data().name,
-                range: connection.source_pins.range.clone(),
-            };
-
-            let sink_pins = WeakPortPins {
-                port: connection.sink_pins.port(self.module).data().name,
-                range: connection.sink_pins.range.clone(),
-            };
+        for connection in connections {
+            let source_pins = connection.source_pins().to_weak(self.module);
+            let sink_pins = connection.sink_pins().to_weak(self.module);
 
             let select_component = |component: &ComponentRefs| {
                 (
@@ -211,14 +208,12 @@ impl Serialize for SerializeConnections<'_, '_> {
             };
 
             let (source_component, source_start, source_end) = connection
-                .source_component
-                .as_ref()
+                .source_component()
                 .map(select_component)
                 .unwrap_or((None, None, None));
 
             let (sink_component, sink_start, sink_end) = connection
-                .sink_component
-                .as_ref()
+                .sink_component()
                 .map(select_component)
                 .unwrap_or((None, None, None));
 
@@ -226,7 +221,7 @@ impl Serialize for SerializeConnections<'_, '_> {
                 .set_source(source_pins, source_component, source_start, source_end)
                 .set_sink(sink_pins, sink_component, sink_start, sink_end);
 
-            builder.set_kind(connection.kind);
+            builder.set_kind(connection.kind());
             state.serialize_element(&builder.finish())?;
         }
 

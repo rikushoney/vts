@@ -1,6 +1,6 @@
 pub use super::{
     component::{Component, ComponentAccess, ComponentClass},
-    connection::{Connection, ConnectionKind},
+    connection::{Connection, ConnectionAccess, ConnectionKind},
     module::Module,
     port::{Port, PortAccess, PortClass, PortKind},
     reference::{ComponentRef, ComponentRefAccess},
@@ -9,8 +9,9 @@ pub use super::{
 pub(crate) use super::{
     checker::Checker,
     component::ComponentData,
+    connection::ConnectionData,
     linker::Linker,
-    module::{ComponentId, ComponentRefId, ModuleLookup, PortId},
+    module::{ComponentId, ComponentRefId, ConnectionId, ModuleLookup, PortId},
     port::PortData,
     reference::ComponentRefData,
 };
