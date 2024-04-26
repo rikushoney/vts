@@ -1,3 +1,5 @@
+use std::result::Result;
+
 use serde::{
     ser::{SerializeMap, SerializeSeq, SerializeStruct},
     Serialize, Serializer,

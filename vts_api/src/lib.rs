@@ -52,7 +52,7 @@ macro_rules! wrap_enum {
         impl std::str::FromStr for $py_name {
             type Err = String;
 
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
+            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 let lower = s.to_lowercase();
                 match lower.as_str() {
                     $(

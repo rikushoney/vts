@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use ustr::{ustr, Ustr};
 
 use super::{
-    linker::{self, KnownComponents, Resolve},
+    linker::{self, Error, KnownComponents, Resolve},
     module::ComponentRefId,
     port::{PortPins, WeakPortPins},
     prelude::*,
@@ -86,9 +86,12 @@ impl ComponentRefs {
     }
 
     pub fn to_weak(&self, module: &Module) -> WeakReferences {
+        let mut range = self.range.clone();
+        range.flatten(module.lookup(self.reference).n_instances);
+
         WeakReferences {
             reference: self.reference(module).component().data().name,
-            range: self.range.clone(),
+            range,
         }
     }
 
@@ -236,6 +239,10 @@ impl<'m> Connection<'m> {
         Self(module, connection)
     }
 
+    pub fn unbind(self) -> ConnectionId {
+        self.1
+    }
+
     pub(crate) fn data(&self) -> &'m ConnectionData {
         self.0.lookup(self.1)
     }
@@ -330,8 +337,10 @@ pub struct ConnectionBuilder<'a, 'm, Src, Snk> {
     kind: Option<ConnectionKind>,
 }
 
+pub type ConnectionBuilderNew<'a, 'm> = ConnectionBuilder<'a, 'm, SourceUnset, SinkUnset>;
+
 impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceUnset, SinkUnset> {
-    pub fn new<C: ComponentAccess>(
+    pub(super) fn new<C: ComponentAccess>(
         module: &'m mut Module,
         checker: &'a mut Checker,
         component: C,
@@ -415,7 +424,7 @@ impl<'a, 'm, Src, Snk> ConnectionBuilder<'a, 'm, Src, Snk> {
 }
 
 impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceSet, SinkSet> {
-    fn insert(self) -> (&'m mut Module, ComponentId, ConnectionId) {
+    fn insert(self) -> (&'m mut Module, &'a mut Checker, ComponentId, ConnectionId) {
         let kind = self.kind.unwrap_or(ConnectionKind::Direct);
 
         let SourceSet(source_pins, source_component) = self.source;
@@ -430,13 +439,14 @@ impl<'a, 'm> ConnectionBuilder<'a, 'm, SourceSet, SinkSet> {
             sink_component,
         ));
 
-        (self.module, self.component, connection)
+        (self.module, self.checker, self.component, connection)
     }
 
-    pub fn finish(self) -> Connection<'m> {
-        let (module, component, connection) = self.insert();
-        module.lookup_mut(component).connections.push(connection);
-        connection.bind(module)
+    pub fn finish(self) -> linker::Result<Connection<'m>> {
+        let (module, checker, parent, connection) = self.insert();
+        checker.register_connection(module, connection)?;
+        module.lookup_mut(parent).connections.push(connection);
+        Ok(connection.bind(module))
     }
 }
 
@@ -526,6 +536,16 @@ pub struct Concat {
     sources: Vec<ConcatSource>,
 }
 
+struct Splitter<'a, 'm> {
+    module: &'m mut Module,
+    checker: &'a mut Checker,
+    parent: ComponentId,
+    source: ConcatSource,
+    sink_n_pins: u32,
+    sink_start_i: u32,
+    sink_last_i: u32,
+}
+
 impl Concat {
     fn new(sink_component: ComponentOrRefs, sink_port: PortPins) -> Self {
         Self {
@@ -567,7 +587,7 @@ impl Concat {
         })
     }
 
-    pub fn append_component_source(
+    pub fn append_component(
         &mut self,
         module: &Module,
         source_component: ComponentId,
@@ -577,14 +597,14 @@ impl Concat {
         self.append_source(module, source_component, source_pins)
     }
 
-    pub fn append_reference_source(
+    pub fn append_reference(
         &mut self,
         module: &Module,
-        source_component: ComponentRefs,
+        source_reference: ComponentRefs,
         source_pins: PortPins,
     ) {
-        let source_component = ComponentOrRefs::Reference(source_component);
-        self.append_source(module, source_component, source_pins)
+        let source_reference = ComponentOrRefs::Reference(source_reference);
+        self.append_source(module, source_reference, source_pins)
     }
 
     // TODO: make lazy instead
@@ -642,18 +662,18 @@ impl Concat {
         splits
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn split_and_connect(
-        self,
-        module: &mut Module,
-        checker: &mut Checker,
-        parent: ComponentId,
-        source: ConcatSource,
-        sink_n_pins: u32,
-        sink_start_i: u32,
-        sink_last_i: u32,
-    ) {
+    fn split_and_connect(self, splitter: Splitter) -> linker::Result<()> {
         use std::iter::zip;
+
+        let Splitter {
+            module,
+            checker,
+            parent,
+            source,
+            sink_n_pins,
+            sink_start_i,
+            sink_last_i,
+        } = splitter;
 
         debug_assert!(sink_start_i < sink_last_i);
         let source_n_pins = source.pins.len(module);
@@ -687,11 +707,17 @@ impl Concat {
             ConnectionBuilder::new(module, checker, parent)
                 .set_source(source_pins, source_component.into_reference())
                 .set_sink(sink_pins, sink_component.into_reference())
-                .finish();
+                .finish()?;
         }
+
+        Ok(())
     }
 
-    pub fn make_connections(self, module: &mut Module, checker: &mut Checker) {
+    pub fn make_connections(
+        self,
+        module: &mut Module,
+        checker: &mut Checker,
+    ) -> linker::Result<()> {
         let parent = self.sink_component.parent(module).id();
         let sink_n_pins = self.sink_port.len(module);
 
@@ -712,11 +738,11 @@ impl Concat {
                 ConnectionBuilder::new(module, checker, parent)
                     .set_source(source.pins, source.component.into_reference())
                     .set_sink(sink_pins, self.sink_component.get_reference().cloned())
-                    .finish();
+                    .finish()?;
             } else {
                 let splitter = Self::new(self.sink_component.clone(), self.sink_port.clone());
 
-                splitter.split_and_connect(
+                splitter.split_and_connect(Splitter {
                     module,
                     checker,
                     parent,
@@ -724,9 +750,11 @@ impl Concat {
                     sink_n_pins,
                     sink_start_i,
                     sink_last_i,
-                )
+                })?;
             }
         }
+
+        Ok(())
     }
 }
 
@@ -811,7 +839,7 @@ impl Signature {
             .unwrap_or("".to_string());
 
         let pins = format!(".{}", self.pins.to_string(style));
-        let root = self.parent.as_ref().map(|name| name.as_str()).unwrap_or("");
+        let root = self.parent.as_deref().unwrap_or("");
         format!("{root}{reference}{pins}")
     }
 }
@@ -942,7 +970,7 @@ impl<'a, 'm> Resolve<'a, 'm> for Signature {
         checker: &'a mut Checker,
         parent: C,
         components: &KnownComponents,
-    ) -> Result<Self::Output, linker::Error> {
+    ) -> linker::Result<Self::Output> {
         let component = parent.bind(module);
 
         let reference = self
@@ -952,7 +980,7 @@ impl<'a, 'm> Resolve<'a, 'm> for Signature {
                 let end = reference.range.get_end();
                 component
                     .find_reference(&reference.reference)
-                    .ok_or(linker::Error::undefined_reference(
+                    .ok_or(Error::undefined_reference(
                         component.name(),
                         &reference.reference,
                     ))
@@ -981,7 +1009,7 @@ impl<'a, 'm> Resolve<'a, 'm> for WeakConnection {
         checker: &'a mut Checker,
         parent: C,
         components: &KnownComponents,
-    ) -> Result<Self::Output, linker::Error> {
+    ) -> linker::Result<Self::Output> {
         let (source_pins, source_reference) =
             self.source.resolve(module, checker, parent, components)?;
 
@@ -992,7 +1020,6 @@ impl<'a, 'm> Resolve<'a, 'm> for WeakConnection {
             .set_sink(sink_pins, sink_reference);
 
         builder.set_kind(self.kind);
-
-        Ok(builder.finish())
+        builder.finish()
     }
 }

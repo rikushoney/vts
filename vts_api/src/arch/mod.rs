@@ -14,9 +14,9 @@ use pyo3::{
     prelude::*,
     types::{PySlice, PySliceIndices},
 };
-use vts_core::arch::{checker, Error};
+use vts_core::arch::{checker, linker};
 
-struct PyError(Error);
+pub(crate) struct PyError(Error);
 
 impl From<Error> for PyError {
     fn from(err: Error) -> Self {
@@ -27,14 +27,14 @@ impl From<Error> for PyError {
 impl From<PyError> for PyErr {
     fn from(PyError(err): PyError) -> Self {
         match err {
-            Error::Linker(err) => PyValueError::new_err(err.to_string()),
-            Error::Checker(err) => PyValueError::new_err(err.to_string()),
-            Error::Generic(err) => PyException::new_err(err.to_string()),
+            Error::Linker(err) => PyValueError::new_err(format!("{err}")),
+            Error::Checker(err) => PyValueError::new_err(format!("{err}")),
+            Error::Generic(err) => PyException::new_err(format!("{err}")),
         }
     }
 }
 
-struct PyCheckerError(checker::Error);
+pub(crate) struct PyCheckerError(checker::Error);
 
 impl From<checker::Error> for PyCheckerError {
     fn from(err: checker::Error) -> Self {
@@ -44,7 +44,21 @@ impl From<checker::Error> for PyCheckerError {
 
 impl From<PyCheckerError> for PyErr {
     fn from(PyCheckerError(err): PyCheckerError) -> Self {
-        PyValueError::new_err(err.to_string())
+        PyValueError::new_err(format!("{err}"))
+    }
+}
+
+pub(crate) struct PyLinkerError(linker::Error);
+
+impl From<linker::Error> for PyLinkerError {
+    fn from(err: linker::Error) -> Self {
+        Self(err)
+    }
+}
+
+impl From<PyLinkerError> for PyErr {
+    fn from(PyLinkerError(err): PyLinkerError) -> Self {
+        PyValueError::new_err(format!("{err}"))
     }
 }
 

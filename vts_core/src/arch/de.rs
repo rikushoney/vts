@@ -1,4 +1,5 @@
 use std::fmt;
+use std::result::Result;
 
 use serde::{
     de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor},
@@ -88,7 +89,8 @@ impl<'de> Deserialize<'de> for Module {
                                 ));
                             }
 
-                            module.rename(map.next_value()?);
+                            let name: String = map.next_value()?;
+                            module.rename(&name);
                         }
                         Field::Components => {
                             if !module.components.is_empty() {

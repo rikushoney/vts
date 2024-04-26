@@ -25,13 +25,13 @@ pub enum Error {
     },
     #[error(r#""{source}" already driving "{sink}""#)]
     SourceCollision {
-        source: ConnectionName,
-        sink: ConnectionName,
+        source: Box<ConnectionName>,
+        sink: Box<ConnectionName>,
     },
     #[error(r#""{sink}" already driven by "{source}""#)]
     SinkCollision {
-        source: ConnectionName,
-        sink: ConnectionName,
+        source: Box<ConnectionName>,
+        sink: Box<ConnectionName>,
     },
 }
 
@@ -58,13 +58,21 @@ impl Error {
     }
 
     pub fn source_collision(source: ConnectionName, sink: ConnectionName) -> Self {
-        Self::SourceCollision { source, sink }
+        Self::SourceCollision {
+            source: Box::new(source),
+            sink: Box::new(sink),
+        }
     }
 
     pub fn sink_collision(source: ConnectionName, sink: ConnectionName) -> Self {
-        Self::SinkCollision { source, sink }
+        Self::SinkCollision {
+            source: Box::new(source),
+            sink: Box::new(sink),
+        }
     }
 }
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub(super) struct CheckComponent {
     ports: HashSet<Ustr>,
@@ -95,7 +103,7 @@ impl From<ResolvedComponent> for CheckComponent {
     }
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 struct PinRecord {
     port: PortId,
     pin: u32,
@@ -116,7 +124,7 @@ struct Connectivity {
 }
 
 impl Connectivity {
-    fn get_record(&mut self, record: PinRecord) -> u64 {
+    fn get_record_index(&mut self, record: PinRecord) -> u64 {
         *self.pin_indices.entry(record).or_insert_with(|| {
             let index = self.pin_index_end;
             self.pin_index_end += 1;
@@ -124,30 +132,9 @@ impl Connectivity {
         })
     }
 
-    #[allow(dead_code)] // TODO: remove this!
-    fn index_of(
-        &mut self,
-        port: PortId,
-        pin: u32,
-        reference: Option<(ComponentRefId, u32)>,
-    ) -> u64 {
-        self.get_record(PinRecord {
-            port,
-            pin,
-            reference,
-        })
-    }
-
     fn ensure_usage(&mut self) {
         self.pin_usage
-            .resize_with((self.pin_index_end - 1) as usize, PinUsage::default);
-    }
-
-    #[allow(dead_code)] // TODO: remove this!
-    fn get_usage(&mut self, pin: u64) -> &PinUsage {
-        assert!(pin < self.pin_index_end);
-        self.ensure_usage();
-        &self.pin_usage[pin as usize]
+            .resize_with(self.pin_index_end as usize, PinUsage::default);
     }
 
     fn get_usage_mut(&mut self, pin: u64) -> &mut PinUsage {
@@ -205,19 +192,17 @@ impl Connectivity {
         )
     }
 
-    fn insert_connection(
-        &mut self,
-        module: &Module,
-        connection: ConnectionId,
-    ) -> Result<(), Error> {
+    fn register_connection(&mut self, module: &Module, connection: ConnectionId) -> Result<()> {
         let (source_pins, sink_pins) = self.collect_records(module, connection);
 
         for pin in source_pins {
-            let record = self.get_record(pin);
-            let mut usage = self.get_usage_mut(record);
+            let index = self.get_record_index(pin);
+            let usage = self.get_usage_mut(index);
+
             if let Some(existing) = usage.source {
-                let source = existing.bind(module).source_name_or_default();
-                let sink = connection.bind(module).sink_name_or_default();
+                let existing = existing.bind(module);
+                let source = existing.source_name_or_default();
+                let sink = existing.sink_name_or_default();
                 return Err(Error::source_collision(source, sink));
             } else {
                 usage.source = Some(connection);
@@ -225,10 +210,14 @@ impl Connectivity {
         }
 
         for pin in sink_pins {
-            let record = self.get_record(pin);
-            let mut usage = self.get_usage_mut(record);
+            let index = self.get_record_index(pin);
+            let usage = self.get_usage_mut(index);
+
             if let Some(existing) = usage.sink {
-                todo!()
+                let existing = existing.bind(module);
+                let source = existing.source_name_or_default();
+                let sink = existing.sink_name_or_default();
+                return Err(Error::sink_collision(source, sink));
             } else {
                 usage.sink = Some(connection);
             }
@@ -237,17 +226,15 @@ impl Connectivity {
         Ok(())
     }
 
-    fn new(module: &Module) -> Self {
+    fn new(module: &Module) -> Result<Self> {
         let mut connections = Self::default();
 
         module
             .components()
             .flat_map(|component| component.connections())
-            .for_each(|connection| {
-                connections.insert_connection(module, connection.id());
-            });
+            .try_for_each(|connection| connections.register_connection(module, connection.id()))?;
 
-        connections
+        Ok(connections)
     }
 }
 
@@ -257,8 +244,10 @@ pub struct Checker {
     connections: Connectivity,
 }
 
-impl Checker {
-    pub fn new(module: &Module) -> Self {
+impl TryFrom<&Module> for Checker {
+    type Error = Error;
+
+    fn try_from(module: &Module) -> Result<Self> {
         let components = HashMap::from_iter(module.components().map(|component| {
             (
                 ustr(component.name()),
@@ -266,14 +255,16 @@ impl Checker {
             )
         }));
 
-        let connections = Connectivity::new(module);
+        let connections = Connectivity::new(module)?;
 
-        Self {
+        Ok(Self {
             components,
             connections,
-        }
+        })
     }
+}
 
+impl Checker {
     fn get_component_checker(&self, module: &Module, component: ComponentId) -> &CheckComponent {
         self.components
             .get(&module.lookup(component).name)
@@ -294,7 +285,7 @@ impl Checker {
         &mut self,
         module: &Module,
         component: C,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let component = component.id();
         let name = module.lookup(component).name;
         let checker = CheckComponent::new(module, component);
@@ -311,7 +302,7 @@ impl Checker {
         module: &Module,
         component: C,
         port: PortId,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let component = component.id();
         let name = port.bind(module).data().name;
         let checker = self.get_component_checker_mut(module, component);
@@ -329,7 +320,7 @@ impl Checker {
         module: &Module,
         component: C,
         reference: R,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let component = component.id();
         let reference = ustr(reference.bind(module).alias_or_name());
         let checker = self.get_component_checker_mut(module, component);
@@ -342,16 +333,16 @@ impl Checker {
         }
     }
 
-    pub fn register_connection(&mut self) -> Result<(), Error> {
-        // TODO:
-        Ok(())
+    pub fn register_connection<C: ConnectionAccess>(
+        &mut self,
+        module: &Module,
+        connection: C,
+    ) -> Result<()> {
+        self.connections
+            .register_connection(module, connection.id())
     }
 
-    pub fn ensure_no_existing_component(
-        &self,
-        module: &Module,
-        component: &str,
-    ) -> Result<(), Error> {
+    pub fn ensure_no_existing_component(&self, module: &Module, component: &str) -> Result<()> {
         if self.components.contains_key(&ustr(component)) {
             Err(Error::component_exists(module.name(), component))
         } else {
@@ -364,7 +355,7 @@ impl Checker {
         module: &Module,
         component: C,
         port: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let component = component.bind(module);
         let checker = self.get_component_checker(module, component.id());
 
@@ -380,7 +371,7 @@ impl Checker {
         module: &Module,
         component: C,
         reference: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let component = component.bind(module);
         let checker = self.get_component_checker(module, component.id());
 
@@ -389,9 +380,5 @@ impl Checker {
         } else {
             Ok(())
         }
-    }
-
-    pub fn ensure_no_colliding_connection(&self) {
-        todo!()
     }
 }

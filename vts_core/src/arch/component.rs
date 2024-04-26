@@ -203,8 +203,10 @@ pub struct ComponentBuilder<'a, 'm, N> {
     class: Option<ComponentClass>,
 }
 
+pub type ComponentBuilderNew<'a, 'm> = ComponentBuilder<'a, 'm, NameUnset>;
+
 impl<'a, 'm> ComponentBuilder<'a, 'm, NameUnset> {
-    pub fn new(module: &'m mut Module, checker: &'a mut Checker) -> Self {
+    pub(super) fn new(module: &'m mut Module, checker: &'a mut Checker) -> Self {
         Self {
             module,
             checker,
@@ -239,7 +241,7 @@ impl<'m> ComponentBuilder<'_, 'm, NameSet> {
         self.module.components.insert(component)
     }
 
-    pub fn finish(mut self) -> Result<Component<'m>, checker::Error> {
+    pub fn finish(mut self) -> checker::Result<Component<'m>> {
         let component = self.insert();
         self.checker.register_component(self.module, component)?;
         Ok(Component::new(self.module, component))

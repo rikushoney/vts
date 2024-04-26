@@ -1,20 +1,9 @@
 use std::str::FromStr;
 
-use pyo3::{
-    exceptions::{PyAttributeError, PyTypeError, PyValueError},
-    prelude::*,
-    types::{PyMapping, PyString},
-};
-use vts_core::arch::{
-    connection::ConnectionBuilder, module::ComponentId, port::PortBuilder, prelude::*,
-    reference::ComponentRefBuilder,
-};
+use pyo3::prelude::*;
+use vts_core::arch::{builder::prelude::*, prelude::*};
 
-use super::{
-    connection::{Connector, IntoSignature, PyConnectionKind},
-    prelude::*,
-    PyCheckerError,
-};
+use super::prelude::*;
 
 wrap_enum!(
     PyComponentClass (name = "ComponentClass", help = "component class") => ComponentClass:
@@ -114,7 +103,9 @@ impl PyComponent {
             let mut checker = module.checker.borrow_mut(py);
             let kind = kind.get_kind(py)?.borrow();
 
-            let mut builder = PortBuilder::new(&mut inner.0, &mut checker.0, parent)
+            let mut builder = inner
+                .0
+                .add_port(&mut checker.0, parent)
                 .set_name(name.to_str()?)
                 .set_kind(PortKind::from(*kind));
 
@@ -362,7 +353,9 @@ impl PyComponent {
         let mut inner = module.inner.borrow_mut(py);
         let mut checker = module.checker.borrow_mut(py);
 
-        let mut builder = ConnectionBuilder::new(&mut inner.0, &mut checker.0, self.id())
+        let mut builder = inner
+            .0
+            .add_connection(&mut checker.0, self.id())
             .set_source(source.pins.1.clone(), source_selection)
             .set_sink(sink.pins.1.clone(), sink_selection);
 
@@ -370,7 +363,7 @@ impl PyComponent {
             builder.set_kind(ConnectionKind::from(kind));
         }
 
-        builder.finish();
+        builder.finish().map_err(PyLinkerError::from)?;
         Ok(())
     }
 

@@ -309,6 +309,9 @@ impl PortPins {
     }
 
     pub fn to_weak(&self, module: &Module) -> WeakPortPins {
+        let mut range = self.range.clone();
+        range.flatten(module.lookup(self.port).n_pins);
+
         WeakPortPins {
             port: self.port(module).data().name,
             range: self.range.clone(),
@@ -341,8 +344,10 @@ pub struct PortBuilder<'a, 'm, N, K> {
     class: Option<PortClass>,
 }
 
+pub type PortBuilderNew<'a, 'm> = PortBuilder<'a, 'm, NameUnset, KindUnset>;
+
 impl<'a, 'm> PortBuilder<'a, 'm, NameUnset, KindUnset> {
-    pub fn new<C: ComponentAccess>(
+    pub(super) fn new<C: ComponentAccess>(
         module: &'m mut Module,
         checker: &'a mut Checker,
         component: C,
@@ -418,7 +423,7 @@ impl<'a, 'm> PortBuilder<'a, 'm, NameSet, KindSet> {
         self.module.ports.insert(port)
     }
 
-    pub fn finish(mut self) -> Result<Port<'m>, checker::Error> {
+    pub fn finish(mut self) -> checker::Result<Port<'m>> {
         let port = self.insert();
         self.checker.register_port(self.module, self.parent, port)?;
         self.module.lookup_mut(self.parent).ports.push(port);
@@ -446,7 +451,12 @@ impl WeakPortPins {
 
                 let end = end.map(|end| end.to_string()).unwrap_or("".to_string());
                 let sep = style.range_sep();
-                format!("{start}{sep}{end}")
+
+                if start.is_empty() && end.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("[{start}{sep}{end}]")
+                }
             }
         };
 
@@ -460,10 +470,10 @@ impl<'a, 'm> Resolve<'a, 'm> for (WeakPortPins, Option<ComponentRefId>) {
     fn resolve<C: ComponentAccess>(
         self,
         module: &'m mut Module,
-        checker: &'a mut Checker,
+        _checker: &'a mut Checker,
         parent: C,
         _components: &KnownComponents,
-    ) -> Result<Self::Output, linker::Error> {
+    ) -> linker::Result<Self::Output> {
         let component = parent.bind(module);
 
         let parent = if let Some(reference) = self.1 {
@@ -477,7 +487,6 @@ impl<'a, 'm> Resolve<'a, 'm> for (WeakPortPins, Option<ComponentRefId>) {
             .ok_or(linker::Error::undefined_port(parent.name(), &self.0.port))?
             .unbind();
 
-        checker.register_connection()?;
         Ok(PortPins::new(port, self.0.range))
     }
 }

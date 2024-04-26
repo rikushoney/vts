@@ -8,7 +8,6 @@ use pyo3::{
 };
 use vts_core::arch::{
     checker::Checker,
-    component::ComponentBuilder,
     json,
     module::{ComponentId, ComponentRefId, PortId},
     toml, yaml, ComponentClass, Module,
@@ -136,8 +135,10 @@ impl PyModule_ {
             let mut inner = module.inner.borrow_mut(py);
             let mut checker = module.checker.borrow_mut(py);
 
-            let mut builder =
-                ComponentBuilder::new(&mut inner.0, &mut checker.0).set_name(name.to_str()?);
+            let mut builder = inner
+                .0
+                .add_component(&mut checker.0)
+                .set_name(name.to_str()?);
 
             if let Some(class) = class {
                 let class = class.get_class(py)?.borrow();

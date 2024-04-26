@@ -228,6 +228,8 @@ pub struct ComponentRefBuilder<'a, 'm, C> {
     n_instances: Option<u32>,
 }
 
+pub type ComponentRefBuilderNew<'a, 'm> = ComponentRefBuilder<'a, 'm, ComponentUnset>;
+
 impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentUnset> {
     pub fn new<C: ComponentAccess>(
         module: &'m mut Module,
@@ -291,7 +293,7 @@ impl<'a, 'm> ComponentRefBuilder<'a, 'm, ComponentSet> {
         self.module.references.insert(reference)
     }
 
-    pub fn finish(mut self) -> Result<ComponentRef<'m>, checker::Error> {
+    pub fn finish(mut self) -> checker::Result<ComponentRef<'m>> {
         let reference = {
             let reference = {
                 let reference = self.insert();
@@ -346,7 +348,7 @@ impl<'a, 'm> Resolve<'a, 'm> for ComponentWeakRef {
         checker: &mut Checker,
         component: C,
         components: &KnownComponents,
-    ) -> Result<Self::Output, linker::Error> {
+    ) -> linker::Result<Self::Output> {
         let referenced_component = {
             let component = self.component.as_str();
             components.get(module, component)?.unbind()

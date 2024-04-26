@@ -60,3 +60,15 @@ notebook:
 
 clean:
     cargo clean
+
+watch-cargo:
+    cargo watch -c -w vts_api -w vts_core -w vts_cli -x check -x clippy
+
+watch-maturin:
+    watchexec -c -w vts_api -w vts_core maturin dev
+
+watch-git:
+    watchexec -c -w . git status
+
+watch-scratchpad:
+    watchexec -c -w . RUST_BACKTRACE=1 python scratchpad.py

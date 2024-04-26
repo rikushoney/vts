@@ -4,14 +4,10 @@ pub use super::{
     module::Module,
     port::{Port, PortAccess, PortClass, PortKind},
     reference::{ComponentRef, ComponentRefAccess},
+    Error, Result,
 };
 
 pub(crate) use super::{
-    checker::Checker,
-    component::ComponentData,
-    connection::ConnectionData,
-    linker::Linker,
-    module::{ComponentId, ComponentRefId, ConnectionId, ModuleLookup, PortId},
-    port::PortData,
-    reference::ComponentRefData,
+    builder::prelude::*, checker::Checker, component::ComponentData, connection::ConnectionData,
+    linker::Linker, module::ModuleLookup, port::PortData, reference::ComponentRefData,
 };

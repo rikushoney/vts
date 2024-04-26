@@ -1,7 +1,7 @@
 use slotmap::{new_key_type, SlotMap};
 use ustr::{ustr, Ustr};
 
-use super::prelude::*;
+use super::{builder::prelude::*, prelude::*};
 
 pub(super) const FIELDS: &[&str] = &["name", "components"];
 
@@ -69,6 +69,37 @@ impl Module {
             .iter()
             .find(|(_, component)| component.name == name)
             .map(|(component, _)| component.bind(self))
+    }
+
+    pub fn add_component<'a, 'm>(
+        &'m mut self,
+        checker: &'a mut Checker,
+    ) -> ComponentBuilderNew<'a, 'm> {
+        ComponentBuilder::new(self, checker)
+    }
+
+    pub fn add_port<'a, 'm, C: ComponentAccess>(
+        &'m mut self,
+        checker: &'a mut Checker,
+        parent: C,
+    ) -> PortBuilderNew<'a, 'm> {
+        PortBuilder::new(self, checker, parent)
+    }
+
+    pub fn add_component_ref<'a, 'm, C: ComponentAccess>(
+        &'m mut self,
+        checker: &'a mut Checker,
+        parent: C,
+    ) -> ComponentRefBuilderNew<'a, 'm> {
+        ComponentRefBuilder::new(self, checker, parent)
+    }
+
+    pub fn add_connection<'a, 'm, C: ComponentAccess>(
+        &'m mut self,
+        checker: &'a mut Checker,
+        parent: C,
+    ) -> ConnectionBuilderNew<'a, 'm> {
+        ConnectionBuilder::new(self, checker, parent)
     }
 }
 

@@ -4,8 +4,9 @@ use pyo3::{
     types::{PyString, PyTuple},
 };
 use vts_core::arch::{
-    connection::{ComponentRefs, Concat, ConnectionKind},
-    module::ComponentId,
+    builder::prelude::*,
+    connection::{ComponentRefs, Concat},
+    prelude::*,
     reference::ReferenceRange,
 };
 
@@ -365,17 +366,13 @@ impl<'py> Connector<'py> {
 
                         match source.component_or_reference {
                             ComponentOrRef::Component(component) => {
-                                concat.append_component_source(
-                                    &inner.0,
-                                    component,
-                                    source.pins.1.clone(),
-                                );
+                                concat.append_component(&inner.0, component, source.pins.1.clone());
                             }
                             ComponentOrRef::Reference(ref reference) => {
                                 let range = reference.range.clone();
                                 let reference = reference.reference.bind(py);
 
-                                concat.append_reference_source(
+                                concat.append_reference(
                                     &inner.0,
                                     reference.select(py, range),
                                     source.pins.1.clone(),
@@ -386,7 +383,9 @@ impl<'py> Connector<'py> {
                 })?;
 
                 module::borrow_inner_mut!(module + py => inner + checker);
-                concat.make_connections(&mut inner.0, &mut checker.0);
+                concat
+                    .make_connections(&mut inner.0, &mut checker.0)
+                    .map_err(PyLinkerError::from)?;
                 return Ok(());
             }
         };
