@@ -68,7 +68,7 @@ watch-maturin:
     watchexec -c -w vts_api -w vts_core maturin dev
 
 watch-git:
-    watchexec -c -r git status
+    watchexec -c -r -w ./ -w .git/objects git status
 
 watch-scratchpad:
     watchexec -c -r RUST_BACKTRACE=1 python scratchpad.py
