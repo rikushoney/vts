@@ -1,0 +1,89 @@
+proc %sr.always_ff.162.0 (i1$ %clk, i1$ %reset, i1$ %op, i1$ %shift_in) -> (i4$ %registers) {
+0:
+    %1 = prb i4$ %registers
+    %registers.shadow = var i4 %1
+    br %init
+init:
+    %clk.prb = prb i1$ %clk
+    %reset.prb = prb i1$ %reset
+    wait %check, %clk, %reset
+check:
+    %2 = prb i4$ %registers
+    st i4* %registers.shadow, %2
+    %clk.prb1 = prb i1$ %clk
+    %3 = const i1 0
+    %4 = eq i1 %clk.prb, %3
+    %5 = neq i1 %clk.prb1, %3
+    %posedge = and i1 %4, %5
+    %reset.prb1 = prb i1$ %reset
+    %6 = const i1 0
+    %7 = neq i1 %reset.prb, %6
+    %8 = eq i1 %reset.prb1, %6
+    %negedge = and i1 %7, %8
+    %event_or = or i1 %posedge, %negedge
+    br %event_or, %event, %init
+event:
+    %reset.prb2 = prb i1$ %reset
+    %9 = not i1 %reset.prb2
+    %10 = const i1 0
+    %11 = neq i1 %9, %10
+    br %11, %if_false, %if_true
+if_true:
+    %12 = const time 0s 1d
+    %13 = const i4 0
+    drv i4$ %registers, %13, %12
+    br %if_exit
+if_false:
+    %op.prb = prb i1$ %op
+    %14 = const i1 0
+    %15 = eq i1 %op.prb, %14
+    %16 = const i1 0
+    %17 = neq i1 %15, %16
+    br %17, %if_false1, %if_true1
+if_exit:
+    br %0
+if_true1:
+    %18 = const time 0s 1d
+    %registers.shadow.ld = ld i4* %registers.shadow
+    %19 = const i1 0
+    %20 = const i4 0
+    %21 = shr i4 %registers.shadow.ld, i4 %20, i1 %19
+    %22 = exts i3, i4 %21, 0, 3
+    %shift_in.prb = prb i1$ %shift_in
+    %23 = const i4 0
+    drv i4$ %registers, %23, %18
+    br %if_exit1
+if_false1:
+    %op.prb1 = prb i1$ %op
+    %24 = const i1 1
+    %25 = eq i1 %op.prb1, %24
+    %26 = const i1 0
+    %27 = neq i1 %25, %26
+    br %27, %if_false2, %if_true2
+if_exit1:
+    br %if_exit
+if_true2:
+    %28 = const time 0s 1d
+    %shift_in.prb1 = prb i1$ %shift_in
+    %registers.shadow.ld1 = ld i4* %registers.shadow
+    %29 = const i1 1
+    %30 = const i4 0
+    %31 = shr i4 %registers.shadow.ld1, i4 %30, i1 %29
+    %32 = exts i3, i4 %31, 0, 3
+    %33 = const i4 0
+    drv i4$ %registers, %33, %28
+    br %if_exit2
+if_false2:
+    br %if_exit2
+if_exit2:
+    br %if_exit1
+}
+
+entity @sr (i1$ %clk, i1$ %reset, i1$ %op, i1$ %shift_in) -> (i4$ %shift_out) {
+    %0 = const i4 0
+    %registers = sig i4 %0
+    %1 = const time 0s 1e
+    %registers.prb = prb i4$ %registers
+    drv i4$ %shift_out, %registers.prb, %1
+    inst %sr.always_ff.162.0 (i1$ %clk, i1$ %reset, i1$ %op, i1$ %shift_in) -> (i4$ %registers)
+}

@@ -13,3 +13,4 @@ slotmap = "1.0.7"
 serde_yaml = "0.9.34"
 toml = "0.8.12"
 ustr = { version = "1.0.0", features = ["serde"] }
+llhd = "0.16.0"

@@ -1,0 +1,7 @@
+[package]
+name = "vts_circt"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+circt-sys = { path = "./circt-sys" }

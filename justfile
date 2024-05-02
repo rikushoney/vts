@@ -72,3 +72,39 @@ watch-git:
 
 watch-scratchpad:
     watchexec -c -r RUST_BACKTRACE=1 python scratchpad.py
+
+circt_sys_dir := justfile_directory() / "vts_circt" / "circt-sys"
+
+format-cpp:
+    clang-format -i {{circt_sys_dir / "wrapper.h"}} {{circt_sys_dir / "wrapper.cpp"}}
+
+circt_dir := circt_sys_dir / "circt"
+llvm_dir := circt_dir / "llvm"
+circt_build_dir := circt_dir / "build"
+llvm_build_dir := llvm_dir / "build"
+
+build-llvm:
+    mkdir -p {{llvm_build_dir}}
+    cmake -S {{llvm_dir / "llvm"}} -B {{llvm_build_dir}} -G Ninja \
+        -DLLVM_ENABLE_PROJECTS="mlir" \
+        -DLLVM_TARGETS_TO_BUILD="host" \
+        -DLLVM_ENABLE_ASSERTIONS=ON \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    cmake --build {{llvm_build_dir}}
+
+clean-llvm:
+    rm -r {{llvm_build_dir}}
+
+build-circt:
+    mkdir -p {{circt_build_dir}}
+    cmake -S {{circt_dir}} -B {{circt_build_dir}} -G Ninja \
+        -DMLIR_DIR={{llvm_build_dir / "lib" / "cmake" / "mlir"}} \
+        -DLLVM_DIR={{llvm_build_dir / "lib" / "cmake" / "llvm"}} \
+        -DLLVM_ENABLE_ASSERTIONS=ON \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    cmake --build {{circt_build_dir}}
+
+clean-circt:
+    rm -r {{circt_build_dir}}

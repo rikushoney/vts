@@ -1,0 +1,3 @@
+[submodule "vts_circt/circt-sys/circt"]
+	path = vts_circt/circt-sys/circt
+	url = https://github.com/llvm/circt.git

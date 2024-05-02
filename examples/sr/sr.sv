@@ -1,11 +1,11 @@
-typedef enum logic [0] {SHIFT_LEFT, SHIFT_RIGHT} SHIFT_OP;
+typedef enum logic [0:0] {SHIFT_LEFT, SHIFT_RIGHT} SHIFT_OP;
 
 module sr #(parameter WIDTH = 4) (
-  input logic             clk,
-  input logic             reset,
-  input SHIFT_OP          op,
-  input logic             shift_in,
-  output logic [WIDTH-1:0] shift_out,
+  input logic              clk,
+  input logic              reset,
+  input SHIFT_OP           op,
+  input logic              shift_in,
+  output logic [WIDTH-1:0] shift_out
 );
 
 logic [WIDTH-1:0] registers;
