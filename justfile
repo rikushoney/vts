@@ -78,33 +78,31 @@ circt_sys_dir := justfile_directory() / "vts_circt" / "circt-sys"
 format-cpp:
     clang-format -i {{circt_sys_dir / "wrapper.h"}} {{circt_sys_dir / "wrapper.cpp"}}
 
-circt_dir := circt_sys_dir / "circt"
-llvm_dir := circt_dir / "llvm"
-circt_build_dir := circt_dir / "build"
-llvm_build_dir := llvm_dir / "build"
-
-build-llvm:
-    mkdir -p {{llvm_build_dir}}
-    cmake -S {{llvm_dir / "llvm"}} -B {{llvm_build_dir}} -G Ninja \
-        -DLLVM_ENABLE_PROJECTS="mlir" \
-        -DLLVM_TARGETS_TO_BUILD="host" \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-    cmake --build {{llvm_build_dir}}
-
-clean-llvm:
-    rm -r {{llvm_build_dir}}
+circt_src_dir := circt_sys_dir / "circt"
+circt_build_dir := circt_sys_dir / "build"
+circt_install_dir := circt_sys_dir / "install"
 
 build-circt:
-    mkdir -p {{circt_build_dir}}
-    cmake -S {{circt_dir}} -B {{circt_build_dir}} -G Ninja \
-        -DMLIR_DIR={{llvm_build_dir / "lib" / "cmake" / "mlir"}} \
-        -DLLVM_DIR={{llvm_build_dir / "lib" / "cmake" / "llvm"}} \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
+    cmake -G Ninja -B {{circt_build_dir}} -S {{circt_src_dir / "llvm" / "llvm"}} \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        -DCMAKE_INSTALL_PREFIX={{circt_install_dir}} \
+        -DLLVM_ENABLE_PROJECTS=mlir \
+        -DLLVM_ENABLE_ASSERTIONS=ON \
+        -DLLVM_ENABLE_ZSTD=OFF \
+        -DLLVM_EXTERNAL_PROJECTS=circt \
+        -DLLVM_EXTERNAL_CIRCT_SOURCE_DIR={{circt_src_dir}} \
+        -DLLVM_TARGETS_TO_BUILD=host
     cmake --build {{circt_build_dir}}
 
-clean-circt:
+install-circt:
+    cmake --install {{circt_build_dir}}
+
+clean-circt-build:
     rm -r {{circt_build_dir}}
+
+clean-circt: clean-circt-build
+    rm -r {{circt_install_dir}}
+
+generate-bindings:
+    bindgen -o {{circt_sys_dir / "src" / "bindings.rs"}} {{circt_sys_dir / "wrapper.h"}} -- \
+        -I$({{circt_install_dir / "bin" / "llvm-config"}} --includedir)

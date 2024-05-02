@@ -48,10 +48,8 @@ impl LLVMConfig {
 
 fn main() {
     const CIRCT_DIR: &str = "CIRCT_SYS_CIRCT_DIR";
-    const CIRCT_BUILD_DIR: &str = "CIRCT_SYS_CIRCT_BUILD_DIR";
-    const LLVM_DIR: &str = "CIRCT_SYS_LLVM_DIR";
-    const LLVM_BUILD_DIR: &str = "CIRCT_SYS_LLVM_BUILD_DIR";
-    let watch_envs = [CIRCT_DIR, CIRCT_BUILD_DIR, LLVM_DIR, LLVM_BUILD_DIR];
+    const CIRCT_INSTALL_DIR: &str = "CIRCT_SYS_CIRCT_BUILD_DIR";
+    let watch_envs = [CIRCT_DIR, CIRCT_INSTALL_DIR];
     for env in watch_envs {
         println!("cargo:rerun-if-env-changed={env}");
     }
@@ -62,30 +60,54 @@ fn main() {
         .unwrap_or(cargo_manifest_dir.join("circt"));
     ensure_exists(&circt_dir);
 
-    let circt_build_dir = env::var(CIRCT_BUILD_DIR)
+    let circt_install_dir = env::var(CIRCT_INSTALL_DIR)
         .map(PathBuf::from)
-        .unwrap_or(circt_dir.join("build"));
-    ensure_exists(&circt_build_dir);
+        .unwrap_or(cargo_manifest_dir.join("install"));
+    ensure_exists(&circt_install_dir);
 
-    let llvm_dir = env::var(LLVM_DIR)
-        .map(PathBuf::from)
-        .unwrap_or(circt_dir.join("llvm"));
-    ensure_exists(&llvm_dir);
-
-    let llvm_build_dir = env::var(LLVM_BUILD_DIR)
-        .map(PathBuf::from)
-        .unwrap_or(llvm_dir.join("build"));
-    ensure_exists(&llvm_build_dir);
-
-    let watch_dirs = [&circt_dir, &circt_build_dir, &llvm_dir, &llvm_build_dir];
+    let watch_dirs = [&circt_dir, &circt_install_dir];
     for dir in watch_dirs {
         println!("cargo:rerun-if-changed={}", dir.display());
     }
 
-    let llvm_config = LLVMConfig::from(llvm_build_dir.join("bin/llvm-config"));
+    let llvm_config = LLVMConfig::from(circt_install_dir.join("bin/llvm-config"));
     let llvm_lib_dir = llvm_config.option("libdir");
     println!("cargo:rustc-link-search=native={llvm_lib_dir}");
     let llvm_include_dir = llvm_config.option("includedir");
+
+    let link_libs = [
+        "CIRCTHW",
+        "CIRCTHWToLLHD",
+        "CIRCTLLHD",
+        "LLVMDemangle",
+        "LLVMSupport",
+        "MLIRAnalysis",
+        "MLIRControlFlowInterfaces",
+        "MLIRInferTypeOpInterface",
+        "MLIRIR",
+        "MLIRFunctionInterfaces",
+        "MLIRPass",
+        "MLIRPDLDialect",
+        "MLIRPDLInterpDialect",
+        "MLIRPDLToPDLInterp",
+        "MLIRRewrite",
+        "MLIRRewritePDL",
+        "MLIRSideEffectInterfaces",
+        "MLIRSupport",
+        "MLIRTransforms",
+        "MLIRTransformUtils",
+    ];
+    for lib in link_libs {
+        println!("cargo:rustc-link-lib=static={lib}");
+    }
+
+    let system_libs = llvm_config.option("system-libs");
+    let iter_system_libs = system_libs
+        .split_whitespace()
+        .map(|lib| lib.strip_prefix("-l").unwrap_or(lib));
+    for lib in iter_system_libs {
+        println!("cargo:rustc-link-lib=dylib={lib}")
+    }
 
     println!("cargo:rerun-if-changed=wrapper.h");
     println!("cargo:rerun-if-changed=wrapper.cpp");
@@ -93,6 +115,7 @@ fn main() {
     cc::Build::new()
         .include(llvm_include_dir)
         .file("wrapper.cpp")
+        .cpp(true)
         .warnings(false)
         .extra_warnings(false)
         .compile("circt-sys-wrapper")
