@@ -1,0 +1,756 @@
+{
+  "creator": "Yosys 0.39 (git sha1 00338082b, g++ 13.2.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
+  "modules": {
+    "alu4": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "alu4.sv:7.1-56.16"
+      },
+      "ports": {
+        "A": {
+          "direction": "input",
+          "bits": [ 2, 3, 4, 5 ]
+        },
+        "B": {
+          "direction": "input",
+          "bits": [ 6, 7, 8, 9 ]
+        },
+        "S": {
+          "direction": "output",
+          "bits": [ 10, 11, 12, 13 ]
+        },
+        "V": {
+          "direction": "output",
+          "bits": [ 14 ]
+        },
+        "op": {
+          "direction": "input",
+          "bits": [ 15, 16 ]
+        }
+      },
+      "cells": {
+        "$auto$flowmap.cc:1412:pack_cells$170": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1000",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:46.11-46.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 9 ],
+            "Y": [ 17 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$171": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1000",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:46.11-46.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 8 ],
+            "Y": [ 18 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$172": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1000",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:46.11-46.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3, 7 ],
+            "Y": [ 19 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$173": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1000",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:46.11-46.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2, 6 ],
+            "Y": [ 20 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$174": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:50.11-50.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 9 ],
+            "Y": [ 21 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$175": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:50.11-50.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 8 ],
+            "Y": [ 22 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$176": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:50.11-50.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3, 7 ],
+            "Y": [ 23 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$177": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:50.11-50.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2, 6 ],
+            "Y": [ 24 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$178": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:15.12-15.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 25 ],
+            "Y": [ 26 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$179": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 26, 27 ],
+            "Y": [ 28 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$180": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:15.12-15.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 29 ],
+            "Y": [ 30 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$181": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 30, 31 ],
+            "Y": [ 32 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$182": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:15.12-15.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3, 33 ],
+            "Y": [ 34 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$183": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 34, 35 ],
+            "Y": [ 36 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$184": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "00111100",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "alu4.sv:25.11-25.13|add4.sv:25.12-25.21|add4.sv:15.12-15.17|alu4.sv:23.3-29.6|alu4.sv:23.7-23.16|alu4.sv:36.3-53.10|alu4.sv:0.0-0.0"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 37, 6, 2 ],
+            "Y": [ 38 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$185": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11010010",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "alu4.sv:23.7-23.16|alu4.sv:23.3-29.6|alu4.sv:25.11-25.13|alu4.sv:36.3-53.10|alu4.sv:0.0-0.0"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16, 9 ],
+            "Y": [ 25 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$186": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11010010",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "alu4.sv:23.7-23.16|alu4.sv:23.3-29.6|alu4.sv:25.11-25.13|alu4.sv:36.3-53.10|alu4.sv:0.0-0.0"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16, 8 ],
+            "Y": [ 29 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$187": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11010010",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "alu4.sv:23.7-23.16|alu4.sv:23.3-29.6|alu4.sv:25.11-25.13|alu4.sv:36.3-53.10|alu4.sv:0.0-0.0"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16, 7 ],
+            "Y": [ 33 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$188": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1101",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:0.0-0.0|alu4.sv:36.3-53.10"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16 ],
+            "Y": [ 37 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$189": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11010001",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "alu4.sv:25.11-25.13|add4.sv:21.17-21.49|add4.sv:14.12-14.17|add4.sv:21.29-21.48|add4.sv:15.12-15.17|alu4.sv:23.3-29.6|alu4.sv:23.7-23.16|alu4.sv:36.3-53.10|alu4.sv:0.0-0.0"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 37, 6, 2 ],
+            "Y": [ 35 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$190": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11101000",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:15.12-15.17|add4.sv:21.17-21.49|add4.sv:21.29-21.48|add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3, 33, 35 ],
+            "Y": [ 31 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$191": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11101000",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:15.12-15.17|add4.sv:21.17-21.49|add4.sv:21.29-21.48|add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 29, 31 ],
+            "Y": [ 27 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$192": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11101000",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:15.12-15.17|add4.sv:26.15-26.35|add4.sv:26.23-26.34|add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 25, 27 ],
+            "Y": [ 39 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$193": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0100",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:36.3-53.10|alu4.sv:0.0-0.0"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16 ],
+            "Y": [ 40 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$194": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1000",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:36.3-53.10|alu4.sv:0.0-0.0"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16 ],
+            "Y": [ 41 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$195": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0011",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:0.0-0.0|alu4.sv:36.3-53.10"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16 ],
+            "Y": [ 42 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$196": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1100",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "alu4.sv:0.0-0.0|alu4.sv:36.3-53.10"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 15, 16 ],
+            "Y": [ 43 ]
+          }
+        },
+        "$procmux$80": {
+          "hide_name": 1,
+          "type": "$pmux",
+          "parameters": {
+            "S_WIDTH": "00000000000000000000000000000010",
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "alu4.sv:0.0-0.0|alu4.sv:36.3-53.10"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "x" ],
+            "B": [ "0", 39 ],
+            "S": [ 43, 42 ],
+            "Y": [ 14 ]
+          }
+        },
+        "$procmux$85": {
+          "hide_name": 1,
+          "type": "$pmux",
+          "parameters": {
+            "S_WIDTH": "00000000000000000000000000000011",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "alu4.sv:0.0-0.0|alu4.sv:36.3-53.10"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "x", "x", "x", "x" ],
+            "B": [ 24, 23, 22, 21, 20, 19, 18, 17, 38, 36, 32, 28 ],
+            "S": [ 41, 40, 42 ],
+            "Y": [ 10, 11, 12, 13 ]
+          }
+        }
+      },
+      "netnames": {
+        "$and$alu4.sv:46$71_Y": {
+          "hide_name": 1,
+          "bits": [ 20, 19, 18, 17 ],
+          "attributes": {
+            "src": "alu4.sv:46.11-46.16"
+          }
+        },
+        "$auto$opt_reduce.cc:134:opt_pmux$91": {
+          "hide_name": 1,
+          "bits": [ 43 ],
+          "attributes": {
+          }
+        },
+        "$auto$opt_reduce.cc:134:opt_pmux$93": {
+          "hide_name": 1,
+          "bits": [ 42 ],
+          "attributes": {
+          }
+        },
+        "$auto$simplemap.cc:246:simplemap_eqne$161": {
+          "hide_name": 1,
+          "bits": [ 37 ],
+          "attributes": {
+          }
+        },
+        "$or$alu4.sv:50$72_Y": {
+          "hide_name": 1,
+          "bits": [ 24, 23, 22, 21 ],
+          "attributes": {
+            "src": "alu4.sv:50.11-50.16"
+          }
+        },
+        "$procmux$81_CMP": {
+          "hide_name": 1,
+          "bits": [ 41 ],
+          "attributes": {
+          }
+        },
+        "$procmux$82_CMP": {
+          "hide_name": 1,
+          "bits": [ 40 ],
+          "attributes": {
+          }
+        },
+        "A": {
+          "hide_name": 0,
+          "bits": [ 2, 3, 4, 5 ],
+          "attributes": {
+            "src": "alu4.sv:8.22-8.23"
+          }
+        },
+        "B": {
+          "hide_name": 0,
+          "bits": [ 6, 7, 8, 9 ],
+          "attributes": {
+            "src": "alu4.sv:9.22-9.23"
+          }
+        },
+        "Bin": {
+          "hide_name": 0,
+          "bits": [ 44, 33, 29, 25 ],
+          "attributes": {
+            "src": "alu4.sv:17.13-17.16",
+            "unused_bits": "0 "
+          }
+        },
+        "Cout": {
+          "hide_name": 0,
+          "bits": [ 39 ],
+          "attributes": {
+            "src": "alu4.sv:19.7-19.11"
+          }
+        },
+        "S": {
+          "hide_name": 0,
+          "bits": [ 10, 11, 12, 13 ],
+          "attributes": {
+            "src": "alu4.sv:11.22-11.23"
+          }
+        },
+        "Sout": {
+          "hide_name": 0,
+          "bits": [ 38, 36, 32, 28 ],
+          "attributes": {
+            "src": "alu4.sv:18.13-18.17"
+          }
+        },
+        "V": {
+          "hide_name": 0,
+          "bits": [ 14 ],
+          "attributes": {
+            "src": "alu4.sv:12.22-12.23"
+          }
+        },
+        "adder.A": {
+          "hide_name": 0,
+          "bits": [ 2, 3, 4, 5 ],
+          "attributes": {
+            "hdlname": "adder A",
+            "src": "add4.sv:3.21-3.22"
+          }
+        },
+        "adder.B": {
+          "hide_name": 0,
+          "bits": [ 44, 33, 29, 25 ],
+          "attributes": {
+            "hdlname": "adder B",
+            "src": "add4.sv:4.21-4.22",
+            "unused_bits": "0 "
+          }
+        },
+        "adder.C": {
+          "hide_name": 0,
+          "bits": [ 45, 35, 31, 27 ],
+          "attributes": {
+            "hdlname": "adder C",
+            "src": "add4.sv:12.13-12.14",
+            "unused_bits": "0 "
+          }
+        },
+        "adder.Cout": {
+          "hide_name": 0,
+          "bits": [ 39 ],
+          "attributes": {
+            "hdlname": "adder Cout",
+            "src": "add4.sv:7.16-7.20"
+          }
+        },
+        "adder.P": {
+          "hide_name": 0,
+          "bits": [ 46, 34, 30, 26 ],
+          "attributes": {
+            "hdlname": "adder P",
+            "src": "add4.sv:11.13-11.14",
+            "unused_bits": "0 "
+          }
+        },
+        "adder.S": {
+          "hide_name": 0,
+          "bits": [ 38, 36, 32, 28 ],
+          "attributes": {
+            "hdlname": "adder S",
+            "src": "add4.sv:6.22-6.23"
+          }
+        },
+        "op": {
+          "hide_name": 0,
+          "bits": [ 15, 16 ],
+          "attributes": {
+            "enum_type": "$enum0",
+            "enum_value_00": "\\ADD",
+            "enum_value_01": "\\SUB",
+            "enum_value_10": "\\AND",
+            "enum_value_11": "\\OR",
+            "src": "alu4.sv:10.22-10.24",
+            "wiretype": "\\ALU_OP"
+          }
+        }
+      }
+    }
+  }
+}

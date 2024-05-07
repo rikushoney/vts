@@ -29,15 +29,10 @@
         }
       },
       "cells": {
-        "$and$add4.sv:14$1": {
+        "$auto$simplemap.cc:75:simplemap_bitop$13": {
           "hide_name": 1,
-          "type": "$and",
+          "type": "$_AND_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000100",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000100",
-            "Y_WIDTH": "00000000000000000000000000000100"
           },
           "attributes": {
             "src": "add4.sv:14.12-14.17"
@@ -48,20 +43,72 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 2, 3, 4, 5 ],
-            "B": [ 6, 7, 8, 9 ],
-            "Y": [ 16, 17, 18, 19 ]
+            "A": [ 2 ],
+            "B": [ 6 ],
+            "Y": [ 16 ]
           }
         },
-        "$and$add4.sv:21$11": {
+        "$auto$simplemap.cc:75:simplemap_bitop$14": {
           "hide_name": 1,
-          "type": "$and",
+          "type": "$_AND_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3 ],
+            "B": [ 7 ],
+            "Y": [ 17 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$15": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4 ],
+            "B": [ 8 ],
+            "Y": [ 18 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$16": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5 ],
+            "B": [ 9 ],
+            "Y": [ 19 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$17": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
           },
           "attributes": {
             "src": "add4.sv:21.29-21.48"
@@ -77,15 +124,10 @@
             "Y": [ 22 ]
           }
         },
-        "$and$add4.sv:21$7": {
+        "$auto$simplemap.cc:75:simplemap_bitop$18": {
           "hide_name": 1,
-          "type": "$and",
+          "type": "$_AND_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
           },
           "attributes": {
             "src": "add4.sv:21.29-21.48"
@@ -101,15 +143,10 @@
             "Y": [ 24 ]
           }
         },
-        "$and$add4.sv:21$9": {
+        "$auto$simplemap.cc:75:simplemap_bitop$19": {
           "hide_name": 1,
-          "type": "$and",
+          "type": "$_AND_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
           },
           "attributes": {
             "src": "add4.sv:21.29-21.48"
@@ -125,15 +162,10 @@
             "Y": [ 27 ]
           }
         },
-        "$and$add4.sv:26$5": {
+        "$auto$simplemap.cc:75:simplemap_bitop$20": {
           "hide_name": 1,
-          "type": "$and",
+          "type": "$_AND_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
           },
           "attributes": {
             "src": "add4.sv:26.23-26.34"
@@ -149,15 +181,10 @@
             "Y": [ 30 ]
           }
         },
-        "$or$add4.sv:21$10": {
+        "$auto$simplemap.cc:75:simplemap_bitop$21": {
           "hide_name": 1,
-          "type": "$or",
+          "type": "$_OR_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
           },
           "attributes": {
             "src": "add4.sv:21.17-21.49"
@@ -173,15 +200,10 @@
             "Y": [ 20 ]
           }
         },
-        "$or$add4.sv:21$12": {
+        "$auto$simplemap.cc:75:simplemap_bitop$22": {
           "hide_name": 1,
-          "type": "$or",
+          "type": "$_OR_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
           },
           "attributes": {
             "src": "add4.sv:21.17-21.49"
@@ -197,15 +219,10 @@
             "Y": [ 28 ]
           }
         },
-        "$or$add4.sv:21$8": {
+        "$auto$simplemap.cc:75:simplemap_bitop$23": {
           "hide_name": 1,
-          "type": "$or",
+          "type": "$_OR_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
           },
           "attributes": {
             "src": "add4.sv:21.17-21.49"
@@ -221,15 +238,10 @@
             "Y": [ 25 ]
           }
         },
-        "$or$add4.sv:26$6": {
+        "$auto$simplemap.cc:75:simplemap_bitop$24": {
           "hide_name": 1,
-          "type": "$or",
+          "type": "$_OR_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000001",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000001",
-            "Y_WIDTH": "00000000000000000000000000000001"
           },
           "attributes": {
             "src": "add4.sv:26.15-26.35"
@@ -245,15 +257,10 @@
             "Y": [ 15 ]
           }
         },
-        "$xor$add4.sv:25$3": {
+        "$auto$simplemap.cc:75:simplemap_bitop$25": {
           "hide_name": 1,
-          "type": "$xor",
+          "type": "$_XOR_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000100",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000100",
-            "Y_WIDTH": "00000000000000000000000000000100"
           },
           "attributes": {
             "src": "add4.sv:25.12-25.17"
@@ -264,20 +271,72 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 2, 3, 4, 5 ],
-            "B": [ 6, 7, 8, 9 ],
-            "Y": [ 23, 26, 21, 29 ]
+            "A": [ 2 ],
+            "B": [ 6 ],
+            "Y": [ 23 ]
           }
         },
-        "$xor$add4.sv:25$4": {
+        "$auto$simplemap.cc:75:simplemap_bitop$26": {
           "hide_name": 1,
-          "type": "$xor",
+          "type": "$_XOR_",
           "parameters": {
-            "A_SIGNED": "00000000000000000000000000000000",
-            "A_WIDTH": "00000000000000000000000000000100",
-            "B_SIGNED": "00000000000000000000000000000000",
-            "B_WIDTH": "00000000000000000000000000000100",
-            "Y_WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3 ],
+            "B": [ 7 ],
+            "Y": [ 26 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$27": {
+          "hide_name": 1,
+          "type": "$_XOR_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4 ],
+            "B": [ 8 ],
+            "Y": [ 21 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$28": {
+          "hide_name": 1,
+          "type": "$_XOR_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5 ],
+            "B": [ 9 ],
+            "Y": [ 29 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$29": {
+          "hide_name": 1,
+          "type": "$_XOR_",
+          "parameters": {
           },
           "attributes": {
             "src": "add4.sv:25.12-25.21"
@@ -288,9 +347,66 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 23, 26, 21, 29 ],
-            "B": [ 10, 25, 20, 28 ],
-            "Y": [ 11, 12, 13, 14 ]
+            "A": [ 23 ],
+            "B": [ 10 ],
+            "Y": [ 11 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$30": {
+          "hide_name": 1,
+          "type": "$_XOR_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 26 ],
+            "B": [ 25 ],
+            "Y": [ 12 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$31": {
+          "hide_name": 1,
+          "type": "$_XOR_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 21 ],
+            "B": [ 20 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$32": {
+          "hide_name": 1,
+          "type": "$_XOR_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 29 ],
+            "B": [ 28 ],
+            "Y": [ 14 ]
           }
         }
       },

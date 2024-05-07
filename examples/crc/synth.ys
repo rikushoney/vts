@@ -1,9 +1,35 @@
 read_verilog -sv crc8.sv
+hierarchy -check -top crc8_07
 opt; proc; opt
+
 write_json crc8.json
 write_rtlil crc8.rtlil
 
+simplemap; opt
+
+write_json crc8_simplemap.json
+write_rtlil crc8_simplemap.rtlil
+
+flowmap; opt
+
+write_json crc8_flowmap.json
+write_rtlil crc8_flowmap.rtlil
+
+delete crc8
+
 read_verilog -sv crc16.sv
+hierarchy -check -top crc16_1021
 opt; proc; opt
+
 write_json crc16.json
 write_rtlil crc16.rtlil
+
+simplemap; opt
+
+write_json crc16_simplemap.json
+write_rtlil crc16_simplemap.rtlil
+
+flowmap; opt
+
+write_json crc16_flowmap.json
+write_rtlil crc16_flowmap.rtlil

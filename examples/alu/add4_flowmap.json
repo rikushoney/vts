@@ -1,0 +1,296 @@
+{
+  "creator": "Yosys 0.39 (git sha1 00338082b, g++ 13.2.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
+  "modules": {
+    "add4": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "add4.sv:2.1-28.16"
+      },
+      "ports": {
+        "A": {
+          "direction": "input",
+          "bits": [ 2, 3, 4, 5 ]
+        },
+        "B": {
+          "direction": "input",
+          "bits": [ 6, 7, 8, 9 ]
+        },
+        "Cin": {
+          "direction": "input",
+          "bits": [ 10 ]
+        },
+        "S": {
+          "direction": "output",
+          "bits": [ 11, 12, 13, 14 ]
+        },
+        "Cout": {
+          "direction": "output",
+          "bits": [ 15 ]
+        }
+      },
+      "cells": {
+        "$auto$flowmap.cc:1412:pack_cells$33": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 9 ],
+            "Y": [ 16 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$34": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 16, 17 ],
+            "Y": [ 14 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$35": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 8 ],
+            "Y": [ 18 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$36": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 18, 19 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$37": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3, 7 ],
+            "Y": [ 20 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$38": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 20, 21 ],
+            "Y": [ 12 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$39": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.21|add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 10, 2, 6 ],
+            "Y": [ 11 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$40": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11101000",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:21.17-21.49|add4.sv:14.12-14.17|add4.sv:21.29-21.48|add4.sv:25.12-25.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2, 6, 10 ],
+            "Y": [ 21 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$41": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11101000",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17|add4.sv:21.17-21.49|add4.sv:21.29-21.48|add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 3, 7, 21 ],
+            "Y": [ 19 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$42": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11101000",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17|add4.sv:21.17-21.49|add4.sv:21.29-21.48|add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 8, 19 ],
+            "Y": [ 17 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$43": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "11101000",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "add4.sv:25.12-25.17|add4.sv:26.15-26.35|add4.sv:26.23-26.34|add4.sv:14.12-14.17"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 9, 17 ],
+            "Y": [ 15 ]
+          }
+        }
+      },
+      "netnames": {
+        "A": {
+          "hide_name": 0,
+          "bits": [ 2, 3, 4, 5 ],
+          "attributes": {
+            "src": "add4.sv:3.21-3.22"
+          }
+        },
+        "B": {
+          "hide_name": 0,
+          "bits": [ 6, 7, 8, 9 ],
+          "attributes": {
+            "src": "add4.sv:4.21-4.22"
+          }
+        },
+        "C": {
+          "hide_name": 0,
+          "bits": [ 10, 21, 19, 17 ],
+          "attributes": {
+            "src": "add4.sv:12.13-12.14"
+          }
+        },
+        "Cin": {
+          "hide_name": 0,
+          "bits": [ 10 ],
+          "attributes": {
+            "src": "add4.sv:5.15-5.18"
+          }
+        },
+        "Cout": {
+          "hide_name": 0,
+          "bits": [ 15 ],
+          "attributes": {
+            "src": "add4.sv:7.16-7.20"
+          }
+        },
+        "P": {
+          "hide_name": 0,
+          "bits": [ 22, 20, 18, 16 ],
+          "attributes": {
+            "src": "add4.sv:11.13-11.14",
+            "unused_bits": "0 "
+          }
+        },
+        "S": {
+          "hide_name": 0,
+          "bits": [ 11, 12, 13, 14 ],
+          "attributes": {
+            "src": "add4.sv:6.22-6.23"
+          }
+        }
+      }
+    }
+  }
+}
