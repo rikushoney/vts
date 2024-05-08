@@ -166,7 +166,7 @@ impl Graph {
 
     pub fn edges(&self) -> Edges<'_> {
         Edges {
-            iter: self.nodes(),
+            nodes: self.nodes(),
             last_node: 0,
             current: None,
         }
@@ -195,7 +195,7 @@ struct CurrentNode<'a> {
 }
 
 pub struct Edges<'a> {
-    iter: Nodes<'a>,
+    nodes: Nodes<'a>,
     last_node: usize,
     current: Option<CurrentNode<'a>>,
 }
@@ -204,7 +204,7 @@ impl<'a> Iterator for Edges<'a> {
     type Item = (usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let entries = &mut self.iter.iter;
+        let entries = &mut self.nodes.iter;
         if self.current.is_none() {
             self.current = entries.next().map(|entry| {
                 let n = CurrentNode {
