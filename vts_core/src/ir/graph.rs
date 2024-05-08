@@ -216,10 +216,13 @@ impl<'a> Iterator for Edges<'a> {
             });
         }
         if let Some(current) = &mut self.current {
-            current.sinks.next().map(|sink| (current.id, *sink))
-        } else {
-            None
+            if let Some(sink) = current.sinks.next() {
+                return Some((current.id, *sink));
+            } else {
+                self.current = None;
+            }
         }
+        None
     }
 }
 
@@ -303,7 +306,7 @@ impl TryFrom<yosys::Module> for Graph {
                                 return Err(YosysError::ConstOutput(name.clone()))
                             }
                         };
-                        if let None = bits.next() {
+                        if bits.next().is_none() {
                             Ok(bit)
                         } else {
                             Err(YosysError::MultiBitOutput(name.clone()))
@@ -323,7 +326,7 @@ impl TryFrom<yosys::Module> for Graph {
                 .and_then(|input| {
                     let mut bits = input.iter();
                     if let Some(bit) = bits.next() {
-                        if let None = bits.next() {
+                        if bits.next().is_none() {
                             Ok(bit)
                         } else {
                             Err(YosysError::MultiBitInput {
@@ -364,7 +367,7 @@ impl TryFrom<yosys::Module> for Graph {
                     .and_then(|input| {
                         let mut bits = input.iter();
                         if let Some(bit) = bits.next() {
-                            if let None = bits.next() {
+                            if bits.next().is_none() {
                                 Ok(bit)
                             } else {
                                 Err(YosysError::MultiBitInput {
