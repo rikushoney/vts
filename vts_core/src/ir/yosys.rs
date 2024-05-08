@@ -12,7 +12,7 @@
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
-use std::{error, fs, io::Read, path::Path, str::FromStr};
+use std::{error, fmt, fs, io::Read, path::Path, str::FromStr};
 
 /// A structural description of a circuit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -126,6 +126,21 @@ pub enum ConstBit {
     X,
     /// High impedance
     Z,
+}
+
+impl fmt::Display for ConstBit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ConstBit::Zero => "0",
+                ConstBit::One => "1",
+                ConstBit::X => "x",
+                ConstBit::Z => "z",
+            }
+        )
+    }
 }
 
 /// A basic building block of a circuit such as logic gates or registers

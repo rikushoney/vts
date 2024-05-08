@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::ops::Range;
+use std::slice;
 
 use thiserror::Error;
 
 use super::{
-    ops::{AnyOp, BinaryOp, ConstOp, UnaryOp},
-    yosys::{self, PortDirection, SignalBit},
+    ops::{AnyOp, ConstOp},
+    yosys::{self, ConstBit, PortDirection, SignalBit},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -39,18 +40,6 @@ impl NodeData {
         }
     }
 
-    pub fn new_unary(op: UnaryOp) -> Self {
-        Self::new_op(op)
-    }
-
-    pub fn new_binary(op: BinaryOp) -> Self {
-        Self::new_op(op)
-    }
-
-    pub fn new_const(op: ConstOp) -> Self {
-        Self::new_op(op)
-    }
-
     pub fn new_source() -> Self {
         Self {
             kind: NodeKind::Source,
@@ -72,7 +61,6 @@ pub struct Edge {
 
 #[derive(Clone, Debug)]
 struct NodeEntry {
-    #[allow(dead_code)] // TODO: remove once used
     data: NodeData,
     sinks: Vec<usize>,
 }
@@ -131,13 +119,29 @@ impl Graph {
         self.add_nodes((0..width).map(|_| NodeData::new_sink()))
     }
 
+    pub fn add_const(&mut self, k: ConstOp) -> usize {
+        self.add_node(NodeData::new_op(k))
+    }
+
+    pub fn add_unit(&mut self) -> usize {
+        self.add_const(ConstOp::Unit)
+    }
+
+    pub fn add_zero(&mut self) -> usize {
+        self.add_const(ConstOp::Unit)
+    }
+
     fn check_node(&self, node: usize) {
         assert!(node < self.entries.len(), r#"node {node} out of bounds"#);
     }
 
-    pub fn add_edge(&mut self, edge: Edge) {
+    fn check_edge(&self, edge: &Edge) {
         self.check_node(edge.source);
         self.check_node(edge.sink);
+    }
+
+    pub fn add_edge(&mut self, edge: Edge) {
+        self.check_edge(&edge);
         self.add_edge_unchecked(edge)
     }
 
@@ -153,13 +157,77 @@ impl Graph {
             self.add_edge(e);
         }
     }
+
+    pub fn nodes(&self) -> Nodes<'_> {
+        Nodes {
+            iter: self.entries.iter(),
+        }
+    }
+
+    pub fn edges(&self) -> Edges<'_> {
+        Edges {
+            iter: self.nodes(),
+            last_node: 0,
+            current: None,
+        }
+    }
+}
+
+pub struct Nodes<'a> {
+    iter: slice::Iter<'a, NodeEntry>,
+}
+
+impl<'a> Iterator for Nodes<'a> {
+    type Item = &'a NodeData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|entry| &entry.data)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+struct CurrentNode<'a> {
+    id: usize,
+    sinks: slice::Iter<'a, usize>,
+}
+
+pub struct Edges<'a> {
+    iter: Nodes<'a>,
+    last_node: usize,
+    current: Option<CurrentNode<'a>>,
+}
+
+impl<'a> Iterator for Edges<'a> {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let entries = &mut self.iter.iter;
+        if self.current.is_none() {
+            self.current = entries.next().map(|entry| {
+                let n = CurrentNode {
+                    id: self.last_node,
+                    sinks: entry.sinks.iter(),
+                };
+                self.last_node += 1;
+                n
+            });
+        }
+        if let Some(current) = &mut self.current {
+            current.sinks.next().map(|sink| (current.id, *sink))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone, Debug, Error)]
 pub enum YosysError {
     #[error(r#""{0}" not supported"#)]
     Unsupported(String),
-    #[error(r#"cell "{0}" should have output (Y)"#)]
+    #[error(r#"cell "{0}" should have output Y"#)]
     ShouldHaveOutput(String),
     #[error(r#"multi-bit output ports are not supported ("{0}".Y)"#)]
     MultiBitOutput(String),
@@ -217,9 +285,9 @@ impl TryFrom<yosys::Module> for Graph {
             .collect();
         for (name, cell, op) in known_cells {
             let id = graph.add_node(match op {
-                AnyOp::Unary(op) => NodeData::new_unary(op),
-                AnyOp::Binary(op) => NodeData::new_binary(op),
-                AnyOp::Const(op) => NodeData::new_const(op),
+                AnyOp::Unary(op) => NodeData::new_op(op),
+                AnyOp::Binary(op) => NodeData::new_op(op),
+                AnyOp::Const(op) => NodeData::new_op(op),
                 AnyOp::Mux => NodeData::new_op(op),
             });
             let output = cell
@@ -274,8 +342,15 @@ impl TryFrom<yosys::Module> for Graph {
                 SignalBit::Ref(_bit) => {
                     // TODO: add edge to graph
                 }
-                SignalBit::Const(_bit) => {
-                    // TODO: should const signals be sources to the graph?
+                SignalBit::Const(bit) => {
+                    let node = match bit {
+                        ConstBit::Zero => graph.add_zero(),
+                        ConstBit::One => graph.add_unit(),
+                        k => {
+                            return Err(YosysError::Unsupported(format!("{k} constants")));
+                        }
+                    };
+                    // TODO: add edge to graph
                 }
             }
             if matches!(op, AnyOp::Binary(_) | AnyOp::Mux) {
@@ -308,8 +383,15 @@ impl TryFrom<yosys::Module> for Graph {
                     SignalBit::Ref(_bit) => {
                         // TODO: add edge to graph
                     }
-                    SignalBit::Const(_bit) => {
-                        // TODO: should const signals be sources to the graph?
+                    SignalBit::Const(bit) => {
+                        let node = match bit {
+                            ConstBit::Zero => graph.add_zero(),
+                            ConstBit::One => graph.add_unit(),
+                            k => {
+                                return Err(YosysError::Unsupported(format!("{k} constants")));
+                            }
+                        };
+                        // TODO: add edge to graph
                     }
                 }
             }
@@ -343,8 +425,15 @@ impl TryFrom<yosys::Module> for Graph {
                     SignalBit::Ref(_bit) => {
                         // TODO: add edge to graph
                     }
-                    SignalBit::Const(_bit) => {
-                        // TODO: should const signals be sources to the graph?
+                    SignalBit::Const(bit) => {
+                        let node = match bit {
+                            ConstBit::Zero => graph.add_zero(),
+                            ConstBit::One => graph.add_unit(),
+                            k => {
+                                return Err(YosysError::Unsupported(format!("{k} constants")));
+                            }
+                        };
+                        // TODO: add edge to graph
                     }
                 }
             }
@@ -356,16 +445,17 @@ impl TryFrom<yosys::Module> for Graph {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ir::ops::BinaryOp;
 
     macro_rules! binop {
         (and) => {
-            NodeData::new_binary(BinaryOp::And)
+            NodeData::new_op(BinaryOp::And)
         };
         (or) => {
-            NodeData::new_binary(BinaryOp::Or)
+            NodeData::new_op(BinaryOp::Or)
         };
         (xor) => {
-            NodeData::new_binary(BinaryOp::Xor)
+            NodeData::new_op(BinaryOp::Xor)
         };
     }
 
