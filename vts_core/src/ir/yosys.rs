@@ -1,8 +1,4 @@
-//! The Yosys JSON netlist format
-//! # Overview
-//! The Yosys JSON netlist format is used to describe a circuit
-//! in its simplest form. It is a purely structural description
-//! of a circuit with its cells, ports, memories and wires.
+//! Yosys JSON netlist format
 //!
 //! # Usage
 //! The top-most data type is a [`Netlist`] which is read from
@@ -11,26 +7,12 @@
 //! See [`Netlist::from_str`], [`Netlist::from_file`], [`Netlist::from_slice`]
 //! and [`Netlist::from_reader`].
 //!
-//! # Attributes
-//! Modules, ports, cells, memories and net names can have attributes that
-//! specify extra information about the object. The attributes are stored
-//! in the `attributes` field of the object and is a mapping from attribute
-//! names to values. All attribute values are stored as strings, but some are bit
-//! vectors that can be interpreted as integers. Attributes that are valid bit
-//! vectors, but are intended to be strings, have a trailing space at the end.
-//!
-//! # Wire numbering
-//! Each wire is given a unique integer value to identify them. The wire numbers
-//! start at 2 to avoid confusion with the logic levels 0 and 1.
+//! Reference: <https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/write_json.html>
 
-use fnv::FnvHashMap as HashMap;
+use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
-use std::error;
-use std::fs;
-use std::io::Read;
-use std::path::Path;
-use std::str::FromStr;
+use std::{error, fs, io::Read, path::Path, str::FromStr};
 
 /// A structural description of a circuit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -38,7 +20,7 @@ pub struct Netlist {
     /// The program that created the netlist
     pub creator: String,
     /// A mapping from module names to [`Module`] instances
-    pub modules: HashMap<String, Module>,
+    pub modules: FnvHashMap<String, Module>,
 }
 
 impl Netlist {
@@ -48,7 +30,7 @@ impl Netlist {
         P: AsRef<Path>,
     {
         let json = fs::read_to_string(path)?;
-        Self::from_str(json.as_str()).map_err(|e| e.into())
+        Self::from_str(json.as_str()).map_err(Box::from)
     }
 
     /// Read a netlist from the contents of a byte slice
@@ -74,24 +56,23 @@ impl FromStr for Netlist {
     }
 }
 
-/// A design unit encapsulating ports, cells, memories and wires that implement
-/// some functionality
+/// A design unit encapsulating ports, cells, memories and wires
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Module {
     /// Module attributes
-    pub attributes: HashMap<String, String>,
+    pub attributes: FnvHashMap<String, String>,
     /// Default parameter values
     #[serde(default)]
-    pub parameter_default_values: HashMap<String, String>,
+    pub parameter_default_values: FnvHashMap<String, String>,
     /// Module ports
-    pub ports: HashMap<String, Port>,
+    pub ports: FnvHashMap<String, Port>,
     /// Module cells
-    pub cells: HashMap<String, Cell>,
+    pub cells: FnvHashMap<String, Cell>,
     /// Module memories
     #[serde(default)]
-    pub memories: HashMap<String, Memory>,
+    pub memories: FnvHashMap<String, Memory>,
     /// Module net names
-    pub netnames: HashMap<String, Netname>,
+    pub netnames: FnvHashMap<String, Netname>,
 }
 
 /// A connection point for wires that is either an input, output or both
@@ -100,7 +81,7 @@ pub struct Port {
     /// Port direction
     pub direction: PortDirection,
     /// The signal "bits" of the port
-    pub bits: Vec<SignalBit>,
+    pub bits: Vec<usize>,
     /// The lowest bit index of the port
     #[serde(default)]
     pub offset: usize,
@@ -156,14 +137,14 @@ pub struct Cell {
     #[serde(rename = "type")]
     pub ty: String,
     /// Cell parameters
-    pub parameters: HashMap<String, String>,
+    pub parameters: FnvHashMap<String, String>,
     /// Cell attributes
-    pub attributes: HashMap<String, String>,
+    pub attributes: FnvHashMap<String, String>,
     /// The directions of the cell's ports
     #[serde(default)]
-    pub port_directions: HashMap<String, PortDirection>,
+    pub port_directions: FnvHashMap<String, PortDirection>,
     /// The signal bits connected to the cell
-    pub connections: HashMap<String, Vec<SignalBit>>,
+    pub connections: FnvHashMap<String, Vec<SignalBit>>,
 }
 
 /// A block of memory
@@ -172,7 +153,7 @@ pub struct Memory {
     /// 1 if the name of the memory is hidden, otherwise 0
     pub hide_name: usize,
     /// Memory attributes
-    pub attributes: HashMap<String, String>,
+    pub attributes: FnvHashMap<String, String>,
     /// The memory word size
     pub width: usize,
     /// The starting index offset
@@ -187,7 +168,7 @@ pub struct Netname {
     /// 1 if the net name is hidden, otherwise 0
     pub hide_name: usize,
     /// Net name attributes
-    pub attributes: HashMap<String, String>,
+    pub attributes: FnvHashMap<String, String>,
     /// The signal "bits" of the net
     pub bits: Vec<SignalBit>,
     /// The lowest bit index
@@ -207,18 +188,13 @@ mod tests {
 
     #[test]
     fn test_parse_port_details() {
-        let json = r#"{"direction": "input", "bits": ["x", 3, "1", 1]}"#;
+        let json = r#"{"direction": "input", "bits": [0, 1, 2, 3]}"#;
         let parsed: Port = serde_json::from_str(json).unwrap();
         assert_eq!(
             parsed,
             Port {
                 direction: PortDirection::Input,
-                bits: vec![
-                    SignalBit::Const(ConstBit::X),
-                    SignalBit::Ref(3),
-                    SignalBit::Const(ConstBit::One),
-                    SignalBit::Ref(1)
-                ],
+                bits: vec![0, 1, 2, 3],
                 offset: 0,
                 upto: 0,
                 signed: 0
@@ -251,7 +227,7 @@ mod tests {
             Cell {
                 hide_name: 0,
                 ty: "test_cell".to_string(),
-                parameters: HashMap::from_iter([
+                parameters: FnvHashMap::from_iter([
                     (
                         "A_SIGNED".to_string(),
                         "00000000000000000000000000000001".to_string()
@@ -261,9 +237,9 @@ mod tests {
                         "00000000000000000000000000000100".to_string()
                     )
                 ]),
-                attributes: HashMap::from_iter([("src".to_string(), "test.v".to_string())]),
-                port_directions: HashMap::from_iter([("A".to_string(), PortDirection::Output)]),
-                connections: HashMap::from_iter([(
+                attributes: FnvHashMap::from_iter([("src".to_string(), "test.v".to_string())]),
+                port_directions: FnvHashMap::from_iter([("A".to_string(), PortDirection::Output)]),
+                connections: FnvHashMap::from_iter([(
                     "A".to_string(),
                     vec![
                         SignalBit::Ref(4),
@@ -292,7 +268,7 @@ mod tests {
             parsed,
             Memory {
                 hide_name: 1,
-                attributes: HashMap::from_iter([("src".to_string(), "test.v".to_string())]),
+                attributes: FnvHashMap::from_iter([("src".to_string(), "test.v".to_string())]),
                 width: 32,
                 start_offset: 1024,
                 size: 8192
@@ -320,7 +296,7 @@ mod tests {
                     SignalBit::Ref(3),
                     SignalBit::Const(ConstBit::X)
                 ],
-                attributes: HashMap::from_iter([("src".to_string(), "test.v".to_string())]),
+                attributes: FnvHashMap::from_iter([("src".to_string(), "test.v".to_string())]),
                 offset: 0,
                 upto: 0,
                 signed: 0
