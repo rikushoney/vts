@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-use std::ops::Range;
-use std::slice;
+use std::{collections::HashMap, fmt, slice};
 
 use thiserror::Error;
 
@@ -8,6 +6,58 @@ use super::{
     ops::{AnyOp, ConstOp},
     yosys::{self, ConstBit, PortDirection, SignalBit},
 };
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Node(usize);
+
+impl Node {
+    fn new(id: usize) -> Self {
+        Self(id)
+    }
+
+    fn advance(&mut self, count: usize) {
+        self.0 += count;
+    }
+
+    fn bump(&mut self) {
+        self.advance(1)
+    }
+}
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct NodeRange {
+    start: Node,
+    end: Node,
+}
+
+impl Iterator for NodeRange {
+    type Item = Node;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start < self.end {
+            let n = self.start;
+            self.start.bump();
+            Some(n)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.start < self.end {
+            let len = self.end.0 - self.start.0;
+            (len, Some(len))
+        } else {
+            (0, Some(0))
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum NodeKind {
@@ -55,14 +105,14 @@ impl NodeData {
 
 #[derive(Clone, Debug)]
 pub struct Edge {
-    source: usize,
-    sink: usize,
+    pub source: Node,
+    pub sink: Node,
 }
 
 #[derive(Clone, Debug)]
 struct NodeEntry {
     data: NodeData,
-    sinks: Vec<usize>,
+    sinks: Vec<Node>,
 }
 
 impl From<NodeData> for NodeEntry {
@@ -94,45 +144,45 @@ impl Graph {
         graph
     }
 
-    pub fn add_node(&mut self, node: NodeData) -> usize {
+    pub fn add_node(&mut self, node: NodeData) -> Node {
         self.entries.push(NodeEntry::from(node));
-        self.entries.len() - 1
+        Node::new(self.entries.len() - 1)
     }
 
-    pub fn add_nodes<Ns>(&mut self, nodes: Ns) -> Range<usize>
+    pub fn add_nodes<Ns>(&mut self, nodes: Ns) -> NodeRange
     where
         Ns: IntoIterator<Item = NodeData>,
     {
-        let start = self.entries.len();
+        let start = Node::new(self.entries.len());
         for node in nodes.into_iter() {
             self.add_node(node);
         }
-        let end = self.entries.len();
-        Range { start, end }
+        let end = Node::new(self.entries.len());
+        NodeRange { start, end }
     }
 
-    pub fn add_source(&mut self, width: usize) -> Range<usize> {
+    pub fn add_source(&mut self, width: usize) -> NodeRange {
         self.add_nodes((0..width).map(|_| NodeData::new_source()))
     }
 
-    pub fn add_sink(&mut self, width: usize) -> Range<usize> {
+    pub fn add_sink(&mut self, width: usize) -> NodeRange {
         self.add_nodes((0..width).map(|_| NodeData::new_sink()))
     }
 
-    pub fn add_const(&mut self, k: ConstOp) -> usize {
+    pub fn add_const(&mut self, k: ConstOp) -> Node {
         self.add_node(NodeData::new_op(k))
     }
 
-    pub fn add_unit(&mut self) -> usize {
+    pub fn add_unit(&mut self) -> Node {
         self.add_const(ConstOp::Unit)
     }
 
-    pub fn add_zero(&mut self) -> usize {
+    pub fn add_zero(&mut self) -> Node {
         self.add_const(ConstOp::Unit)
     }
 
-    fn check_node(&self, node: usize) {
-        assert!(node < self.entries.len(), r#"node {node} out of bounds"#);
+    fn check_node(&self, node: Node) {
+        assert!(node.0 < self.entries.len(), r#"node {node} out of bounds"#);
     }
 
     fn check_edge(&self, edge: &Edge) {
@@ -146,7 +196,7 @@ impl Graph {
     }
 
     pub fn add_edge_unchecked(&mut self, edge: Edge) {
-        self.entries[edge.source].sinks.push(edge.sink);
+        self.entries[edge.source.0].sinks.push(edge.sink);
     }
 
     pub fn add_edges<Es>(&mut self, edges: Es)
@@ -167,7 +217,7 @@ impl Graph {
     pub fn edges(&self) -> Edges<'_> {
         Edges {
             nodes: self.nodes(),
-            last_node: 0,
+            last_node: Node::new(0),
             current: None,
         }
     }
@@ -190,18 +240,18 @@ impl<'a> Iterator for Nodes<'a> {
 }
 
 struct CurrentNode<'a> {
-    id: usize,
-    sinks: slice::Iter<'a, usize>,
+    id: Node,
+    sinks: slice::Iter<'a, Node>,
 }
 
 pub struct Edges<'a> {
     nodes: Nodes<'a>,
-    last_node: usize,
+    last_node: Node,
     current: Option<CurrentNode<'a>>,
 }
 
 impl<'a> Iterator for Edges<'a> {
-    type Item = (usize, usize);
+    type Item = (Node, Node);
 
     fn next(&mut self) -> Option<Self::Item> {
         let entries = &mut self.nodes.iter;
@@ -211,7 +261,7 @@ impl<'a> Iterator for Edges<'a> {
                     id: self.last_node,
                     sinks: entry.sinks.iter(),
                 };
-                self.last_node += 1;
+                self.last_node.bump();
                 n
             });
         }
@@ -248,6 +298,7 @@ pub enum YosysError {
     BitOutOfBounds(usize),
 }
 
+// Reference: https://yosyshq.readthedocs.io/projects/yosys/en/latest/yosys_internals/formats/cell_library.html
 impl TryFrom<yosys::Module> for Graph {
     type Error = YosysError;
 
@@ -299,148 +350,70 @@ impl TryFrom<yosys::Module> for Graph {
                 .ok_or(YosysError::ShouldHaveOutput(cell.ty.clone()))
                 .and_then(|output| {
                     let mut bits = output.iter();
-                    if let Some(bit) = bits.next() {
-                        let bit = match bit {
-                            SignalBit::Ref(bit) => *bit,
-                            SignalBit::Const(_) => {
-                                return Err(YosysError::ConstOutput(name.clone()))
-                            }
-                        };
-                        if bits.next().is_none() {
-                            Ok(bit)
-                        } else {
-                            Err(YosysError::MultiBitOutput(name.clone()))
-                        }
-                    } else {
-                        Err(YosysError::MissingOutput(name.clone()))
+                    match (bits.next(), bits.next()) {
+                        (Some(bit), None) => match bit {
+                            SignalBit::Ref(bit) => Ok(*bit),
+                            SignalBit::Const(_) => Err(YosysError::ConstOutput(name.clone())),
+                        },
+                        (Some(_), Some(_)) => Err(YosysError::MultiBitOutput(name.clone())),
+                        (None, _) => Err(YosysError::MissingOutput(name.clone())),
                     }
                 })?;
             bits_to_nodes.insert(output, id);
-            let input_a = cell
-                .connections
-                .get("A")
-                .ok_or(YosysError::ShouldHaveInput {
-                    cell: cell.ty.clone(),
-                    port: "A".to_string(),
-                })
-                .and_then(|input| {
-                    let mut bits = input.iter();
-                    if let Some(bit) = bits.next() {
-                        if bits.next().is_none() {
-                            Ok(bit)
-                        } else {
-                            Err(YosysError::MultiBitInput {
-                                cell: name.clone(),
-                                port: "A".to_string(),
-                            })
-                        }
-                    } else {
-                        Err(YosysError::MissingInput {
-                            cell: name.clone(),
-                            port: "A".to_string(),
-                        })
-                    }
-                })?;
-            match input_a {
-                SignalBit::Ref(_bit) => {
-                    // TODO: add edge to graph
-                }
-                SignalBit::Const(bit) => {
-                    let node = match bit {
-                        ConstBit::Zero => graph.add_zero(),
-                        ConstBit::One => graph.add_unit(),
-                        k => {
-                            return Err(YosysError::Unsupported(format!("{k} constants")));
-                        }
-                    };
-                    // TODO: add edge to graph
-                }
-            }
-            if matches!(op, AnyOp::Binary(_) | AnyOp::Mux) {
-                let input_b = cell
-                    .connections
-                    .get("B")
+            let mut add_input = |port: &'static str| -> Result<(), YosysError> {
+                cell.connections
+                    .get(port)
                     .ok_or(YosysError::ShouldHaveInput {
                         cell: cell.ty.clone(),
-                        port: "B".to_string(),
+                        port: port.to_string(),
                     })
                     .and_then(|input| {
                         let mut bits = input.iter();
-                        if let Some(bit) = bits.next() {
-                            if bits.next().is_none() {
-                                Ok(bit)
-                            } else {
-                                Err(YosysError::MultiBitInput {
-                                    cell: name.clone(),
-                                    port: "B".to_string(),
-                                })
-                            }
-                        } else {
-                            Err(YosysError::MissingInput {
+                        match (bits.next(), bits.next()) {
+                            (Some(bit), None) => Ok(bit),
+                            (Some(_), Some(_)) => Err(YosysError::MultiBitInput {
                                 cell: name.clone(),
-                                port: "B".to_string(),
-                            })
+                                port: port.to_string(),
+                            }),
+                            (None, _) => Err(YosysError::MissingInput {
+                                cell: name.clone(),
+                                port: port.to_string(),
+                            }),
                         }
-                    })?;
-                match input_b {
-                    SignalBit::Ref(_bit) => {
-                        // TODO: add edge to graph
-                    }
-                    SignalBit::Const(bit) => {
-                        let node = match bit {
-                            ConstBit::Zero => graph.add_zero(),
-                            ConstBit::One => graph.add_unit(),
-                            k => {
-                                return Err(YosysError::Unsupported(format!("{k} constants")));
-                            }
-                        };
-                        // TODO: add edge to graph
-                    }
-                }
+                    })
+                    .and_then(|input| match input {
+                        SignalBit::Ref(bit) => {
+                            graph.add_edge_unchecked(Edge {
+                                source: Node::new(*bit),
+                                sink: id,
+                            });
+                            Ok(())
+                        }
+                        SignalBit::Const(bit) => {
+                            let node = match bit {
+                                ConstBit::Zero => graph.add_zero(),
+                                ConstBit::One => graph.add_unit(),
+                                k => {
+                                    return Err(YosysError::Unsupported(format!("{k} constants")));
+                                }
+                            };
+                            graph.add_edge_unchecked(Edge {
+                                source: node,
+                                sink: id,
+                            });
+                            Ok(())
+                        }
+                    })
+            };
+            add_input("A")?;
+            if matches!(op, AnyOp::Binary(_) | AnyOp::Mux) {
+                add_input("B")?;
             }
             if matches!(op, AnyOp::Mux) {
-                let input_s = cell
-                    .connections
-                    .get("S")
-                    .ok_or(YosysError::ShouldHaveInput {
-                        cell: cell.ty.clone(),
-                        port: "S".to_string(),
-                    })
-                    .and_then(|input| {
-                        let mut bits = input.iter();
-                        if let Some(bit) = bits.next() {
-                            if let None = bits.next() {
-                                Ok(bit)
-                            } else {
-                                Err(YosysError::MultiBitInput {
-                                    cell: name.clone(),
-                                    port: "S".to_string(),
-                                })
-                            }
-                        } else {
-                            Err(YosysError::MissingInput {
-                                cell: name.clone(),
-                                port: "S".to_string(),
-                            })
-                        }
-                    })?;
-                match input_s {
-                    SignalBit::Ref(_bit) => {
-                        // TODO: add edge to graph
-                    }
-                    SignalBit::Const(bit) => {
-                        let node = match bit {
-                            ConstBit::Zero => graph.add_zero(),
-                            ConstBit::One => graph.add_unit(),
-                            k => {
-                                return Err(YosysError::Unsupported(format!("{k} constants")));
-                            }
-                        };
-                        // TODO: add edge to graph
-                    }
-                }
+                add_input("S")?;
             }
         }
+        // TODO: validation
         Ok(graph)
     }
 }
@@ -483,8 +456,8 @@ mod tests {
     macro_rules! edge {
         ($src:literal : $sink:literal) => {
             Edge {
-                source: $src,
-                sink: $sink,
+                source: Node::new($src),
+                sink: Node::new($sink),
             }
         };
     }
