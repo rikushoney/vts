@@ -1,10 +1,10 @@
 {
-  "creator": "Yosys 0.37 (git sha1 a5c7f69ed8f, gcc 13.2.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
+  "creator": "Yosys 0.39 (git sha1 00338082b, g++ 13.2.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
   "modules": {
     "sr": {
       "attributes": {
         "dynports": "00000000000000000000000000000001",
-        "cells_not_processed": "00000000000000000000000000000001",
+        "top": "00000000000000000000000000000001",
         "src": "sr.sv:3.1-25.14"
       },
       "parameter_default_values": {
@@ -19,27 +19,27 @@
           "direction": "input",
           "bits": [ 3 ]
         },
-        "op": {
+        "shift_in": {
           "direction": "input",
           "bits": [ 4 ]
         },
-        "shift_in": {
-          "direction": "input",
-          "bits": [ 5 ]
-        },
         "shift_out": {
           "direction": "output",
-          "bits": [ 6, 7, 8, 9 ]
+          "bits": [ 5, 6, 7, 8 ]
+        },
+        "op": {
+          "direction": "input",
+          "bits": [ 9 ]
         }
       },
       "cells": {
-        "$procdff$36": {
+        "$auto$ff.cc:266:slice$14": {
           "hide_name": 1,
-          "type": "$adff",
+          "type": "$sdff",
           "parameters": {
-            "ARST_POLARITY": "0",
-            "ARST_VALUE": "0000",
-            "CLK_POLARITY": "1",
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000000",
+            "SRST_VALUE": "0000",
             "WIDTH": "00000000000000000000000000000100"
           },
           "attributes": {
@@ -47,19 +47,19 @@
             "src": "sr.sv:13.1-21.4"
           },
           "port_directions": {
-            "ARST": "input",
             "CLK": "input",
             "D": "input",
-            "Q": "output"
+            "Q": "output",
+            "SRST": "input"
           },
           "connections": {
-            "ARST": [ 3 ],
             "CLK": [ 2 ],
             "D": [ 10, 11, 12, 13 ],
-            "Q": [ 6, 7, 8, 9 ]
+            "Q": [ 5, 6, 7, 8 ],
+            "SRST": [ 3 ]
           }
         },
-        "$procmux$34": {
+        "$procmux$8": {
           "hide_name": 1,
           "type": "$mux",
           "parameters": {
@@ -76,41 +76,41 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 5, 6, 7, 8 ],
-            "B": [ 7, 8, 9, 5 ],
-            "S": [ 4 ],
+            "A": [ 4, 5, 6, 7 ],
+            "B": [ 6, 7, 8, 4 ],
+            "S": [ 9 ],
             "Y": [ 10, 11, 12, 13 ]
           }
         }
       },
       "netnames": {
-        "$0\\registers[3:0]": {
+        "$procmux$8_Y": {
           "hide_name": 1,
           "bits": [ 10, 11, 12, 13 ],
           "attributes": {
-            "src": "sr.sv:13.1-21.4"
           }
         },
         "clk": {
           "hide_name": 0,
           "bits": [ 2 ],
           "attributes": {
-            "src": "sr.sv:4.27-4.30"
+            "src": "sr.sv:4.28-4.31"
           }
         },
         "op": {
           "hide_name": 0,
-          "bits": [ 4 ],
+          "bits": [ 9 ],
           "attributes": {
+            "enum_type": "$enum0",
             "enum_value_0": "\\SHIFT_LEFT",
             "enum_value_1": "\\SHIFT_RIGHT",
-            "src": "sr.sv:6.27-6.29",
+            "src": "sr.sv:6.28-6.30",
             "wiretype": "\\SHIFT_OP"
           }
         },
         "registers": {
           "hide_name": 0,
-          "bits": [ 6, 7, 8, 9 ],
+          "bits": [ 5, 6, 7, 8 ],
           "attributes": {
             "src": "sr.sv:11.19-11.28"
           }
@@ -119,19 +119,19 @@
           "hide_name": 0,
           "bits": [ 3 ],
           "attributes": {
-            "src": "sr.sv:5.27-5.32"
+            "src": "sr.sv:5.28-5.33"
           }
         },
         "shift_in": {
           "hide_name": 0,
-          "bits": [ 5 ],
+          "bits": [ 4 ],
           "attributes": {
-            "src": "sr.sv:7.27-7.35"
+            "src": "sr.sv:7.28-7.36"
           }
         },
         "shift_out": {
           "hide_name": 0,
-          "bits": [ 6, 7, 8, 9 ],
+          "bits": [ 5, 6, 7, 8 ],
           "attributes": {
             "src": "sr.sv:8.28-8.37"
           }

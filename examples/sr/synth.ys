@@ -1,0 +1,27 @@
+read_verilog -sv sr.sv
+hierarchy -check -top sr
+opt; proc; opt
+
+write_json sr.json
+write_rtlil sr.rtlil
+
+simplemap; opt
+dffunmap
+aigmap
+write_aiger -ascii -zinit sr.aag
+
+design -reset
+
+read_verilog -sv sr.sv
+hierarchy -check -top sr
+opt; proc; opt
+
+simplemap; opt
+
+write_json sr_simplemap.json
+write_rtlil sr_simplemap.rtlil
+
+flowmap; opt
+
+write_json sr_flowmap.json
+write_rtlil sr_flowmap.rtlil
