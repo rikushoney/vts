@@ -21,273 +21,7 @@
         }
       },
       "cells": {
-        "$auto$flowmap.cc:1412:pack_cells$100": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:16.24-16.66|crc8.sv:16.24-16.51"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 6, 4, 5 ],
-            "Y": [ 26 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$101": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:16.24-17.30|crc8.sv:16.24-17.15"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 13, 26, 12 ],
-            "Y": [ 27 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$102": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "0110",
-            "WIDTH": "00000000000000000000000000000010"
-          },
-          "attributes": {
-            "src": "crc8.sv:16.24-17.45"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 27, 14 ],
-            "Y": [ 22 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$103": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:14.24-14.66|crc8.sv:14.24-14.51"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 5, 3, 4 ],
-            "Y": [ 28 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$104": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:14.24-15.15|crc8.sv:14.24-14.81"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 11, 28, 9 ],
-            "Y": [ 29 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$105": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:14.24-15.45|crc8.sv:14.24-15.30"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 13, 29, 12 ],
-            "Y": [ 30 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$106": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "0110",
-            "WIDTH": "00000000000000000000000000000010"
-          },
-          "attributes": {
-            "src": "crc8.sv:14.24-15.60"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 30, 17 ],
-            "Y": [ 21 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$107": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:12.24-12.66|crc8.sv:12.24-12.51"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 4, 2, 3 ],
-            "Y": [ 31 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$108": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:12.24-13.15|crc8.sv:12.24-12.81"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 10, 31, 8 ],
-            "Y": [ 32 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$109": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:12.24-13.45|crc8.sv:12.24-13.30"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 12, 32, 11 ],
-            "Y": [ 33 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$110": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "0110",
-            "WIDTH": "00000000000000000000000000000010"
-          },
-          "attributes": {
-            "src": "crc8.sv:12.24-13.60"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 33, 16 ],
-            "Y": [ 20 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$111": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:10.24-10.66|crc8.sv:12.24-12.51"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 8, 2, 3 ],
-            "Y": [ 34 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$112": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "10010110",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "crc8.sv:10.24-11.30|crc8.sv:10.24-11.15"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 11, 34, 10 ],
-            "Y": [ 35 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$113": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "0110",
-            "WIDTH": "00000000000000000000000000000010"
-          },
-          "attributes": {
-            "src": "crc8.sv:10.24-11.45"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 35, 16 ],
-            "Y": [ 19 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$88": {
+        "$auto$flowmap.cc:1412:pack_cells$777": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -303,10 +37,10 @@
           },
           "connections": {
             "A": [ 9, 2, 8 ],
-            "Y": [ 36 ]
+            "Y": [ 26 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$89": {
+        "$auto$flowmap.cc:1412:pack_cells$778": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -321,11 +55,11 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 16, 36, 10 ],
-            "Y": [ 37 ]
+            "A": [ 16, 26, 10 ],
+            "Y": [ 27 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$90": {
+        "$auto$flowmap.cc:1412:pack_cells$779": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -340,11 +74,11 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 37, 17 ],
+            "A": [ 27, 17 ],
             "Y": [ 18 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$91": {
+        "$auto$flowmap.cc:1412:pack_cells$780": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -360,10 +94,10 @@
           },
           "connections": {
             "A": [ 9, 7, 8 ],
-            "Y": [ 38 ]
+            "Y": [ 28 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$92": {
+        "$auto$flowmap.cc:1412:pack_cells$781": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -378,11 +112,11 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 16, 38, 15 ],
-            "Y": [ 39 ]
+            "A": [ 16, 28, 15 ],
+            "Y": [ 29 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$93": {
+        "$auto$flowmap.cc:1412:pack_cells$782": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -397,11 +131,11 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 39, 17 ],
+            "A": [ 29, 17 ],
             "Y": [ 25 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$94": {
+        "$auto$flowmap.cc:1412:pack_cells$783": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -417,10 +151,10 @@
           },
           "connections": {
             "A": [ 8, 6, 7 ],
-            "Y": [ 40 ]
+            "Y": [ 30 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$95": {
+        "$auto$flowmap.cc:1412:pack_cells$784": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -435,11 +169,11 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 15, 40, 14 ],
-            "Y": [ 41 ]
+            "A": [ 15, 30, 14 ],
+            "Y": [ 31 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$96": {
+        "$auto$flowmap.cc:1412:pack_cells$785": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -454,11 +188,11 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 41, 16 ],
+            "A": [ 31, 16 ],
             "Y": [ 24 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$97": {
+        "$auto$flowmap.cc:1412:pack_cells$786": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -474,10 +208,10 @@
           },
           "connections": {
             "A": [ 7, 5, 6 ],
-            "Y": [ 42 ]
+            "Y": [ 32 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$98": {
+        "$auto$flowmap.cc:1412:pack_cells$787": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -492,11 +226,11 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 14, 42, 13 ],
-            "Y": [ 43 ]
+            "A": [ 14, 32, 13 ],
+            "Y": [ 33 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$99": {
+        "$auto$flowmap.cc:1412:pack_cells$788": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -511,134 +245,400 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 43, 15 ],
+            "A": [ 33, 15 ],
             "Y": [ 23 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$789": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:16.24-16.66|crc8.sv:16.24-16.51"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 6, 4, 5 ],
+            "Y": [ 34 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$790": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:16.24-17.30|crc8.sv:16.24-17.15"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 13, 34, 12 ],
+            "Y": [ 35 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$791": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "crc8.sv:16.24-17.45"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 35, 14 ],
+            "Y": [ 22 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$792": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:14.24-14.66|crc8.sv:14.24-14.51"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 3, 4 ],
+            "Y": [ 36 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$793": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:14.24-15.15|crc8.sv:14.24-14.81"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 11, 36, 9 ],
+            "Y": [ 37 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$794": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:14.24-15.45|crc8.sv:14.24-15.30"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 13, 37, 12 ],
+            "Y": [ 38 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$795": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "crc8.sv:14.24-15.60"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 38, 17 ],
+            "Y": [ 21 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$796": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:12.24-12.66|crc8.sv:12.24-12.51"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 2, 3 ],
+            "Y": [ 39 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$797": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:12.24-13.15|crc8.sv:12.24-12.81"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 10, 39, 8 ],
+            "Y": [ 40 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$798": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:12.24-13.45|crc8.sv:12.24-13.30"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 12, 40, 11 ],
+            "Y": [ 41 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$799": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "crc8.sv:12.24-13.60"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 41, 16 ],
+            "Y": [ 20 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$800": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:10.24-10.66|crc8.sv:12.24-12.51"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 8, 2, 3 ],
+            "Y": [ 42 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$801": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "src": "crc8.sv:10.24-11.30|crc8.sv:10.24-11.15"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 11, 42, 10 ],
+            "Y": [ 43 ]
+          }
+        },
+        "$auto$flowmap.cc:1412:pack_cells$802": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "crc8.sv:10.24-11.45"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 43, 16 ],
+            "Y": [ 19 ]
           }
         }
       },
       "netnames": {
-        "$xor$crc8.sv:10$7_Y": {
+        "$xor$crc8.sv:10$696_Y": {
           "hide_name": 1,
-          "bits": [ 34 ],
+          "bits": [ 42 ],
           "attributes": {
             "src": "crc8.sv:10.24-10.66"
           }
         },
-        "$xor$crc8.sv:10$9_Y": {
+        "$xor$crc8.sv:10$698_Y": {
           "hide_name": 1,
-          "bits": [ 35 ],
+          "bits": [ 43 ],
           "attributes": {
             "src": "crc8.sv:10.24-11.30"
           }
         },
-        "$xor$crc8.sv:12$12_Y": {
+        "$xor$crc8.sv:12$701_Y": {
           "hide_name": 1,
-          "bits": [ 31 ],
+          "bits": [ 39 ],
           "attributes": {
             "src": "crc8.sv:12.24-12.66"
           }
         },
-        "$xor$crc8.sv:12$14_Y": {
+        "$xor$crc8.sv:12$703_Y": {
           "hide_name": 1,
-          "bits": [ 32 ],
+          "bits": [ 40 ],
           "attributes": {
             "src": "crc8.sv:12.24-13.15"
           }
         },
-        "$xor$crc8.sv:12$16_Y": {
+        "$xor$crc8.sv:12$705_Y": {
           "hide_name": 1,
-          "bits": [ 33 ],
+          "bits": [ 41 ],
           "attributes": {
             "src": "crc8.sv:12.24-13.45"
           }
         },
-        "$xor$crc8.sv:14$19_Y": {
+        "$xor$crc8.sv:14$708_Y": {
           "hide_name": 1,
-          "bits": [ 28 ],
+          "bits": [ 36 ],
           "attributes": {
             "src": "crc8.sv:14.24-14.66"
           }
         },
-        "$xor$crc8.sv:14$21_Y": {
+        "$xor$crc8.sv:14$710_Y": {
           "hide_name": 1,
-          "bits": [ 29 ],
+          "bits": [ 37 ],
           "attributes": {
             "src": "crc8.sv:14.24-15.15"
           }
         },
-        "$xor$crc8.sv:14$23_Y": {
+        "$xor$crc8.sv:14$712_Y": {
           "hide_name": 1,
-          "bits": [ 30 ],
+          "bits": [ 38 ],
           "attributes": {
             "src": "crc8.sv:14.24-15.45"
           }
         },
-        "$xor$crc8.sv:16$26_Y": {
+        "$xor$crc8.sv:16$715_Y": {
           "hide_name": 1,
-          "bits": [ 26 ],
+          "bits": [ 34 ],
           "attributes": {
             "src": "crc8.sv:16.24-16.66"
           }
         },
-        "$xor$crc8.sv:16$28_Y": {
+        "$xor$crc8.sv:16$717_Y": {
           "hide_name": 1,
-          "bits": [ 27 ],
+          "bits": [ 35 ],
           "attributes": {
             "src": "crc8.sv:16.24-17.30"
           }
         },
-        "$xor$crc8.sv:18$31_Y": {
+        "$xor$crc8.sv:18$720_Y": {
           "hide_name": 1,
-          "bits": [ 42 ],
+          "bits": [ 32 ],
           "attributes": {
             "src": "crc8.sv:18.24-18.66"
           }
         },
-        "$xor$crc8.sv:18$33_Y": {
+        "$xor$crc8.sv:18$722_Y": {
           "hide_name": 1,
-          "bits": [ 43 ],
+          "bits": [ 33 ],
           "attributes": {
             "src": "crc8.sv:18.24-19.30"
           }
         },
-        "$xor$crc8.sv:20$36_Y": {
+        "$xor$crc8.sv:20$725_Y": {
           "hide_name": 1,
-          "bits": [ 40 ],
+          "bits": [ 30 ],
           "attributes": {
             "src": "crc8.sv:20.24-20.66"
           }
         },
-        "$xor$crc8.sv:20$38_Y": {
+        "$xor$crc8.sv:20$727_Y": {
           "hide_name": 1,
-          "bits": [ 41 ],
+          "bits": [ 31 ],
           "attributes": {
             "src": "crc8.sv:20.24-21.30"
           }
         },
-        "$xor$crc8.sv:22$41_Y": {
+        "$xor$crc8.sv:22$730_Y": {
           "hide_name": 1,
-          "bits": [ 38 ],
+          "bits": [ 28 ],
           "attributes": {
             "src": "crc8.sv:22.24-22.66"
           }
         },
-        "$xor$crc8.sv:22$43_Y": {
+        "$xor$crc8.sv:22$732_Y": {
           "hide_name": 1,
-          "bits": [ 39 ],
+          "bits": [ 29 ],
           "attributes": {
             "src": "crc8.sv:22.24-23.30"
           }
         },
-        "$xor$crc8.sv:8$2_Y": {
+        "$xor$crc8.sv:8$691_Y": {
           "hide_name": 1,
-          "bits": [ 36 ],
+          "bits": [ 26 ],
           "attributes": {
             "src": "crc8.sv:8.24-8.66"
           }
         },
-        "$xor$crc8.sv:8$4_Y": {
+        "$xor$crc8.sv:8$693_Y": {
           "hide_name": 1,
-          "bits": [ 37 ],
+          "bits": [ 27 ],
           "attributes": {
             "src": "crc8.sv:8.24-9.30"
           }

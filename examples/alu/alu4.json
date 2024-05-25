@@ -29,7 +29,7 @@
         }
       },
       "cells": {
-        "$and$alu4.sv:46$71": {
+        "$and$alu4.sv:46$247": {
           "hide_name": 1,
           "type": "$and",
           "parameters": {
@@ -53,7 +53,7 @@
             "Y": [ 17, 18, 19, 20 ]
           }
         },
-        "$auto$opt_reduce.cc:128:opt_pmux$90": {
+        "$auto$opt_reduce.cc:128:opt_pmux$266": {
           "hide_name": 1,
           "type": "$reduce_or",
           "parameters": {
@@ -72,7 +72,7 @@
             "Y": [ 23 ]
           }
         },
-        "$auto$opt_reduce.cc:128:opt_pmux$94": {
+        "$auto$opt_reduce.cc:128:opt_pmux$270": {
           "hide_name": 1,
           "type": "$reduce_or",
           "parameters": {
@@ -91,7 +91,7 @@
             "Y": [ 26 ]
           }
         },
-        "$flatten\\adder.$and$add4.sv:14$55": {
+        "$flatten\\adder.$and$add4.sv:14$231": {
           "hide_name": 1,
           "type": "$and",
           "parameters": {
@@ -115,7 +115,7 @@
             "Y": [ 31, 32, 33, 34 ]
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$61": {
+        "$flatten\\adder.$and$add4.sv:21$237": {
           "hide_name": 1,
           "type": "$and",
           "parameters": {
@@ -139,7 +139,7 @@
             "Y": [ 37 ]
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$63": {
+        "$flatten\\adder.$and$add4.sv:21$239": {
           "hide_name": 1,
           "type": "$and",
           "parameters": {
@@ -163,7 +163,7 @@
             "Y": [ 40 ]
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$65": {
+        "$flatten\\adder.$and$add4.sv:21$241": {
           "hide_name": 1,
           "type": "$and",
           "parameters": {
@@ -187,7 +187,7 @@
             "Y": [ 43 ]
           }
         },
-        "$flatten\\adder.$and$add4.sv:26$59": {
+        "$flatten\\adder.$and$add4.sv:26$235": {
           "hide_name": 1,
           "type": "$and",
           "parameters": {
@@ -211,7 +211,7 @@
             "Y": [ 46 ]
           }
         },
-        "$flatten\\adder.$or$add4.sv:21$62": {
+        "$flatten\\adder.$or$add4.sv:21$238": {
           "hide_name": 1,
           "type": "$or",
           "parameters": {
@@ -235,7 +235,7 @@
             "Y": [ 38 ]
           }
         },
-        "$flatten\\adder.$or$add4.sv:21$64": {
+        "$flatten\\adder.$or$add4.sv:21$240": {
           "hide_name": 1,
           "type": "$or",
           "parameters": {
@@ -259,7 +259,7 @@
             "Y": [ 41 ]
           }
         },
-        "$flatten\\adder.$or$add4.sv:21$66": {
+        "$flatten\\adder.$or$add4.sv:21$242": {
           "hide_name": 1,
           "type": "$or",
           "parameters": {
@@ -283,7 +283,7 @@
             "Y": [ 44 ]
           }
         },
-        "$flatten\\adder.$or$add4.sv:26$60": {
+        "$flatten\\adder.$or$add4.sv:26$236": {
           "hide_name": 1,
           "type": "$or",
           "parameters": {
@@ -307,7 +307,7 @@
             "Y": [ 47 ]
           }
         },
-        "$flatten\\adder.$xor$add4.sv:15$56": {
+        "$flatten\\adder.$xor$add4.sv:15$232": {
           "hide_name": 1,
           "type": "$xor",
           "parameters": {
@@ -331,7 +331,7 @@
             "Y": [ 36, 39, 42, 45 ]
           }
         },
-        "$flatten\\adder.$xor$add4.sv:25$58": {
+        "$flatten\\adder.$xor$add4.sv:25$234": {
           "hide_name": 1,
           "type": "$xor",
           "parameters": {
@@ -355,7 +355,7 @@
             "Y": [ 48, 49, 50, 51 ]
           }
         },
-        "$not$alu4.sv:25$69": {
+        "$not$alu4.sv:25$245": {
           "hide_name": 1,
           "type": "$not",
           "parameters": {
@@ -375,7 +375,7 @@
             "Y": [ 52, 53, 54, 55 ]
           }
         },
-        "$or$alu4.sv:50$72": {
+        "$or$alu4.sv:50$248": {
           "hide_name": 1,
           "type": "$or",
           "parameters": {
@@ -399,7 +399,7 @@
             "Y": [ 56, 57, 58, 59 ]
           }
         },
-        "$procmux$75": {
+        "$procmux$251": {
           "hide_name": 1,
           "type": "$mux",
           "parameters": {
@@ -418,11 +418,11 @@
           "connections": {
             "A": [ 6, 7, 8, 9 ],
             "B": [ 52, 53, 54, 55 ],
-            "S": [ 24 ],
+            "S": [ 25 ],
             "Y": [ 27, 28, 29, 30 ]
           }
         },
-        "$procmux$78": {
+        "$procmux$254": {
           "hide_name": 1,
           "type": "$mux",
           "parameters": {
@@ -441,11 +441,11 @@
           "connections": {
             "A": [ "0" ],
             "B": [ "1" ],
-            "S": [ 24 ],
+            "S": [ 25 ],
             "Y": [ 35 ]
           }
         },
-        "$procmux$80": {
+        "$procmux$256": {
           "hide_name": 1,
           "type": "$pmux",
           "parameters": {
@@ -469,7 +469,7 @@
             "Y": [ 14 ]
           }
         },
-        "$procmux$85": {
+        "$procmux$261": {
           "hide_name": 1,
           "type": "$pmux",
           "parameters": {
@@ -489,11 +489,11 @@
           "connections": {
             "A": [ "x", "x", "x", "x" ],
             "B": [ 56, 57, 58, 59, 17, 18, 19, 20, 48, 49, 50, 51 ],
-            "S": [ 22, 21, 26 ],
+            "S": [ 21, 22, 26 ],
             "Y": [ 10, 11, 12, 13 ]
           }
         },
-        "$procmux$86_CMP0": {
+        "$procmux$262_CMP0": {
           "hide_name": 1,
           "type": "$eq",
           "parameters": {
@@ -515,10 +515,10 @@
           "connections": {
             "A": [ 15, 16 ],
             "B": [ "1", "1" ],
-            "Y": [ 22 ]
+            "Y": [ 21 ]
           }
         },
-        "$procmux$87_CMP0": {
+        "$procmux$263_CMP0": {
           "hide_name": 1,
           "type": "$eq",
           "parameters": {
@@ -540,10 +540,10 @@
           "connections": {
             "A": [ 15, 16 ],
             "B": [ "0", "1" ],
-            "Y": [ 21 ]
+            "Y": [ 22 ]
           }
         },
-        "$procmux$88_CMP0": {
+        "$procmux$264_CMP0": {
           "hide_name": 1,
           "type": "$eq",
           "parameters": {
@@ -565,10 +565,10 @@
           "connections": {
             "A": [ 15, 16 ],
             "B": [ "1", "0" ],
-            "Y": [ 24 ]
+            "Y": [ 25 ]
           }
         },
-        "$procmux$89_CMP0": {
+        "$procmux$265_CMP0": {
           "hide_name": 1,
           "type": "$logic_not",
           "parameters": {
@@ -586,94 +586,94 @@
           },
           "connections": {
             "A": [ 15, 16 ],
-            "Y": [ 25 ]
+            "Y": [ 24 ]
           }
         }
       },
       "netnames": {
-        "$and$alu4.sv:46$71_Y": {
+        "$and$alu4.sv:46$247_Y": {
           "hide_name": 1,
           "bits": [ 17, 18, 19, 20 ],
           "attributes": {
             "src": "alu4.sv:46.11-46.16"
           }
         },
-        "$auto$opt_reduce.cc:134:opt_pmux$91": {
+        "$auto$opt_reduce.cc:134:opt_pmux$267": {
           "hide_name": 1,
           "bits": [ 23 ],
           "attributes": {
           }
         },
-        "$auto$opt_reduce.cc:134:opt_pmux$93": {
+        "$auto$opt_reduce.cc:134:opt_pmux$269": {
           "hide_name": 1,
           "bits": [ 26 ],
           "attributes": {
           }
         },
-        "$eq$alu4.sv:23$68_Y": {
+        "$eq$alu4.sv:23$244_Y": {
           "hide_name": 1,
-          "bits": [ 24 ],
+          "bits": [ 25 ],
           "attributes": {
             "src": "alu4.sv:23.7-23.16"
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$61_Y": {
+        "$flatten\\adder.$and$add4.sv:21$237_Y": {
           "hide_name": 1,
           "bits": [ 37 ],
           "attributes": {
             "src": "add4.sv:21.29-21.48"
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$63_Y": {
+        "$flatten\\adder.$and$add4.sv:21$239_Y": {
           "hide_name": 1,
           "bits": [ 40 ],
           "attributes": {
             "src": "add4.sv:21.29-21.48"
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$65_Y": {
+        "$flatten\\adder.$and$add4.sv:21$241_Y": {
           "hide_name": 1,
           "bits": [ 43 ],
           "attributes": {
             "src": "add4.sv:21.29-21.48"
           }
         },
-        "$flatten\\adder.$and$add4.sv:26$59_Y": {
+        "$flatten\\adder.$and$add4.sv:26$235_Y": {
           "hide_name": 1,
           "bits": [ 46 ],
           "attributes": {
             "src": "add4.sv:26.23-26.34"
           }
         },
-        "$not$alu4.sv:25$69_Y": {
+        "$not$alu4.sv:25$245_Y": {
           "hide_name": 1,
           "bits": [ 52, 53, 54, 55 ],
           "attributes": {
             "src": "alu4.sv:25.11-25.13"
           }
         },
-        "$or$alu4.sv:50$72_Y": {
+        "$or$alu4.sv:50$248_Y": {
           "hide_name": 1,
           "bits": [ 56, 57, 58, 59 ],
           "attributes": {
             "src": "alu4.sv:50.11-50.16"
           }
         },
-        "$procmux$81_CMP": {
-          "hide_name": 1,
-          "bits": [ 22 ],
-          "attributes": {
-          }
-        },
-        "$procmux$82_CMP": {
+        "$procmux$257_CMP": {
           "hide_name": 1,
           "bits": [ 21 ],
           "attributes": {
           }
         },
-        "$procmux$84_CMP": {
+        "$procmux$258_CMP": {
           "hide_name": 1,
-          "bits": [ 25 ],
+          "bits": [ 22 ],
+          "attributes": {
+          }
+        },
+        "$procmux$260_CMP": {
+          "hide_name": 1,
+          "bits": [ 24 ],
           "attributes": {
           }
         },

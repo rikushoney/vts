@@ -21,26 +21,7 @@
         }
       },
       "cells": {
-        "$auto$simplemap.cc:75:simplemap_bitop$45": {
-          "hide_name": 1,
-          "type": "$_XOR_",
-          "parameters": {
-          },
-          "attributes": {
-            "src": "crc8.sv:10.24-11.45"
-          },
-          "port_directions": {
-            "A": "input",
-            "B": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 26 ],
-            "B": [ 16 ],
-            "Y": [ 19 ]
-          }
-        },
-        "$auto$simplemap.cc:75:simplemap_bitop$46": {
+        "$auto$simplemap.cc:75:simplemap_bitop$734": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -54,12 +35,12 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 27 ],
+            "A": [ 26 ],
             "B": [ 8 ],
-            "Y": [ 28 ]
+            "Y": [ 27 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$47": {
+        "$auto$simplemap.cc:75:simplemap_bitop$735": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -73,12 +54,12 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 28 ],
+            "A": [ 27 ],
             "B": [ 10 ],
-            "Y": [ 29 ]
+            "Y": [ 28 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$48": {
+        "$auto$simplemap.cc:75:simplemap_bitop$736": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -92,12 +73,31 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 29 ],
+            "A": [ 28 ],
             "B": [ 11 ],
-            "Y": [ 26 ]
+            "Y": [ 29 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$49": {
+        "$auto$simplemap.cc:75:simplemap_bitop$737": {
+          "hide_name": 1,
+          "type": "$_XOR_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "crc8.sv:10.24-11.45"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 29 ],
+            "B": [ 16 ],
+            "Y": [ 19 ]
+          }
+        },
+        "$auto$simplemap.cc:75:simplemap_bitop$738": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -113,10 +113,10 @@
           "connections": {
             "A": [ 2 ],
             "B": [ 3 ],
-            "Y": [ 27 ]
+            "Y": [ 26 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$50": {
+        "$auto$simplemap.cc:75:simplemap_bitop$739": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -130,12 +130,12 @@
             "Y": "output"
           },
           "connections": {
-            "A": [ 27 ],
+            "A": [ 26 ],
             "B": [ 4 ],
             "Y": [ 30 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$51": {
+        "$auto$simplemap.cc:75:simplemap_bitop$740": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -154,7 +154,7 @@
             "Y": [ 31 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$52": {
+        "$auto$simplemap.cc:75:simplemap_bitop$741": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -173,7 +173,7 @@
             "Y": [ 32 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$53": {
+        "$auto$simplemap.cc:75:simplemap_bitop$742": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -192,7 +192,7 @@
             "Y": [ 33 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$54": {
+        "$auto$simplemap.cc:75:simplemap_bitop$743": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -211,7 +211,7 @@
             "Y": [ 34 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$55": {
+        "$auto$simplemap.cc:75:simplemap_bitop$744": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -230,7 +230,7 @@
             "Y": [ 20 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$56": {
+        "$auto$simplemap.cc:75:simplemap_bitop$745": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -249,7 +249,7 @@
             "Y": [ 35 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$57": {
+        "$auto$simplemap.cc:75:simplemap_bitop$746": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -268,7 +268,7 @@
             "Y": [ 36 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$58": {
+        "$auto$simplemap.cc:75:simplemap_bitop$747": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -287,7 +287,7 @@
             "Y": [ 37 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$59": {
+        "$auto$simplemap.cc:75:simplemap_bitop$748": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -306,7 +306,7 @@
             "Y": [ 38 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$60": {
+        "$auto$simplemap.cc:75:simplemap_bitop$749": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -325,7 +325,7 @@
             "Y": [ 39 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$61": {
+        "$auto$simplemap.cc:75:simplemap_bitop$750": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -344,7 +344,7 @@
             "Y": [ 40 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$62": {
+        "$auto$simplemap.cc:75:simplemap_bitop$751": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -363,7 +363,7 @@
             "Y": [ 21 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$63": {
+        "$auto$simplemap.cc:75:simplemap_bitop$752": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -382,7 +382,7 @@
             "Y": [ 41 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$64": {
+        "$auto$simplemap.cc:75:simplemap_bitop$753": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -401,7 +401,7 @@
             "Y": [ 42 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$65": {
+        "$auto$simplemap.cc:75:simplemap_bitop$754": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -420,7 +420,7 @@
             "Y": [ 43 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$66": {
+        "$auto$simplemap.cc:75:simplemap_bitop$755": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -439,7 +439,7 @@
             "Y": [ 44 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$67": {
+        "$auto$simplemap.cc:75:simplemap_bitop$756": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -458,7 +458,7 @@
             "Y": [ 22 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$68": {
+        "$auto$simplemap.cc:75:simplemap_bitop$757": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -477,7 +477,7 @@
             "Y": [ 45 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$69": {
+        "$auto$simplemap.cc:75:simplemap_bitop$758": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -496,7 +496,7 @@
             "Y": [ 46 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$70": {
+        "$auto$simplemap.cc:75:simplemap_bitop$759": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -515,7 +515,7 @@
             "Y": [ 47 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$71": {
+        "$auto$simplemap.cc:75:simplemap_bitop$760": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -534,7 +534,7 @@
             "Y": [ 48 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$72": {
+        "$auto$simplemap.cc:75:simplemap_bitop$761": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -553,7 +553,7 @@
             "Y": [ 23 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$73": {
+        "$auto$simplemap.cc:75:simplemap_bitop$762": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -572,7 +572,7 @@
             "Y": [ 49 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$74": {
+        "$auto$simplemap.cc:75:simplemap_bitop$763": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -591,7 +591,7 @@
             "Y": [ 50 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$75": {
+        "$auto$simplemap.cc:75:simplemap_bitop$764": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -610,7 +610,7 @@
             "Y": [ 51 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$76": {
+        "$auto$simplemap.cc:75:simplemap_bitop$765": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -629,7 +629,7 @@
             "Y": [ 52 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$77": {
+        "$auto$simplemap.cc:75:simplemap_bitop$766": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -648,7 +648,7 @@
             "Y": [ 24 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$78": {
+        "$auto$simplemap.cc:75:simplemap_bitop$767": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -667,7 +667,7 @@
             "Y": [ 53 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$79": {
+        "$auto$simplemap.cc:75:simplemap_bitop$768": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -686,7 +686,7 @@
             "Y": [ 54 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$80": {
+        "$auto$simplemap.cc:75:simplemap_bitop$769": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -705,7 +705,7 @@
             "Y": [ 55 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$81": {
+        "$auto$simplemap.cc:75:simplemap_bitop$770": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -724,7 +724,7 @@
             "Y": [ 56 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$82": {
+        "$auto$simplemap.cc:75:simplemap_bitop$771": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -743,7 +743,7 @@
             "Y": [ 25 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$83": {
+        "$auto$simplemap.cc:75:simplemap_bitop$772": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -762,7 +762,7 @@
             "Y": [ 57 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$84": {
+        "$auto$simplemap.cc:75:simplemap_bitop$773": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -781,7 +781,7 @@
             "Y": [ 58 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$85": {
+        "$auto$simplemap.cc:75:simplemap_bitop$774": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -800,7 +800,7 @@
             "Y": [ 59 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$86": {
+        "$auto$simplemap.cc:75:simplemap_bitop$775": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -819,7 +819,7 @@
             "Y": [ 60 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$87": {
+        "$auto$simplemap.cc:75:simplemap_bitop$776": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -840,245 +840,245 @@
         }
       },
       "netnames": {
-        "$xor$crc8.sv:10$6_Y": {
+        "$xor$crc8.sv:10$695_Y": {
           "hide_name": 1,
-          "bits": [ 27 ],
+          "bits": [ 26 ],
           "attributes": {
             "src": "crc8.sv:10.24-10.51"
           }
         },
-        "$xor$crc8.sv:10$7_Y": {
+        "$xor$crc8.sv:10$696_Y": {
           "hide_name": 1,
-          "bits": [ 28 ],
+          "bits": [ 27 ],
           "attributes": {
             "src": "crc8.sv:10.24-10.66"
           }
         },
-        "$xor$crc8.sv:10$8_Y": {
+        "$xor$crc8.sv:10$697_Y": {
           "hide_name": 1,
-          "bits": [ 29 ],
+          "bits": [ 28 ],
           "attributes": {
             "src": "crc8.sv:10.24-11.15"
           }
         },
-        "$xor$crc8.sv:10$9_Y": {
+        "$xor$crc8.sv:10$698_Y": {
           "hide_name": 1,
-          "bits": [ 26 ],
+          "bits": [ 29 ],
           "attributes": {
             "src": "crc8.sv:10.24-11.30"
           }
         },
-        "$xor$crc8.sv:12$12_Y": {
+        "$xor$crc8.sv:12$701_Y": {
           "hide_name": 1,
           "bits": [ 30 ],
           "attributes": {
             "src": "crc8.sv:12.24-12.66"
           }
         },
-        "$xor$crc8.sv:12$13_Y": {
+        "$xor$crc8.sv:12$702_Y": {
           "hide_name": 1,
           "bits": [ 31 ],
           "attributes": {
             "src": "crc8.sv:12.24-12.81"
           }
         },
-        "$xor$crc8.sv:12$14_Y": {
+        "$xor$crc8.sv:12$703_Y": {
           "hide_name": 1,
           "bits": [ 32 ],
           "attributes": {
             "src": "crc8.sv:12.24-13.15"
           }
         },
-        "$xor$crc8.sv:12$15_Y": {
+        "$xor$crc8.sv:12$704_Y": {
           "hide_name": 1,
           "bits": [ 33 ],
           "attributes": {
             "src": "crc8.sv:12.24-13.30"
           }
         },
-        "$xor$crc8.sv:12$16_Y": {
+        "$xor$crc8.sv:12$705_Y": {
           "hide_name": 1,
           "bits": [ 34 ],
           "attributes": {
             "src": "crc8.sv:12.24-13.45"
           }
         },
-        "$xor$crc8.sv:14$18_Y": {
+        "$xor$crc8.sv:14$707_Y": {
           "hide_name": 1,
           "bits": [ 35 ],
           "attributes": {
             "src": "crc8.sv:14.24-14.51"
           }
         },
-        "$xor$crc8.sv:14$19_Y": {
+        "$xor$crc8.sv:14$708_Y": {
           "hide_name": 1,
           "bits": [ 36 ],
           "attributes": {
             "src": "crc8.sv:14.24-14.66"
           }
         },
-        "$xor$crc8.sv:14$20_Y": {
+        "$xor$crc8.sv:14$709_Y": {
           "hide_name": 1,
           "bits": [ 37 ],
           "attributes": {
             "src": "crc8.sv:14.24-14.81"
           }
         },
-        "$xor$crc8.sv:14$21_Y": {
+        "$xor$crc8.sv:14$710_Y": {
           "hide_name": 1,
           "bits": [ 38 ],
           "attributes": {
             "src": "crc8.sv:14.24-15.15"
           }
         },
-        "$xor$crc8.sv:14$22_Y": {
+        "$xor$crc8.sv:14$711_Y": {
           "hide_name": 1,
           "bits": [ 39 ],
           "attributes": {
             "src": "crc8.sv:14.24-15.30"
           }
         },
-        "$xor$crc8.sv:14$23_Y": {
+        "$xor$crc8.sv:14$712_Y": {
           "hide_name": 1,
           "bits": [ 40 ],
           "attributes": {
             "src": "crc8.sv:14.24-15.45"
           }
         },
-        "$xor$crc8.sv:16$25_Y": {
+        "$xor$crc8.sv:16$714_Y": {
           "hide_name": 1,
           "bits": [ 41 ],
           "attributes": {
             "src": "crc8.sv:16.24-16.51"
           }
         },
-        "$xor$crc8.sv:16$26_Y": {
+        "$xor$crc8.sv:16$715_Y": {
           "hide_name": 1,
           "bits": [ 42 ],
           "attributes": {
             "src": "crc8.sv:16.24-16.66"
           }
         },
-        "$xor$crc8.sv:16$27_Y": {
+        "$xor$crc8.sv:16$716_Y": {
           "hide_name": 1,
           "bits": [ 43 ],
           "attributes": {
             "src": "crc8.sv:16.24-17.15"
           }
         },
-        "$xor$crc8.sv:16$28_Y": {
+        "$xor$crc8.sv:16$717_Y": {
           "hide_name": 1,
           "bits": [ 44 ],
           "attributes": {
             "src": "crc8.sv:16.24-17.30"
           }
         },
-        "$xor$crc8.sv:18$30_Y": {
+        "$xor$crc8.sv:18$719_Y": {
           "hide_name": 1,
           "bits": [ 45 ],
           "attributes": {
             "src": "crc8.sv:18.24-18.51"
           }
         },
-        "$xor$crc8.sv:18$31_Y": {
+        "$xor$crc8.sv:18$720_Y": {
           "hide_name": 1,
           "bits": [ 46 ],
           "attributes": {
             "src": "crc8.sv:18.24-18.66"
           }
         },
-        "$xor$crc8.sv:18$32_Y": {
+        "$xor$crc8.sv:18$721_Y": {
           "hide_name": 1,
           "bits": [ 47 ],
           "attributes": {
             "src": "crc8.sv:18.24-19.15"
           }
         },
-        "$xor$crc8.sv:18$33_Y": {
+        "$xor$crc8.sv:18$722_Y": {
           "hide_name": 1,
           "bits": [ 48 ],
           "attributes": {
             "src": "crc8.sv:18.24-19.30"
           }
         },
-        "$xor$crc8.sv:20$35_Y": {
+        "$xor$crc8.sv:20$724_Y": {
           "hide_name": 1,
           "bits": [ 49 ],
           "attributes": {
             "src": "crc8.sv:20.24-20.51"
           }
         },
-        "$xor$crc8.sv:20$36_Y": {
+        "$xor$crc8.sv:20$725_Y": {
           "hide_name": 1,
           "bits": [ 50 ],
           "attributes": {
             "src": "crc8.sv:20.24-20.66"
           }
         },
-        "$xor$crc8.sv:20$37_Y": {
+        "$xor$crc8.sv:20$726_Y": {
           "hide_name": 1,
           "bits": [ 51 ],
           "attributes": {
             "src": "crc8.sv:20.24-21.15"
           }
         },
-        "$xor$crc8.sv:20$38_Y": {
+        "$xor$crc8.sv:20$727_Y": {
           "hide_name": 1,
           "bits": [ 52 ],
           "attributes": {
             "src": "crc8.sv:20.24-21.30"
           }
         },
-        "$xor$crc8.sv:22$40_Y": {
+        "$xor$crc8.sv:22$729_Y": {
           "hide_name": 1,
           "bits": [ 53 ],
           "attributes": {
             "src": "crc8.sv:22.24-22.51"
           }
         },
-        "$xor$crc8.sv:22$41_Y": {
+        "$xor$crc8.sv:22$730_Y": {
           "hide_name": 1,
           "bits": [ 54 ],
           "attributes": {
             "src": "crc8.sv:22.24-22.66"
           }
         },
-        "$xor$crc8.sv:22$42_Y": {
+        "$xor$crc8.sv:22$731_Y": {
           "hide_name": 1,
           "bits": [ 55 ],
           "attributes": {
             "src": "crc8.sv:22.24-23.15"
           }
         },
-        "$xor$crc8.sv:22$43_Y": {
+        "$xor$crc8.sv:22$732_Y": {
           "hide_name": 1,
           "bits": [ 56 ],
           "attributes": {
             "src": "crc8.sv:22.24-23.30"
           }
         },
-        "$xor$crc8.sv:8$1_Y": {
+        "$xor$crc8.sv:8$690_Y": {
           "hide_name": 1,
           "bits": [ 57 ],
           "attributes": {
             "src": "crc8.sv:8.24-8.51"
           }
         },
-        "$xor$crc8.sv:8$2_Y": {
+        "$xor$crc8.sv:8$691_Y": {
           "hide_name": 1,
           "bits": [ 58 ],
           "attributes": {
             "src": "crc8.sv:8.24-8.66"
           }
         },
-        "$xor$crc8.sv:8$3_Y": {
+        "$xor$crc8.sv:8$692_Y": {
           "hide_name": 1,
           "bits": [ 59 ],
           "attributes": {
             "src": "crc8.sv:8.24-9.15"
           }
         },
-        "$xor$crc8.sv:8$4_Y": {
+        "$xor$crc8.sv:8$693_Y": {
           "hide_name": 1,
           "bits": [ 60 ],
           "attributes": {

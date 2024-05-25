@@ -6,6 +6,16 @@ write_json add4.json
 write_rtlil add4.rtlil
 
 simplemap; opt
+aigmap
+write_aiger -ascii -zinit add4.aag
+
+design -reset
+
+read_verilog -sv add4.sv
+hierarchy -check -top add4
+opt; proc; opt
+
+simplemap; opt
 
 write_json add4_simplemap.json
 write_rtlil add4_simplemap.rtlil
@@ -15,7 +25,7 @@ flowmap; opt
 write_json add4_flowmap.json
 write_rtlil add4_flowmap.rtlil
 
-delete add4
+design -reset
 
 read_verilog -sv alu4.sv
 hierarchy -check -top alu4
@@ -25,7 +35,19 @@ opt; proc; opt
 write_json alu4.json
 write_rtlil alu4.rtlil
 
-simplemap
+pmuxtree
+simplemap; opt
+aigmap
+write_aiger -ascii -zinit alu4.aag
+
+design -reset
+
+read_verilog -sv alu4.sv
+hierarchy -check -top alu4
+flatten
+opt; proc; opt
+
+simplemap; opt
 
 write_json alu4_simplemap.json
 write_rtlil alu4_simplemap.rtlil

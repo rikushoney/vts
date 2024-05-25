@@ -10,7 +10,7 @@ module sr #(parameter WIDTH = 4) (
 
 logic [WIDTH-1:0] registers;
 
-always_ff @(posedge clk, negedge reset) begin
+always_ff @(posedge clk) begin
   if (~reset) begin
     registers <= 0;
   end else if (op == SHIFT_LEFT) begin
