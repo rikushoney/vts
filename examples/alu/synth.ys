@@ -7,7 +7,7 @@ write_rtlil add4.rtlil
 
 simplemap; opt
 aigmap
-write_aiger -ascii -zinit add4.aag
+write_aiger -zinit add4.aig
 
 design -reset
 
@@ -38,7 +38,7 @@ write_rtlil alu4.rtlil
 pmuxtree
 simplemap; opt
 aigmap
-write_aiger -ascii -zinit alu4.aag
+write_aiger -zinit alu4.aig
 
 design -reset
 

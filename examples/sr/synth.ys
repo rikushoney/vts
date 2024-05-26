@@ -8,7 +8,7 @@ write_rtlil sr.rtlil
 simplemap; opt
 dffunmap
 aigmap
-write_aiger -ascii -zinit sr.aag
+write_aiger -zinit sr.aig
 
 design -reset
 

@@ -11,8 +11,6 @@ simulate: testbench
 
 synth:
 	yosys synth.ys
-	head -n -2 add4.aag > add4_trim.aag
-	head -n -2 alu4.aag > alu4_trim.aag
 
 clean:
 	rm -r _build alu_testbench_dump.vcd

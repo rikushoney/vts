@@ -7,7 +7,7 @@ write_rtlil crc8.rtlil
 
 simplemap; opt
 aigmap
-write_aiger -ascii -zinit crc8.aag
+write_aiger -zinit crc8.aig
 
 design -reset
 
@@ -36,7 +36,7 @@ write_rtlil crc16.rtlil
 
 simplemap; opt
 aigmap
-write_aiger -ascii -zinit crc16.aag
+write_aiger -zinit crc16.aig
 
 design -reset
 

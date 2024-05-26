@@ -11,8 +11,6 @@ simulate: testbench
 
 synth:
 	yosys synth.ys
-	head -n -2 crc8.aag > crc8_trim.aag
-	head -n -2 crc16.aag > crc16_trim.aag
 
 clean:
 	rm -r _build crc_testbench_dump.vcd
