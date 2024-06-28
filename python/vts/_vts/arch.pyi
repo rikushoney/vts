@@ -1,14 +1,23 @@
-from __future__ import annotations
+from typing import Any, Literal, Self, TypeAlias, overload
 
-from typing import Any, Literal, TypeAlias, overload
+_ComponentClassStr: TypeAlias = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
 
-_ComponentClassStr = Literal["lut", "LUT", "latch", "LATCH", "ff", "FF"]
-
-_PortKindStr = Literal[
-    "i", "I", "in", "IN", "input", "input", "o", "O", "out", "OUT", "output", "OUTPUT"
+_PortKindStr: TypeAlias = Literal[
+    "i",
+    "I",
+    "in",
+    "IN",
+    "input",
+    "input",
+    "o",
+    "O",
+    "out",
+    "OUT",
+    "output",
+    "OUTPUT",
 ]
 
-_PortClassStr = Literal[
+_PortClassStr: TypeAlias = Literal[
     "lut_in",
     "LUT_IN",
     "lut_out",
@@ -23,7 +32,14 @@ _PortClassStr = Literal[
     "FF_OUT",
 ]
 
-_ConnectionKindStr = Literal["direct", "DIRECT", "complete", "COMPLETE", "mux", "MUX"]
+_ConnectionKindStr: TypeAlias = Literal[
+    "direct",
+    "DIRECT",
+    "complete",
+    "COMPLETE",
+    "mux",
+    "MUX",
+]
 
 class ComponentClass:
     LUT = ...
@@ -53,7 +69,7 @@ _PortClass: TypeAlias = _PortClassStr | PortClass
 _ConnectionKind: TypeAlias = _ConnectionKindStr | ConnectionKind
 
 class Module:
-    def __new__(cls, name: str) -> Module: ...
+    def __new__(cls, name: str) -> Self: ...
     def name(self) -> str: ...
     def copy(self, name: str | None = None) -> Module: ...
     @overload
@@ -149,15 +165,13 @@ class ComponentRef:
     def __getattr__(self, port: str) -> ComponentRefPort: ...
     def __setattr__(self, sink: str, source: Connector) -> None: ...
 
-class PortPins:
-    pass
+class PortPins: ...
 
 class ComponentRefPort:
     def __getitem__(self, index: slice | int) -> Signature: ...
     def __setitem__(self, sink: slice | int, source: Connector) -> None: ...
 
-class Signature:
-    pass
+class Signature: ...
 
 class ComponentRefs:
     def __getattr__(self, port: str) -> Signature: ...
@@ -165,23 +179,19 @@ class ComponentRefs:
 
 IntoSignature: TypeAlias = Signature | ComponentRefPort | Port
 
-class Direct:
-    pass
+class Direct: ...
 
 def direct(connector: Connector) -> Direct: ...
 
-class Complete:
-    pass
+class Complete: ...
 
 def complete(connector: Connector) -> Complete: ...
 
-class Mux:
-    pass
+class Mux: ...
 
 def mux(connector: Connector) -> Mux: ...
 
-class Concat:
-    pass
+class Concat: ...
 
 Connector: TypeAlias = IntoSignature | Direct | Complete | Mux | Concat
 

@@ -27,12 +27,26 @@ manifest-path = "vts_api/Cargo.toml"
 python-source = "python"
 module-name = "vts._vts"
 
-[tool.black]
+[tool.ruff]
 line-length = 88
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "N", "I"]
+select = [
+  "F",   # pyflakes
+  "E",   # pycodestyle (errors)
+  "W",   # pycodestyle (warnings)
+  "N",   # pep8-naming
+  "I",   # isort
+  "UP",  # pyupgrade
+  "B",   # bugbear
+  "PIE", # flake8-pie
+  "SIM", # flake8-simplify
+  "COM", # flake8-commas
+  "C4",  # flake8-comprehensions
+  "PYI", # flake8-pyi
+]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
+# required-imports = ["from __future__ import annotations"]
