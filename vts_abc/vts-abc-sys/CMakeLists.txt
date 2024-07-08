@@ -87,21 +87,11 @@ function(parse_sources_list sources_list_file sources_list_out)
 endfunction()
 
 parse_sources_list(
-  "${CMAKE_CURRENT_SOURCE_DIR}/abc_c_sources.txt"
-  abc_c_sources
+  "${CMAKE_CURRENT_SOURCE_DIR}/abc_sources.txt"
+  abc_sources
 )
 
-parse_sources_list(
-  "${CMAKE_CURRENT_SOURCE_DIR}/abc_cxx_sources.txt"
-  abc_cxx_sources
-)
-
-target_sources(
-  vts-abc-static
-  PRIVATE
-  ${abc_c_sources}
-  ${abc_cxx_sources}
-)
+target_sources(vts-abc-static PRIVATE ${abc_sources})
 
 if(${VTS_ABC_BUILD_DYLIB})
   add_library(vts-abc SHARED vts-abc.cpp)

@@ -73,48 +73,23 @@ def walk_abc_modules(srcroot: Path) -> Iterator[AbcModule]:
 
 
 def main() -> int:
-    module_names: set[str] = set()
-    c_sources: set[Path] = set()
-    cxx_sources: set[Path] = set()
+    abc_sources: set[Path] = set()
     for module in walk_abc_modules(ABC_SRC_DIR):
         if len(module.sources) == 0:
             continue
-        module_names.add(module.name)
         for mod_source in module.sources:
             src = Path(mod_source)
             if src.as_posix() in ABC_BLACKLISTED_SOURCES:
                 continue
             match src.suffix:
-                case ".c":
-                    c_sources.add(src)
-                case ".cpp":
-                    cxx_sources.add(src)
-    module_names_list = "".join(f"{mod_name}\n" for mod_name in sorted(module_names))
-    abc_c_sources_list = ";".join(f"{src.as_posix()}" for src in sorted(c_sources))
-    abc_cxx_sources_list = ";".join(f"{src.as_posix()}" for src in sorted(cxx_sources))
-    module_names_txt = VTS_ABC_SYS_DIR / "module_names.txt"
-    abc_c_sources_txt = VTS_ABC_SYS_DIR / "abc_c_sources.txt"
-    abc_cxx_sources_txt = VTS_ABC_SYS_DIR / "abc_cxx_sources.txt"
+                case ".c" | ".cpp":
+                    abc_sources.add(src)
+    abc_sources_list = ";".join(f"{src.as_posix()}" for src in sorted(abc_sources))
+    abc_sources_txt = VTS_ABC_SYS_DIR / "abc_sources.txt"
     sources_updated = False
-    if (
-        not module_names_txt.exists()
-        or module_names_txt.read_text() != module_names_list
-    ):
-        module_names_txt.write_text(module_names_list)
-        eprint(f"{module_names_txt} updated")
-    if (
-        not abc_c_sources_txt.exists()
-        or abc_c_sources_txt.read_text() != abc_c_sources_list
-    ):
-        abc_c_sources_txt.write_text(abc_c_sources_list)
-        eprint(f"{abc_c_sources_txt} updated")
-        sources_updated = True
-    if (
-        not abc_cxx_sources_txt.exists()
-        or abc_cxx_sources_txt.read_text() != abc_cxx_sources_list
-    ):
-        abc_cxx_sources_txt.write_text(abc_cxx_sources_list)
-        eprint(f"{abc_cxx_sources_txt} updated")
+    if not abc_sources_txt.exists() or abc_sources_txt.read_text() != abc_sources_list:
+        abc_sources_txt.write_text(abc_sources_list)
+        eprint(f"{abc_sources_txt} updated")
         sources_updated = True
     if sources_updated:
         (VTS_ABC_SYS_DIR / "CMakeLists.txt").touch()
