@@ -1,5 +1,5 @@
 [workspace]
-members = ["vts_core", "vts_api", "vts_cli"]
+members = ["vts_core", "vts_api", "vts_cli", "vts_abc"]
 resolver = "2"
 
 [workspace.dependencies]

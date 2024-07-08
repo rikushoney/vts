@@ -1,3 +1,4 @@
-[submodule "vts_circt/circt-sys/circt"]
-	path = vts_circt/circt-sys/circt
-	url = https://github.com/llvm/circt.git
+[submodule "vts_abc/vts-abc-sys/abc"]
+	path = vts_abc/vts-abc-sys/abc
+	url = git@github.com:rikushoney/abc
+	branch = vts
