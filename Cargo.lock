@@ -488,6 +488,7 @@ dependencies = [
 name = "vts_abc"
 version = "0.1.0"
 dependencies = [
+ "thiserror",
  "vts-abc-sys",
 ]
 

@@ -18,7 +18,7 @@ fn main() {
     let vts_abc_sys_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let abc_build_dir = match env::var_os("VTS_ABC_BUILD_DIR") {
         Some(dir) => PathBuf::from(dir),
-        None => cmake::build(&vts_abc_sys_dir),
+        None => cmake::build(vts_abc_sys_dir),
     };
     cc::Build::new()
         .cpp(true)
