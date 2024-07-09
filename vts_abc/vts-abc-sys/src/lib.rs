@@ -1,5 +1,6 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+extern "C" {
+    pub fn Abc_Start();
+    pub fn Abc_Stop();
 }
 
 #[cfg(test)]
@@ -7,8 +8,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn smoke_test() {
+        unsafe {
+            Abc_Start();
+            Abc_Stop();
+        }
     }
 }

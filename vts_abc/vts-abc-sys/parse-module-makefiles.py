@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 import sys
 from pathlib import Path
 from typing import Any, Iterator, NamedTuple
@@ -72,26 +73,40 @@ def walk_abc_modules(srcroot: Path) -> Iterator[AbcModule]:
             yield AbcModule(mod_name, mod_sources)
 
 
+def append_newline(line: str) -> str:
+    return f"{line}\n"
+
+
 def main() -> int:
-    abc_sources: set[Path] = set()
+    abc_lib_sources: dict[str, list[str]] = {}
     for module in walk_abc_modules(ABC_SRC_DIR):
         if len(module.sources) == 0:
             continue
+        libname = "Abc" + "".join(part.capitalize() for part in module.name.split("/"))
+        abc_lib_sources[libname] = []
         for mod_source in module.sources:
-            src = Path(mod_source)
-            if src.as_posix() in ABC_BLACKLISTED_SOURCES:
+            if mod_source in ABC_BLACKLISTED_SOURCES:
                 continue
-            match src.suffix:
-                case ".c" | ".cpp":
-                    abc_sources.add(src)
-    abc_sources_list = ";".join(f"{src.as_posix()}" for src in sorted(abc_sources))
-    abc_sources_txt = VTS_ABC_SYS_DIR / "abc_sources.txt"
-    sources_updated = False
-    if not abc_sources_txt.exists() or abc_sources_txt.read_text() != abc_sources_list:
-        abc_sources_txt.write_text(abc_sources_list)
-        eprint(f"{abc_sources_txt} updated")
-        sources_updated = True
-    if sources_updated:
+            abc_lib_sources[libname].append(mod_source)
+        abc_lib_sources[libname].sort()
+    abc_lib_sources_serialized = json.dumps(abc_lib_sources, indent=2)
+    abc_lib_names = "".join(map(append_newline, abc_lib_sources.keys()))
+    abc_lib_sources_json = VTS_ABC_SYS_DIR / "abc_lib_sources.json"
+    abc_lib_names_txt = VTS_ABC_SYS_DIR / "abc_lib_names.txt"
+    lib_sources_should_update = (
+        not abc_lib_sources_json.exists()
+        or abc_lib_sources_json.read_text() != abc_lib_sources_serialized
+    )
+    if lib_sources_should_update:
+        eprint(f"updating {abc_lib_sources_json}")
+        abc_lib_sources_json.write_text(abc_lib_sources_serialized)
+    lib_names_should_update = (
+        not abc_lib_names_txt.exists() or abc_lib_names_txt.read_text() != abc_lib_names
+    )
+    if lib_names_should_update:
+        eprint(f"updating {abc_lib_names_txt}")
+        abc_lib_names_txt.write_text(abc_lib_names)
+    if lib_sources_should_update or lib_names_should_update:
         (VTS_ABC_SYS_DIR / "CMakeLists.txt").touch()
     else:
         eprint("nothing updated")

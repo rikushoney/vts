@@ -8,7 +8,7 @@ project(
   LANGUAGES C CXX
 )
 
-option(VTS_ABC_BUILD_DYLIB "Build VTS ABC shared library" ON)
+option(VTS_ABC_BUILD_DYLIB "Build VTS ABC shared library" OFF)
 
 set(vts_abc_required_c_standard 11)
 set(vts_abc_required_cxx_standard 17)
@@ -50,48 +50,61 @@ set(
   "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}"
 )
 
-add_library(vts-abc-static STATIC)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/abc_lib_sources.json" abc_lib_sources)
 
-target_include_directories(
-  vts-abc-static
-  PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/abc/src"
-)
+function(add_abc_library lib_name)
+  string(JSON lib_sources_json GET "${abc_lib_sources}" "${lib_name}")
+  string(JSON lib_sources_len LENGTH "${lib_sources_json}")
+  math(EXPR lib_sources_end "${lib_sources_len}-1")
 
-target_compile_definitions(
-  vts-abc-static
-  PRIVATE
-  ABC_USE_CUDD=1
-  ABC_USE_STDINT_H=1
-)
+  foreach(lib_sources_i RANGE ${lib_sources_end})
+    string(JSON lib_source GET "${lib_sources_json}" "${lib_sources_i}")
+    list(APPEND lib_sources "${CMAKE_CURRENT_SOURCE_DIR}/abc/${lib_source}")
+  endforeach()
 
-target_compile_options(
-  vts-abc-static
-  PRIVATE
-  "$<${gcc_like_compiler}:${gcc_like_compile_options}>"
-)
+  add_library(${lib_name} STATIC ${lib_sources})
 
-if(${VTS_ABC_BUILD_DYLIB})
+  target_include_directories(
+    ${lib_name}
+    PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/abc/src"
+  )
+
+  target_compile_definitions(
+    ${lib_name}
+    PRIVATE
+    ABC_USE_CUDD=1
+    ABC_USE_NO_HISTORY=1
+    ABC_USE_STDINT_H=1
+  )
+
+  target_compile_options(
+    ${lib_name}
+    PRIVATE
+    "$<${gcc_like_compiler}:${gcc_like_compile_options}>"
+  )
+
   set_target_properties(
-    vts-abc-static
+    ${lib_name}
     PROPERTIES
     POSITION_INDEPENDENT_CODE ON
   )
-endif()
-
-function(parse_sources_list sources_list_file sources_list_out)
-  file(READ "${sources_list_file}" raw_sources_list)
-  string(STRIP "${raw_sources_list}" sources_list)
-  list(TRANSFORM sources_list PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/abc/")
-  set(${sources_list_out} ${sources_list} PARENT_SCOPE)
 endfunction()
 
-parse_sources_list(
-  "${CMAKE_CURRENT_SOURCE_DIR}/abc_sources.txt"
-  abc_sources
-)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/abc_lib_names.txt" abc_lib_names)
 
-target_sources(vts-abc-static PRIVATE ${abc_sources})
+foreach(lib_name ${abc_lib_names})
+  add_abc_library(${lib_name})
+endforeach()
+
+install(
+  TARGETS ${abc_lib_names}
+  EXPORT vts-abc-targets
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
 
 if(${VTS_ABC_BUILD_DYLIB})
   add_library(vts-abc SHARED vts-abc.cpp)
@@ -100,7 +113,16 @@ if(${VTS_ABC_BUILD_DYLIB})
     vts-abc
     PRIVATE
     "$<${gcc_like_linker}:-Wl,--whole-archive>"
-    vts-abc-static
+    ${abc_lib_names}
     "$<${gcc_like_linker}:-Wl,--no-whole-archive>"
+  )
+
+  install(
+    TARGETS vts-abc
+    EXPORT vts-abc-targets
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   )
 endif()
