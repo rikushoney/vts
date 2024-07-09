@@ -14,10 +14,12 @@ pub enum Error {
     MissingOutput,
     #[error("Abc failed to read BLIF file \"{0}\"")]
     ReadBlif(PathBuf),
-    #[error("Abc failed to execute Abc command \"{0}\"")]
+    #[error("Abc failed to execute command \"{0}\"")]
     CommandFailed(String),
     #[error("Abc failed to write BLIF file \"{0}\"")]
     WriteBlif(PathBuf),
+    #[error("Abc failed to set the LUT library")]
+    SetLutLibrary,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -42,6 +44,11 @@ impl Abc {
     pub(crate) fn execute_command(&self, command: &str) -> i32 {
         let command = CString::new(command).expect("command should not contain nul bytes");
         unsafe { vts_abc_sys::abc_execute_command(self.0, command.as_ptr()) }
+    }
+
+    pub(crate) fn set_lut_library(&self, library: &str) -> i32 {
+        let lut_library = CString::new(library).expect("lut library should not contain nul bytes");
+        unsafe { vts_abc_sys::abc_frame_set_lut_library(self.0, lut_library.as_ptr()) }
     }
 }
 
@@ -132,8 +139,8 @@ impl Command {
         self
     }
 
-    pub fn map_if(&mut self, lut_size: usize) -> &mut Self {
-        self.push_command(&format!("if -K {lut_size}"));
+    pub fn map_if(&mut self) -> &mut Self {
+        self.push_command("if");
         self
     }
 
@@ -142,17 +149,9 @@ impl Command {
         self
     }
 
-    pub fn lutpack(&mut self, lut_size: usize) -> &mut Self {
-        self.strash()
-            .amp_get()
-            .amp_fraig()
-            .amp_put()
-            .scorr()
-            .dc2()
-            .dretime()
-            .dch()
-            .map_if(lut_size)
-            .mfs2()
+    pub fn lutpack(&mut self) -> &mut Self {
+        self.push_command("lutpack");
+        self
     }
 
     pub fn execute(&mut self, abc: &Abc) -> Result<()> {
@@ -170,6 +169,49 @@ impl Command {
             return Err(Error::WriteBlif(output_filename.clone()));
         }
         Ok(())
+    }
+}
+
+pub struct BlifLutMapper {
+    input_filename: PathBuf,
+    lut_size: usize,
+}
+
+impl BlifLutMapper {
+    pub fn new<P>(input_filename: P, lut_size: usize) -> Self
+    where
+        P: AsRef<Path>,
+    {
+        Self {
+            input_filename: input_filename.as_ref().to_path_buf(),
+            lut_size,
+        }
+    }
+
+    pub fn run<P>(&self, abc: &Abc, output_filename: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let output_filename = output_filename.as_ref().to_path_buf();
+        if abc.set_lut_library(&format!("{} 1 1", self.lut_size)) != 0 {
+            return Err(Error::SetLutLibrary);
+        }
+        // https://github.com/YosysHQ/yosys/blob/65834440add07421a15291551037a645d55a00aa/passes/techmap/abc.cc#L34
+        Command::new()
+            .read_blif(&self.input_filename)
+            .strash()
+            .amp_get()
+            .amp_fraig()
+            .amp_put()
+            .scorr()
+            .dc2()
+            .dretime()
+            .dch()
+            .map_if()
+            .mfs2()
+            .lutpack()
+            .write_blif(output_filename)
+            .execute(abc)
     }
 }
 

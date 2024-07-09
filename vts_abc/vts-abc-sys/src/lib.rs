@@ -19,6 +19,12 @@ extern "C" {
 
     #[link_name = "Cmd_CommandExecute"]
     pub fn abc_execute_command(framework: *mut AbcFrame, command: *const c_char) -> c_int;
+
+    #[link_name = "Abc_FrameSetLutLibrary"]
+    pub fn abc_frame_set_lut_library(
+        framework: *mut AbcFrame,
+        library_string: *const c_char,
+    ) -> c_int;
 }
 
 #[cfg(test)]
