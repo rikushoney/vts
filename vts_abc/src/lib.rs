@@ -22,17 +22,18 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-static ABC_EXISTS: AtomicBool = AtomicBool::new(false);
+static ABC_LOCKED: AtomicBool = AtomicBool::new(false);
 
-pub struct Abc(*mut vts_abc_sys::Abc_Frame_t);
+pub struct Abc(*mut vts_abc_sys::AbcFrame);
 
 impl Abc {
     pub fn new() -> Result<Abc> {
-        if !ABC_EXISTS.swap(true, Ordering::SeqCst) {
+        let locked = ABC_LOCKED.swap(true, Ordering::SeqCst);
+        if !locked {
             unsafe {
-                vts_abc_sys::Abc_Start();
+                vts_abc_sys::abc_start();
             }
-            Ok(Abc(unsafe { vts_abc_sys::Abc_FrameGetGlobalFrame() }))
+            Ok(Abc(unsafe { vts_abc_sys::abc_get_global_frame() }))
         } else {
             Err(Error::InstanceExists)
         }
@@ -40,14 +41,15 @@ impl Abc {
 
     pub(crate) fn execute_command(&self, command: &str) -> i32 {
         let command = CString::new(command).expect("command should not contain nul bytes");
-        unsafe { vts_abc_sys::Cmd_CommandExecute(self.0, command.as_ptr()) }
+        unsafe { vts_abc_sys::abc_execute_command(self.0, command.as_ptr()) }
     }
 }
 
 impl Drop for Abc {
     fn drop(&mut self) {
-        unsafe { vts_abc_sys::Abc_Stop() };
-        ABC_EXISTS.store(false, Ordering::SeqCst);
+        unsafe { vts_abc_sys::abc_stop() };
+        let was_locked = ABC_LOCKED.swap(false, Ordering::SeqCst);
+        debug_assert!(was_locked);
     }
 }
 
