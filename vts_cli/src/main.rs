@@ -1,27 +1,41 @@
-use std::env;
-use std::process::exit;
-use vts_core::ir::yosys::Netlist;
+mod design_entry;
 
-fn usage() {
-    println!("usage: vts [JSON_NETLIST]");
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
 }
 
-fn main() {
-    let args: Vec<String> = env::args().skip(1).collect();
-    if let Some(filename) = args.iter().last() {
-        match Netlist::from_file(filename) {
-            Ok(net) => {
-                println!("netlist OK");
-                let pretty = serde_json::to_string_pretty(&net).unwrap();
-                println!("{}", pretty);
-            }
-            Err(err) => {
-                println!("netlist ERROR");
-                println!("{}", err);
+#[derive(Subcommand)]
+enum Command {
+    DesignEntry {
+        #[command(subcommand)]
+        command: design_entry::Command,
+    },
+}
+
+impl Command {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::DesignEntry { .. } => "design-entry",
+        }
+    }
+
+    fn run(&self) -> Result<()> {
+        match self {
+            Self::DesignEntry { command } => {
+                command
+                    .run()
+                    .with_context(|| format!("`{} {}` failed", self.name(), command.name()))?;
             }
         }
-    } else {
-        usage();
-        exit(1);
+        Ok(())
     }
+}
+
+fn main() -> Result<()> {
+    Cli::parse().command.run()
 }

@@ -185,6 +185,7 @@ impl BlifLutMapper {
             .scorr()
             .dc2()
             .dretime()
+            .strash()
             .dch()
             .map_if()
             .mfs2()

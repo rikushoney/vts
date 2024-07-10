@@ -3,6 +3,14 @@ name = "vts_cli"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "vts"
+path = "src/main.rs"
+
 [dependencies]
+anyhow = "1.0"
+clap = { version = "4.5.9", features = ["derive"] }
 serde_json.workspace = true
+thiserror.workspace = true
+vts_abc.workspace = true
 vts_core.workspace = true
