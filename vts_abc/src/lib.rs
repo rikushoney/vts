@@ -149,6 +149,12 @@ pub struct BlifLutMapper {
     lut_size: usize,
 }
 
+fn generate_lut_library(max_lut_size: usize) -> String {
+    (1..=max_lut_size)
+        .map(|lut_size| format!("{lut_size} 1.0 1.0\n"))
+        .collect()
+}
+
 impl BlifLutMapper {
     pub fn new<P>(input_filename: P, lut_size: usize) -> Self
     where
@@ -165,7 +171,8 @@ impl BlifLutMapper {
         P: AsRef<Path>,
     {
         let output_filename = output_filename.as_ref().to_path_buf();
-        if abc.set_lut_library(&format!("{} 1 1", self.lut_size)) != 0 {
+        let lut_library = generate_lut_library(self.lut_size);
+        if abc.set_lut_library(&lut_library) != 0 {
             return Err(Error::SetLutLibrary);
         }
         // https://github.com/YosysHQ/yosys/blob/65834440add07421a15291551037a645d55a00aa/passes/techmap/abc.cc#L34
