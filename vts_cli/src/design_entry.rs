@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use clap::Subcommand;
 use thiserror::Error;
 
+const GITHUB_REPO_ISSUES: &str = "https://github.com/rikushoney/vts/issues";
+
 #[derive(Debug, Error)]
 pub(super) enum Error {
     #[error("\"{0}\" does not exist")]
@@ -11,6 +13,16 @@ pub(super) enum Error {
     UnknownFileFormat,
     #[error(transparent)]
     Abc(#[from] vts_abc::Error),
+    #[error(
+        "the yosys frontend is not yet supported (see {}/1)",
+        GITHUB_REPO_ISSUES
+    )]
+    RequiresYosys,
+    #[error(
+        "piping requires abc::Io_ReadBlifMv to support strings (see {}/2)",
+        GITHUB_REPO_ISSUES
+    )]
+    RequiresAbcBlifReadString,
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -63,7 +75,7 @@ fn check(input_filename: &PathBuf) -> Result<()> {
 fn lutmap(input_filename: &PathBuf, output_filename: &PathBuf) -> Result<()> {
     let input_format = check_exists_and_guess_format(input_filename)?;
     if matches!(output_filename.to_str(), Some("-")) {
-        todo!()
+        return Err(Error::RequiresAbcBlifReadString);
     }
     match input_format {
         FileFormat::Blif => {
@@ -71,7 +83,7 @@ fn lutmap(input_filename: &PathBuf, output_filename: &PathBuf) -> Result<()> {
             vts_abc::BlifLutMapper::new(input_filename, 4).run(&abc, output_filename)?;
         }
         _ => {
-            todo!()
+            return Err(Error::RequiresYosys);
         }
     }
     Ok(())
