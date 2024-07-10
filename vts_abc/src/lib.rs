@@ -67,6 +67,21 @@ pub struct Command {
     command_buffer: String,
 }
 
+macro_rules! impl_command {
+    ($name:ident) => {
+        pub fn $name(&mut self) -> &mut Self {
+            self.push_command(stringify!($name));
+            self
+        }
+    };
+    ($name:literal as $alias:ident) => {
+        pub fn $alias(&mut self) -> &mut Self {
+            self.push_command($name);
+            self
+        }
+    };
+}
+
 impl Command {
     pub fn new() -> Self {
         Self {
@@ -99,60 +114,17 @@ impl Command {
         self.command_buffer.push_str(command);
     }
 
-    pub fn strash(&mut self) -> &mut Self {
-        self.push_command("strash");
-        self
-    }
-
-    pub fn amp_get(&mut self) -> &mut Self {
-        self.push_command("&get -n");
-        self
-    }
-
-    pub fn amp_fraig(&mut self) -> &mut Self {
-        self.push_command("&fraig -x");
-        self
-    }
-
-    pub fn amp_put(&mut self) -> &mut Self {
-        self.push_command("&put");
-        self
-    }
-
-    pub fn scorr(&mut self) -> &mut Self {
-        self.push_command("scorr");
-        self
-    }
-
-    pub fn dc2(&mut self) -> &mut Self {
-        self.push_command("dc2");
-        self
-    }
-
-    pub fn dretime(&mut self) -> &mut Self {
-        self.push_command("dretime");
-        self
-    }
-
-    pub fn dch(&mut self) -> &mut Self {
-        self.push_command("dch -f");
-        self
-    }
-
-    pub fn map_if(&mut self) -> &mut Self {
-        self.push_command("if");
-        self
-    }
-
-    pub fn mfs2(&mut self) -> &mut Self {
-        self.push_command("mfs2");
-        self
-    }
-
-    pub fn lutpack(&mut self) -> &mut Self {
-        self.push_command("lutpack");
-        self
-    }
+    impl_command!(strash);
+    impl_command!("&get -n" as amp_get);
+    impl_command!("&fraig -x" as amp_fraig);
+    impl_command!("&put" as amp_put);
+    impl_command!(scorr);
+    impl_command!(dc2);
+    impl_command!(dretime);
+    impl_command!(dch);
+    impl_command!("if" as map_if);
+    impl_command!(mfs2);
+    impl_command!(lutpack);
 
     pub fn execute(&mut self, abc: &Abc) -> Result<()> {
         let input_filename = self.input_filename.as_ref().ok_or(Error::MissingInput)?;
