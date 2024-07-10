@@ -1,8 +1,11 @@
-use thiserror::Error;
-
-use std::ffi::CString;
+use std::ffi::{c_char, CString};
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use thiserror::Error;
+
+use vts_abc_sys::AbcFrame;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -26,16 +29,34 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 static ABC_LOCKED: AtomicBool = AtomicBool::new(false);
 
-pub struct Abc(*mut vts_abc_sys::AbcFrame);
+pub struct Abc(*mut AbcFrame);
+
+fn abc_start() {
+    unsafe { vts_abc_sys::abc_start() }
+}
+
+fn abc_stop() {
+    unsafe { vts_abc_sys::abc_stop() }
+}
+
+fn abc_get_global_frame() -> *mut AbcFrame {
+    unsafe { vts_abc_sys::abc_get_global_frame() }
+}
+
+fn abc_execute_command(framework: *mut AbcFrame, command: *const c_char) -> i32 {
+    unsafe { vts_abc_sys::abc_execute_command(framework, command) }
+}
+
+fn abc_frame_set_lut_library(framework: *mut AbcFrame, library: *const c_char) -> i32 {
+    unsafe { vts_abc_sys::abc_frame_set_lut_library(framework, library) }
+}
 
 impl Abc {
     pub fn new() -> Result<Abc> {
         let locked = ABC_LOCKED.swap(true, Ordering::SeqCst);
         if !locked {
-            unsafe {
-                vts_abc_sys::abc_start();
-            }
-            Ok(Abc(unsafe { vts_abc_sys::abc_get_global_frame() }))
+            abc_start();
+            Ok(Abc(abc_get_global_frame()))
         } else {
             Err(Error::InstanceExists)
         }
@@ -43,18 +64,18 @@ impl Abc {
 
     pub(crate) fn execute_command(&self, command: &str) -> i32 {
         let command = CString::new(command).expect("command should not contain nul bytes");
-        unsafe { vts_abc_sys::abc_execute_command(self.0, command.as_ptr()) }
+        abc_execute_command(self.0, command.as_ptr())
     }
 
     pub(crate) fn set_lut_library(&self, library: &str) -> i32 {
         let lut_library = CString::new(library).expect("lut library should not contain nul bytes");
-        unsafe { vts_abc_sys::abc_frame_set_lut_library(self.0, lut_library.as_ptr()) }
+        abc_frame_set_lut_library(self.0, lut_library.as_ptr())
     }
 }
 
 impl Drop for Abc {
     fn drop(&mut self) {
-        unsafe { vts_abc_sys::abc_stop() };
+        abc_stop();
         let was_locked = ABC_LOCKED.swap(false, Ordering::SeqCst);
         debug_assert!(was_locked);
     }
@@ -150,9 +171,10 @@ pub struct BlifLutMapper {
 }
 
 fn generate_lut_library(max_lut_size: usize) -> String {
-    (1..=max_lut_size)
-        .map(|lut_size| format!("{lut_size} 1.0 1.0\n"))
-        .collect()
+    (1..=max_lut_size).fold(String::new(), |mut lut_lib, lut_size| {
+        let _ = writeln!(lut_lib, "{lut_size} 1.0 1.0\n");
+        lut_lib
+    })
 }
 
 impl BlifLutMapper {
