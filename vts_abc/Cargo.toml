@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 thiserror.workspace = true
 vts-abc-sys = { path = "./vts-abc-sys" }
+
+[dev-dependencies]
+serial_test = "3"

@@ -175,7 +175,7 @@ impl BlifLutMapper {
         if abc.set_lut_library(&lut_library) != 0 {
             return Err(Error::SetLutLibrary);
         }
-        // https://github.com/YosysHQ/yosys/blob/65834440add07421a15291551037a645d55a00aa/passes/techmap/abc.cc#L34
+        // https://github.com/YosysHQ/yosys/blob/6583444/passes/techmap/abc.cc#L34
         Command::new()
             .read_blif(&self.input_filename)
             .strash()
@@ -196,11 +196,29 @@ impl BlifLutMapper {
 }
 
 #[cfg(test)]
+#[serial_test::serial]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_new_abc() {
+    fn test_abc_new() {
+        let _abc = Abc::new().unwrap();
+    }
+
+    #[test]
+    fn test_abc_set_lut_library() {
+        let lut_library = generate_lut_library(4);
+        assert_eq!(lut_library, "1 1.0 1.0\n2 1.0 1.0\n3 1.0 1.0\n4 1.0 1.0\n");
+        let abc = Abc::new().unwrap();
+        assert_eq!(abc.set_lut_library(&lut_library), 0);
+    }
+
+    #[test]
+    fn test_abc_is_not_threadsafe() {
+        {
+            let _abc = Abc::new().unwrap();
+            assert!(matches!(Abc::new(), Err(Error::InstanceExists)));
+        }
         let _abc = Abc::new().unwrap();
     }
 }
