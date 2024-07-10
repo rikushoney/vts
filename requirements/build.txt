@@ -4,5 +4,5 @@
 #
 #    pip-compile --output-file=requirements/build.txt --strip-extras requirements/build.in
 #
-maturin==1.6.0
+maturin==1.7.0
     # via -r requirements/build.in

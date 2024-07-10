@@ -4,5 +4,5 @@
 #
 #    pip-compile --output-file=requirements/format.txt --strip-extras requirements/format.in
 #
-ruff==0.5.0
+ruff==0.5.1
     # via -r requirements/format.in
