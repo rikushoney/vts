@@ -73,36 +73,3 @@ watch-git:
 watch-scratchpad:
     watchexec -c -r RUST_BACKTRACE=1 python scratchpad.py
 
-circt_sys_dir := justfile_directory() / "vts_circt" / "circt-sys"
-
-format-cpp:
-    clang-format -i {{circt_sys_dir / "wrapper.h"}} {{circt_sys_dir / "wrapper.cpp"}}
-
-circt_src_dir := circt_sys_dir / "circt"
-circt_build_dir := circt_sys_dir / "build"
-circt_install_dir := circt_sys_dir / "install"
-
-build-circt:
-    cmake -G Ninja -B {{circt_build_dir}} -S {{circt_src_dir / "llvm" / "llvm"}} \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DCMAKE_INSTALL_PREFIX={{circt_install_dir}} \
-        -DLLVM_ENABLE_PROJECTS=mlir \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
-        -DLLVM_ENABLE_ZSTD=OFF \
-        -DLLVM_EXTERNAL_PROJECTS=circt \
-        -DLLVM_EXTERNAL_CIRCT_SOURCE_DIR={{circt_src_dir}} \
-        -DLLVM_TARGETS_TO_BUILD=host
-    cmake --build {{circt_build_dir}}
-
-install-circt:
-    cmake --install {{circt_build_dir}}
-
-clean-circt-build:
-    rm -r {{circt_build_dir}}
-
-clean-circt: clean-circt-build
-    rm -r {{circt_install_dir}}
-
-generate-bindings:
-    bindgen -o {{circt_sys_dir / "src" / "bindings.rs"}} {{circt_sys_dir / "wrapper.h"}} -- \
-        -I$({{circt_install_dir / "bin" / "llvm-config"}} --includedir)
