@@ -172,7 +172,7 @@ pub struct BlifLutMapper {
 
 fn generate_lut_library(max_lut_size: usize) -> String {
     (1..=max_lut_size).fold(String::new(), |mut lut_lib, lut_size| {
-        let _ = writeln!(lut_lib, "{lut_size} 1.0 1.0\n");
+        let _ = writeln!(lut_lib, "{lut_size} 1.0 1.0");
         lut_lib
     })
 }
