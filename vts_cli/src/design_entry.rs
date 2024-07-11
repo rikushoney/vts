@@ -1,7 +1,13 @@
+use std::fs;
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
 use thiserror::Error;
+
+use vts_abc::{Abc, BlifLutMapper};
+use vts_core::blif::reader as blif_reader;
+use vts_core::blif::BlifReader;
 
 const GITHUB_REPO_ISSUES: &str = "https://github.com/rikushoney/vts/issues";
 
@@ -13,13 +19,17 @@ pub(super) enum Error {
     UnknownFileFormat,
     #[error(transparent)]
     Abc(#[from] vts_abc::Error),
+    #[error(transparent)]
+    BlifRead(#[from] blif_reader::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
     #[error(
         "the yosys frontend is not yet supported (see {}/1)",
         GITHUB_REPO_ISSUES
     )]
     RequiresYosys,
     #[error(
-        "piping requires abc::Io_ReadBlifMv to support strings (see {}/2)",
+        "piping requires ABC::Io_ReadBlifMv to support strings (see {}/2)",
         GITHUB_REPO_ISSUES
     )]
     RequiresAbcBlifReadString,
@@ -60,7 +70,15 @@ pub(super) enum Command {
     },
 }
 
-fn check_exists_and_guess_format(filename: &PathBuf) -> Result<FileFormat> {
+fn check_file_is_not_pipe(filename: &PathBuf) -> Result<()> {
+    if matches!(filename.to_str(), Some("-")) {
+        Err(Error::RequiresAbcBlifReadString)
+    } else {
+        Ok(())
+    }
+}
+
+fn check_file_exists_and_guess_format(filename: &PathBuf) -> Result<FileFormat> {
     if !filename.exists() {
         return Err(Error::FileNotFound(filename.clone()));
     }
@@ -68,19 +86,31 @@ fn check_exists_and_guess_format(filename: &PathBuf) -> Result<FileFormat> {
 }
 
 fn check(input_filename: &PathBuf) -> Result<()> {
-    let _input_format = check_exists_and_guess_format(input_filename)?;
-    todo!()
+    check_file_is_not_pipe(input_filename)?;
+    let input_format = check_file_exists_and_guess_format(input_filename)?;
+    match input_format {
+        FileFormat::Blif => {
+            let input_file = fs::File::open(input_filename)?;
+            let mut reader =
+                BlifReader::from_reader(BufReader::new(input_file), input_filename.to_str())?;
+            let _netlist = reader.parse_netlist()?;
+            Ok(())
+        }
+        _ => {
+            return Err(Error::RequiresYosys);
+        }
+    }
 }
 
 fn lutmap(input_filename: &PathBuf, output_filename: &PathBuf) -> Result<()> {
-    let input_format = check_exists_and_guess_format(input_filename)?;
-    if matches!(output_filename.to_str(), Some("-")) {
-        return Err(Error::RequiresAbcBlifReadString);
-    }
+    check_file_is_not_pipe(input_filename)?;
+    check_file_is_not_pipe(output_filename)?;
+    let input_format = check_file_exists_and_guess_format(input_filename)?;
     match input_format {
         FileFormat::Blif => {
-            let abc = vts_abc::Abc::new()?;
-            vts_abc::BlifLutMapper::new(input_filename, 4).run(&abc, output_filename)?;
+            let abc = Abc::new()?;
+            // TODO(rikus): accept LUT size as an argument
+            BlifLutMapper::new(input_filename, 4).run(&abc, output_filename)?;
         }
         _ => {
             return Err(Error::RequiresYosys);
