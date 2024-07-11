@@ -3,5 +3,5 @@
 -r format.in
 -r notebook.in
 
-pip-tools
+uv
 nox
