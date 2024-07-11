@@ -11,12 +11,12 @@ format-py:
 format: format-rs format-py
 
 lock:
-    pip-compile -U --strip-extras -o requirements/tests.txt requirements/tests.in 
-    pip-compile -U --strip-extras -o requirements/check.txt requirements/check.in 
-    pip-compile -U --strip-extras -o requirements/format.txt requirements/format.in 
-    pip-compile -U --strip-extras -o requirements/build.txt requirements/build.in 
-    pip-compile -U --strip-extras -o requirements/notebook.txt requirements/notebook.in
-    pip-compile -U --strip-extras -o requirements/dev.txt requirements/dev.in
+    uv pip compile -o requirements/tests.txt requirements/tests.in
+    uv pip compile -o requirements/check.txt requirements/check.in
+    uv pip compile -o requirements/format.txt requirements/format.in
+    uv pip compile -o requirements/build.txt requirements/build.in
+    uv pip compile -o requirements/notebook.txt requirements/notebook.in
+    uv pip compile -o requirements/dev.txt requirements/dev.in
 
 check-rs:
     cargo check --workspace
