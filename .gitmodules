@@ -1,4 +1,0 @@
-[submodule "vts_abc/vts-abc-sys/abc"]
-	path = vts_abc/vts-abc-sys/abc
-	url = git@github.com:rikushoney/abc
-	branch = vts

@@ -1,7 +1,0 @@
--r tests.in
--r check.in
--r format.in
--r notebook.in
-
-uv
-nox

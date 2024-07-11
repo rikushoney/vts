@@ -1,2 +1,0 @@
-synth:
-	yosys synth.ys
