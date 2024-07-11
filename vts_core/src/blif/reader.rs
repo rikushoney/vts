@@ -42,7 +42,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
-pub trait ParseLocation<T> {
+pub(super) trait ParseLocation<T> {
     fn location(self, location: SourceLocation) -> Result<T>;
 
     fn with_location<F>(self, make_location: F) -> Result<T>
