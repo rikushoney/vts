@@ -5,6 +5,8 @@ use thiserror::Error;
 
 use super::netlist::Netlist;
 
+use crate::bytescanner::Scanner;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct SourceLocation {
     pub file: Option<String>,
@@ -99,15 +101,6 @@ impl<T> ParseLocation<T> for ParseResult<T> {
     }
 }
 
-pub enum Directive {
-    Model,
-    Inputs,
-    Outputs,
-    Names,
-    Latch,
-    Subckt,
-}
-
 #[derive(Default)]
 struct BlifBuffer {
     filename: Option<String>,
@@ -171,138 +164,123 @@ impl From<&str> for BlifBuffer {
     }
 }
 
-struct Tokenizer<'a> {
-    buffer: &'a BlifBuffer,
-    cursor: usize,
+#[derive(Debug, PartialEq)]
+struct Span {
+    start: usize,
+    len: usize,
+}
+
+#[derive(Debug, PartialEq)]
+struct Cover {
+    input: Span,
+    output: Span,
+}
+
+#[derive(Debug, PartialEq)]
+struct FormalActual {
+    input: Span,
+    output: Span,
+}
+
+#[derive(Debug, PartialEq)]
+enum Directive {
+    Model {
+        name: Span,
+        span: Span,
+    },
+    Inputs {
+        list: Vec<Span>,
+        span: Span,
+    },
+    Outputs {
+        list: Vec<Span>,
+        span: Span,
+    },
+    Names {
+        inputs: Vec<Span>,
+        output: Vec<Span>,
+        covers: Vec<Cover>,
+        span: Span,
+    },
+    Latch {
+        input: Span,
+        output: Span,
+        ty: Option<Span>,
+        control: Option<Span>,
+        init: Option<Span>,
+        span: Span,
+    },
+    Subckt {
+        name: Span,
+        formal_actual: Vec<FormalActual>,
+        span: Span,
+    },
+}
+
+impl Directive {
+    fn span(&self) -> &Span {
+        match self {
+            Self::Model { span, .. } => span,
+            Self::Inputs { span, .. } => span,
+            Self::Outputs { span, .. } => span,
+            Self::Names { span, .. } => span,
+            Self::Latch { span, .. } => span,
+            Self::Subckt { span, .. } => span,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 enum Token {
-    Newline(usize),
-    Ident { offset: usize, len: usize },
+    Directive(Directive),
+    Whitespace(Span),
+    Newline(Span),
+    Comment(Span),
+}
+
+impl Token {
+    fn span(&self) -> &Span {
+        match self {
+            Self::Directive(directive) => directive.span(),
+            Self::Whitespace(span) => span,
+            Self::Newline(span) => span,
+            Self::Comment(span) => span,
+        }
+    }
+}
+
+struct Tokenizer<'a> {
+    scanner: Scanner<'a>,
 }
 
 impl<'a> Tokenizer<'a> {
     fn new(buffer: &'a BlifBuffer) -> Self {
-        Self { buffer, cursor: 0 }
-    }
-
-    fn bump(&mut self) {
-        if self.cursor < self.buffer.inner.len() {
-            self.cursor += 1;
-        }
-    }
-
-    fn peek(&mut self) -> Option<u8> {
-        debug_assert!(self.cursor <= self.buffer.inner.len());
-        self.buffer.inner.get(self.cursor).copied()
-    }
-
-    fn peek_unchecked(&mut self) -> u8 {
-        self.buffer.inner.as_slice()[self.cursor]
-    }
-
-    fn rewind(&mut self, cursor: usize) {
-        self.cursor = cursor;
-    }
-
-    fn eat_whitespace(&mut self) {
-        while let Some(space) = self.peek() {
-            if !space.is_ascii_whitespace() {
-                break;
-            }
-            self.bump();
-        }
-    }
-
-    fn parse_ident(&mut self) -> Token {
-        debug_assert!(!self.peek_unchecked().is_ascii_whitespace());
-        let start = self.cursor;
-        while let Some(byte) = self.peek() {
-            // TODO(rikus): specify which characters are valid identifiers
-            // rather than just "not whitespace".
-            if byte.is_ascii_whitespace() {
-                break;
-            }
-            self.bump();
-        }
-        let len = self.cursor - start;
-        Token::Ident { offset: start, len }
-    }
-
-    fn next_byte_escape(&mut self) -> Option<Result<Token>> {
-        // We need to support skipping over newline escapes, i.e., "\\\n". It
-        // may, however, also be present in different forms such as "\\\r\n" or
-        // even with arbitrary space after the "\\", e.g., "\\ \t\r\n". The "\r"
-        // and "\n" might even be swapped around for some weird reason...
-        // NOTE(rikus): the initial BLIF spec asserts that no whitespace should
-        // follow the '\\' -- maybe issue a warning if this is detected.
-        debug_assert!(matches!(self.buffer.inner.get(self.cursor), Some(b'\\')));
-        let start_marker = self.cursor;
-        let make_location = || self.buffer.calculate_location(start_marker);
-        self.bump();
-        match self.peek() {
-            Some(b'\n') => {
-                self.bump();
-                self.next()
-            }
-            Some(space) if space.is_ascii_whitespace() => {
-                self.bump();
-                self.eat_whitespace();
-                match self.peek() {
-                    Some(b'\n') => {
-                        self.bump();
-                        self.next()
-                    }
-                    Some(_) => Some(Err(Error::new_parse(
-                        SyntaxError::InvalidEscape,
-                        make_location(),
-                    ))),
-                    None => None,
-                }
-            }
-            Some(_) => {
-                self.rewind(start_marker);
-                Some(Ok(self.parse_ident()))
-            }
-            None => None,
+        Self {
+            scanner: Scanner::new(&buffer.inner),
         }
     }
 }
 
 impl Iterator for Tokenizer<'_> {
-    type Item = Result<Token>;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.peek() {
-            Some(b'\n') => {
-                let start = self.cursor;
-                self.bump();
-                Some(Ok(Token::Newline(start)))
-            }
-            Some(space) if space.is_ascii_whitespace() => {
-                self.bump();
-                self.eat_whitespace();
-                self.next()
-            }
-            Some(b'\\') => self.next_byte_escape(),
-            Some(b'#') => {
-                self.bump();
-                while let Some(byte) = self.peek() {
-                    if byte == b'\n' {
-                        break;
-                    }
-                    self.bump();
-                }
-                self.next()
-            }
-            Some(_) => Some(Ok(self.parse_ident())),
-            None => None,
+        let start = self.scanner.cursor();
+        if self.scanner.eat_if(u8::is_ascii_whitespace) {
+            self.scanner.eat_whitespace();
+            return Some(Token::Whitespace(Span {
+                start,
+                len: self.scanner.cursor() - start,
+            }));
         }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.buffer.inner.len() - self.cursor))
+        if self.scanner.eat_if(b'#') {
+            self.scanner.eat_until(b'\n');
+            return Some(Token::Comment(Span {
+                start,
+                len: self.scanner.cursor() - start,
+            }));
+        }
+        todo!()
     }
 }
 
@@ -332,7 +310,7 @@ impl BlifReader {
 
     pub fn parse_netlist(&mut self) -> Result<Netlist> {
         let tokenizer = self.buffer.tokenize();
-        let _ = tokenizer.count();
+        // let _ = tokenizer.count();
         todo!()
     }
 }
@@ -375,68 +353,68 @@ mod tests {
         assert_eq!(buffer.calculate_location(1), loc!(2, 1));
     }
 
-    macro_rules! tok {
-        (newline @ $offset:expr) => {
-            Token::Newline($offset)
-        };
-        (ident @ ( $offset:expr, $len:expr )) => {
-            Token::Ident {
-                offset: $offset,
-                len: $len,
-            }
-        };
-    }
+    //     macro_rules! tok {
+    //         (newline @ $offset:expr) => {
+    //             Token::Newline($offset)
+    //         };
+    //         (ident @ ( $offset:expr, $len:expr )) => {
+    //             Token::Ident {
+    //                 offset: $offset,
+    //                 len: $len,
+    //             }
+    //         };
+    //     }
 
-    #[test]
-    fn test_tokenizer() {
-        let buffer = BlifBuffer::from(
-            r#"a b c
-1 2 \
-34
-"#,
-        );
-        let expected = [
-            tok!(ident @ (0, 1)),
-            tok!(ident @ (2, 1)),
-            tok!(ident @ (4, 1)),
-            tok!(newline @ 5),
-            tok!(ident @ (6, 1)),
-            tok!(ident @ (8, 1)),
-            tok!(ident @ (12, 2)),
-            tok!(newline @ 14),
-        ];
-        assert_eq!(
-            buffer.tokenize().map(Result::unwrap).collect::<Vec<_>>(),
-            &expected
-        );
-    }
+    //     #[test]
+    //     fn test_tokenizer() {
+    //         let buffer = BlifBuffer::from(
+    //             r#"a b c
+    // 1 2 \
+    // 34
+    // "#,
+    //         );
+    //         let expected = [
+    //             tok!(ident @ (0, 1)),
+    //             tok!(ident @ (2, 1)),
+    //             tok!(ident @ (4, 1)),
+    //             tok!(newline @ 5),
+    //             tok!(ident @ (6, 1)),
+    //             tok!(ident @ (8, 1)),
+    //             tok!(ident @ (12, 2)),
+    //             tok!(newline @ 14),
+    //         ];
+    //         assert_eq!(
+    //             buffer.tokenize().map(Result::unwrap).collect::<Vec<_>>(),
+    //             &expected
+    //         );
+    //     }
 
-    #[test]
-    fn test_tokenize_comments() {
-        let buffer = BlifBuffer::from(
-            r#"# foo bar
-a b # c d
-# baz \
-1 2
-lorem ipsum
-"#,
-        );
-        let expected = [
-            tok!(newline @ 9),
-            tok!(ident @ (10, 1)),
-            tok!(ident @ (12, 1)),
-            tok!(newline @ 19),
-            tok!(newline @ 27),
-            tok!(ident @ (28, 1)),
-            tok!(ident @ (30, 1)),
-            tok!(newline @ 31),
-            tok!(ident @ (32, 5)),
-            tok!(ident @ (38, 5)),
-            tok!(newline @ 43),
-        ];
-        assert_eq!(
-            buffer.tokenize().map(Result::unwrap).collect::<Vec<_>>(),
-            &expected
-        );
-    }
+    //     #[test]
+    //     fn test_tokenize_comments() {
+    //         let buffer = BlifBuffer::from(
+    //             r#"# foo bar
+    // a b # c d
+    // # baz \
+    // 1 2
+    // lorem ipsum
+    // "#,
+    //         );
+    //         let expected = [
+    //             tok!(newline @ 9),
+    //             tok!(ident @ (10, 1)),
+    //             tok!(ident @ (12, 1)),
+    //             tok!(newline @ 19),
+    //             tok!(newline @ 27),
+    //             tok!(ident @ (28, 1)),
+    //             tok!(ident @ (30, 1)),
+    //             tok!(newline @ 31),
+    //             tok!(ident @ (32, 5)),
+    //             tok!(ident @ (38, 5)),
+    //             tok!(newline @ 43),
+    //         ];
+    //         assert_eq!(
+    //             buffer.tokenize().map(Result::unwrap).collect::<Vec<_>>(),
+    //             &expected
+    //         );
+    //     }
 }
