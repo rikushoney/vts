@@ -1,3 +1,4 @@
+// TODO(rikus): Remove this once everything is implemented.
 #![allow(dead_code)]
 
 use std::fmt;
@@ -23,13 +24,15 @@ impl BlifChar for u8 {
         *self != b'\n' && self.is_ascii_whitespace()
     }
 
-    /// Returns `true` if the byte is the start of a directive ('.').
+    /// Returns `true` if the byte is the start of a directive ('.'),
+    /// else `false`.
     #[inline]
     fn is_directive_start(&self) -> bool {
         *self == b'.'
     }
 
-    /// Returns `true` if the byte is a directive continue (alphabetic).
+    /// Returns `true` if the byte is a directive continue (ascii alphabetic),
+    /// else `false`.
     #[inline]
     fn is_directive_continue(&self) -> bool {
         self.is_ascii_alphabetic()
@@ -95,17 +98,21 @@ pub enum ParseError {
     Syntax(#[from] SyntaxError),
 }
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error(
-        r#"{error}
+#[derive(Clone, Debug, Error)]
+#[error(
+    r#"{error}
 
 while parsing {location}"#
-    )]
-    Parse {
-        error: ParseError,
-        location: SourceLocation,
-    },
+)]
+pub struct TaggedParseError {
+    error: ParseError,
+    location: SourceLocation,
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error(transparent)]
+    Parse(TaggedParseError),
     #[error(transparent)]
     IO(#[from] std::io::Error),
 }
@@ -115,10 +122,10 @@ impl Error {
     where
         ParseError: From<E>,
     {
-        Self::Parse {
+        Self::Parse(TaggedParseError {
             error: ParseError::from(err),
             location,
-        }
+        })
     }
 }
 
@@ -135,11 +142,15 @@ pub(super) trait ParseLocation<T> {
 }
 
 impl<T> ParseLocation<T> for ParseResult<T> {
+    /// Tag a `ParseResult` with a location.
     fn location(self, location: SourceLocation) -> Result<T> {
-        let tag_location = |error| Error::Parse { error, location };
-        self.map_err(tag_location)
+        self.map_err(|error| Error::new_parse(error, location))
     }
 
+    /// Tag a `ParseResult` with a location.
+    ///
+    /// In contrast with [location](#method.location), the location is evaluated
+    /// lazily.
     fn with_location<F>(self, mut make_location: F) -> Result<T>
     where
         F: FnMut() -> SourceLocation,
@@ -173,7 +184,7 @@ impl From<(usize, usize)> for EscapedNewline {
 #[derive(Debug)]
 struct BlifLines {
     line_indices: Box<[usize]>,
-    escaped_newline_indices: Box<[EscapedNewline]>,
+    escaped_newlines: Box<[EscapedNewline]>,
 }
 
 impl BlifBuffer {
@@ -256,7 +267,7 @@ impl BlifBuffer {
         }
         // Replace escaped newlines (and associated escape character) with
         // spaces to simplify the implementation of the tokenizer.
-        // TODO(rikus): investigate performance of handling this in-line the
+        // TODO(rikus): Investigate performance of handling this in-line the
         // tokenizer.
         for (escape_i, newline_i) in escaped_newline_indices.iter() {
             self.inner[*escape_i] = b' ';
@@ -264,7 +275,7 @@ impl BlifBuffer {
         }
         BlifLines {
             line_indices: Box::from_iter(line_indices),
-            escaped_newline_indices: Box::from_iter(
+            escaped_newlines: Box::from_iter(
                 escaped_newline_indices
                     .into_iter()
                     .map(EscapedNewline::from),
@@ -426,8 +437,64 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// The offset to the start of the current line in the buffer.
-    fn current_line_offset(&self) -> usize {
+    fn current_line_start_offset(&self) -> usize {
         self.lines.line_indices[self.current_line]
+    }
+
+    /// Model ::= ".model" S+ ident
+    fn tokenize_model_line(&mut self) -> Token {
+        debug_assert!(self.scanner.before().ends_with(b".model"));
+        self.scanner.eat_while(BlifChar::is_line_whitespace);
+        todo!()
+    }
+
+    /// Inputs ::= ".inputs" S+ ident (S+ ident)*
+    fn tokenize_inputs_line(&mut self) -> Token {
+        debug_assert!(self.scanner.before().ends_with(b".inputs"));
+        self.scanner.eat_while(BlifChar::is_line_whitespace);
+        todo!()
+    }
+
+    /// Outputs ::= ".outputs" S+ ident (S+ ident)*
+    fn tokenize_outputs_line(&mut self) -> Token {
+        debug_assert!(self.scanner.before().ends_with(b".outputs"));
+        self.scanner.eat_while(BlifChar::is_line_whitespace);
+        todo!()
+    }
+
+    /// Names ::= ".names" S+ ident S+ ident (S+ ident)*
+    fn tokenize_names_line(&mut self) -> Token {
+        debug_assert!(self.scanner.before().ends_with(b".names"));
+        self.scanner.eat_while(BlifChar::is_line_whitespace);
+        todo!()
+    }
+
+    /// latch-type ::= "re" | "fe" | "ah" | "al" | "as"
+    /// latch-ctrl ::= S+ latch-type S+ ident
+    /// latch-init ::= S+ [0-3]
+    /// Latch ::= ".latch" S+ ident S+ ident latch-ctrl? latch-init?
+    fn tokenize_latch_line(&mut self) -> Token {
+        debug_assert!(self.scanner.before().ends_with(b".latch"));
+        self.scanner.eat_while(BlifChar::is_line_whitespace);
+        todo!()
+    }
+
+    /// Subckt ::= ".subckt" S+ ident S+ ident=ident (S+ ident=ident)*
+    fn tokenize_subckt_line(&mut self) -> Token {
+        debug_assert!(self.scanner.before().ends_with(b".subckt"));
+        self.scanner.eat_while(BlifChar::is_line_whitespace);
+        todo!()
+    }
+
+    /// End ::= ".end"
+    fn tokenize_end_line(&mut self) -> Token {
+        debug_assert!(self.scanner.before().ends_with(b".end"));
+        // TODO(rikus): Check if we expect a `.end` line and issue a
+        // warning/error otherwise.
+        let line_start = self.current_line_start_offset();
+        Token::Directive(Directive::End {
+            span: Span::new(line_start, ".end".len()),
+        })
     }
 }
 
@@ -457,47 +524,23 @@ impl Iterator for Tokenizer<'_> {
             // Tokenize directives.
             if self.scanner.eat_if(BlifChar::is_directive_start) {
                 let directive = self.scanner.eat_while(BlifChar::is_directive_continue);
-                match directive {
-                    b"model" => {
-                        // TODO(rikus): handle model
-                        todo!()
-                    }
-                    b"inputs" => {
-                        // TODO(rikus): handle inputs
-                        todo!()
-                    }
-                    b"outputs" => {
-                        // TODO(rikus): handle outputs
-                        todo!()
-                    }
-                    b"names" => {
-                        // TODO(rikus): handle names
-                        todo!()
-                    }
-                    b"latch" => {
-                        // TODO(rikus): handle latch
-                        todo!()
-                    }
-                    b"subckt" => {
-                        // TODO(rikus): handle subckt
-                        todo!()
-                    }
-                    b"end" => {
-                        // TODO(rikus): handle end
-                        todo!()
-                    }
+                token = Some(match directive {
+                    b"model" => self.tokenize_model_line(),
+                    b"inputs" => self.tokenize_inputs_line(),
+                    b"outputs" => self.tokenize_outputs_line(),
+                    b"names" => self.tokenize_names_line(),
+                    b"latch" => self.tokenize_latch_line(),
+                    b"subckt" => self.tokenize_subckt_line(),
+                    b"end" => self.tokenize_end_line(),
                     _unknown => {
-                        // TODO(rikus): look out for directives that we don't
+                        // TODO(rikus): Look out for directives that we don't
                         // support and report those as separate errors.
-                        token = Some(Token::UnknownDirective(Span::new_range(
-                            start,
-                            self.scanner.cursor(),
-                        )));
+                        Token::UnknownDirective(Span::new_range(start, self.scanner.cursor()))
                     }
-                }
+                });
                 break;
             }
-            // TODO(rikus): tokenize other cases and report unexpected bytes.
+            // TODO(rikus): Tokenize other cases and report unexpected bytes.
             let eof = self.scanner.bytes().len();
             self.scanner.jump(eof);
             todo!()
