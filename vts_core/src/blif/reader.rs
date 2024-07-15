@@ -58,7 +58,7 @@ impl fmt::Display for SourceLocation {
 
         impl fmt::Display for Filename<'_> {
             fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                if self.0.bytes().any(|b| b.is_ascii_whitespace()) {
+                if self.0.chars().any(char::is_whitespace) {
                     write!(formatter, "\"{}\"", self.0)
                 } else {
                     write!(formatter, "{}", self.0)
