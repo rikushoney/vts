@@ -234,7 +234,7 @@ impl BlifBuffer {
     /// Preprocess the buffer and replace newline escapes.
     ///
     /// Returns
-    /// - a list of offsets to newline characters (excluding escaped
+    /// - a list of offsets to the start of lines (excluding escaped
     ///   newlines).
     /// - a list of offsets to escaped newlines (along with the
     ///   offset to the associated escape character).
