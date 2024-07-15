@@ -479,7 +479,7 @@ impl<'a> Tokenizer<'a> {
         todo!()
     }
 
-    /// Subckt ::= ".subckt" S+ ident S+ ident=ident (S+ ident=ident)*
+    /// Subckt ::= ".subckt" S+ ident S+ ident "=" ident (S+ ident "=" ident)*
     fn tokenize_subckt_line(&mut self) -> Token {
         debug_assert!(self.scanner.before().ends_with(b".subckt"));
         self.scanner.eat_while(BlifChar::is_line_whitespace);
