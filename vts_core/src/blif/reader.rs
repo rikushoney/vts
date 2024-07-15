@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::fmt;
 use std::io::Read;
 
@@ -7,10 +9,14 @@ use super::netlist::Netlist;
 
 use crate::bytescanner::Scanner;
 
+/// A location in BLIF text/bytes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SourceLocation {
+    /// Optional filename.
     pub file: Option<String>,
+    /// 1-based line number.
     pub line: usize,
+    /// 1-based column offset.
     pub column: usize,
 }
 
@@ -18,6 +24,18 @@ impl Eq for SourceLocation {}
 
 impl fmt::Display for SourceLocation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        struct Filename<'a>(&'a str);
+
+        impl fmt::Display for Filename<'_> {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                if self.0.bytes().any(|b| b.is_ascii_whitespace()) {
+                    write!(formatter, "\"{}\"", self.0)
+                } else {
+                    write!(formatter, "{}", self.0)
+                }
+            }
+        }
+
         let filename = self
             .file
             .as_ref()
@@ -26,11 +44,13 @@ impl fmt::Display for SourceLocation {
                 name => name,
             })
             .unwrap_or("<unknown>");
-        if filename.bytes().any(|b| b.is_ascii_whitespace()) {
-            write!(formatter, "\"{}\":{}:{}", filename, self.line, self.column)
-        } else {
-            write!(formatter, "{}:{}:{}", filename, self.line, self.column)
-        }
+        write!(
+            formatter,
+            "{}:{}:{}",
+            Filename(filename),
+            self.line,
+            self.column
+        )
     }
 }
 
@@ -101,10 +121,32 @@ impl<T> ParseLocation<T> for ParseResult<T> {
     }
 }
 
-#[derive(Default)]
+/// An owned buffer of BLIF text/bytes.
+#[derive(Debug, Default)]
 struct BlifBuffer {
     filename: Option<String>,
-    inner: Vec<u8>,
+    inner: Box<[u8]>,
+}
+
+#[derive(Debug, PartialEq)]
+struct EscapedNewline {
+    escape_i: usize,
+    newline_i: usize,
+}
+
+impl From<(usize, usize)> for EscapedNewline {
+    fn from(indices: (usize, usize)) -> Self {
+        Self {
+            escape_i: indices.0,
+            newline_i: indices.1,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct BlifLines {
+    line_indices: Box<[usize]>,
+    escaped_newline_indices: Box<[EscapedNewline]>,
 }
 
 impl BlifBuffer {
@@ -118,6 +160,13 @@ impl BlifBuffer {
         }
     }
 
+    fn new_str(input: &str) -> Self {
+        Self::new(input.bytes(), None)
+    }
+
+    /// Calculate the 1-based line location and column offset at `offset`.
+    ///
+    /// Panics if `offset` is out of bounds.
     fn calculate_location(&self, offset: usize) -> SourceLocation {
         assert!(offset < self.inner.len());
         let line = self
@@ -141,78 +190,145 @@ impl BlifBuffer {
             file: self.filename.clone(),
         }
     }
-}
 
-impl From<String> for BlifBuffer {
-    fn from(input: String) -> Self {
-        Self::new(input.into_bytes(), None)
-    }
-}
-
-impl From<Vec<u8>> for BlifBuffer {
-    fn from(input: Vec<u8>) -> Self {
-        Self {
-            filename: None,
-            inner: input,
+    /// Preprocess the buffer.
+    ///
+    /// Returns
+    /// - a list of offsets to newline characters (excluding escaped
+    ///   newlines).
+    /// - a list of offsets to escaped newlines (along with the
+    ///   offset to the associated escape character).
+    /// as a single struct, [BlifLines].
+    fn preprocess(&mut self) -> BlifLines {
+        let mut line_indices = Vec::new();
+        let mut escaped_newline_indices = Vec::new();
+        let mut scanner = Scanner::new(&self.inner);
+        while !scanner.done() {
+            let start = scanner.cursor();
+            let line = scanner.eat_until(b'\n');
+            // Check for a newline escape, i.e. "\\\n".
+            // Also support arbitrary whitespace between the '\\' and '\n',
+            // including carriage returns (b'\r') used by older systems.
+            let maybe_escape_i = line.len()
+                - (1 + line
+                    .iter()
+                    .rev()
+                    .take_while(|b| b.is_ascii_whitespace())
+                    .count());
+            if line[maybe_escape_i] == b'\\' {
+                let escape_i = start + maybe_escape_i;
+                let newline_i = start + line.len();
+                escaped_newline_indices.push((escape_i, newline_i));
+            } else {
+                line_indices.push(start);
+            }
+        }
+        // Replace escaped newlines (and associated escape character) with
+        // spaces to simplify the implementation of the tokenizer.
+        // TODO(rikus): investigate performance of handling this in-line the
+        // tokenizer.
+        for (escape_i, newline_i) in escaped_newline_indices.iter() {
+            self.inner[*escape_i] = b' ';
+            self.inner[*newline_i] = b' ';
+        }
+        BlifLines {
+            line_indices: Box::from_iter(line_indices),
+            escaped_newline_indices: Box::from_iter(
+                escaped_newline_indices
+                    .into_iter()
+                    .map(EscapedNewline::from),
+            ),
         }
     }
 }
 
-impl From<&str> for BlifBuffer {
-    fn from(input: &str) -> Self {
-        Self::new(input.bytes(), None)
+impl<I> From<I> for BlifBuffer
+where
+    I: IntoIterator<Item = u8>,
+{
+    fn from(input: I) -> Self {
+        Self {
+            filename: None,
+            inner: Box::from_iter(input),
+        }
     }
 }
 
+/// A spanned location in the buffer.
 #[derive(Debug, PartialEq)]
 struct Span {
     start: usize,
     len: usize,
 }
 
+impl Span {
+    fn new(start: usize, len: usize) -> Self {
+        Self { start, len }
+    }
+
+    fn new_range(start: usize, end: usize) -> Self {
+        Self::new(start, end - start)
+    }
+}
+
+/// A list of [Span]s.
+#[derive(Debug, PartialEq)]
+struct SpanList {
+    spans: Box<[Span]>,
+}
+
+/// A multi-input, single-output PLA description.
 #[derive(Debug, PartialEq)]
 struct Cover {
     input: Span,
     output: Span,
+    span: Span,
 }
 
+/// A `formal=actual` pair in a subcircuit instantiation.
 #[derive(Debug, PartialEq)]
 struct FormalActual {
     input: Span,
     output: Span,
 }
 
+/// A BLIF directive.
 #[derive(Debug, PartialEq)]
 enum Directive {
+    // .model <name>
     Model {
         name: Span,
         span: Span,
     },
+    // .inputs <name0> [<name1> ...]
     Inputs {
-        list: Vec<Span>,
+        list: SpanList,
         span: Span,
     },
+    // .outputs <name0> [<name1> ...]
     Outputs {
-        list: Vec<Span>,
+        list: SpanList,
         span: Span,
     },
+    // .names <in0> [<in1> ...] <out>
     Names {
-        inputs: Vec<Span>,
-        output: Vec<Span>,
-        covers: Vec<Cover>,
+        inputs: SpanList,
+        output: SpanList,
         span: Span,
     },
+    // .latch <input> <output> [<ty> <ctrl>] [<init>]
     Latch {
         input: Span,
         output: Span,
         ty: Option<Span>,
-        control: Option<Span>,
+        ctrl: Option<Span>,
         init: Option<Span>,
         span: Span,
     },
+    // .subckt <name> <formal0=actual0> [<formal1=actual1> ...]
     Subckt {
         name: Span,
-        formal_actual: Vec<FormalActual>,
+        formal_actual: Box<[FormalActual]>,
         span: Span,
     },
 }
@@ -233,7 +349,7 @@ impl Directive {
 #[derive(Debug, PartialEq)]
 enum Token {
     Directive(Directive),
-    Whitespace(Span),
+    Cover(Cover),
     Newline(Span),
     Comment(Span),
 }
@@ -242,7 +358,7 @@ impl Token {
     fn span(&self) -> &Span {
         match self {
             Self::Directive(directive) => directive.span(),
-            Self::Whitespace(span) => span,
+            Self::Cover(cover) => &cover.span,
             Self::Newline(span) => span,
             Self::Comment(span) => span,
         }
@@ -265,21 +381,21 @@ impl Iterator for Tokenizer<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.scanner.eat_whitespace();
         let start = self.scanner.cursor();
-        if self.scanner.eat_if(u8::is_ascii_whitespace) {
-            self.scanner.eat_whitespace();
-            return Some(Token::Whitespace(Span {
-                start,
-                len: self.scanner.cursor() - start,
-            }));
-        }
+        // comments
         if self.scanner.eat_if(b'#') {
             self.scanner.eat_until(b'\n');
-            return Some(Token::Comment(Span {
+            return Some(Token::Comment(Span::new_range(
                 start,
-                len: self.scanner.cursor() - start,
-            }));
+                self.scanner.cursor(),
+            )));
         }
+        // newlines
+        if self.scanner.eat_if(b'\n') {
+            return Some(Token::Newline(Span::new(start, 1)));
+        }
+
         todo!()
     }
 }
@@ -290,16 +406,21 @@ impl BlifBuffer {
     }
 }
 
+#[derive(Debug)]
 pub struct BlifReader {
     buffer: BlifBuffer,
 }
 
 impl BlifReader {
     pub fn from_reader<R: Read>(mut reader: R, filename: Option<&str>) -> Result<Self> {
-        let mut buffer = BlifBuffer::default();
-        reader.read_to_end(&mut buffer.inner)?;
-        buffer.filename = filename.map(str::to_string);
-        Ok(Self { buffer })
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer)?;
+        Ok(Self {
+            buffer: BlifBuffer {
+                filename: filename.map(str::to_string),
+                inner: Box::from_iter(buffer),
+            },
+        })
     }
 
     pub fn from_str(input: &str, filename: Option<&str>) -> Self {
@@ -331,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_calculate_source_location() {
-        let buffer = BlifBuffer::from(
+        let buffer = BlifBuffer::new_str(
             r#".model top
 .inputs a b c
 .outputs d
@@ -348,7 +469,7 @@ mod tests {
         assert_eq!(buffer.inner.len(), 62);
         assert_eq!(buffer.calculate_location(60), loc!(6, 4));
 
-        let buffer = BlifBuffer::from("\na");
+        let buffer = BlifBuffer::new_str("\na");
         assert_eq!(buffer.calculate_location(0), loc!(1, 1));
         assert_eq!(buffer.calculate_location(1), loc!(2, 1));
     }
