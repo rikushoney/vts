@@ -9,10 +9,37 @@ use super::netlist::Netlist;
 
 use crate::bytescanner::Scanner;
 
+trait BlifChar {
+    fn is_line_whitespace(&self) -> bool;
+    fn is_directive_start(&self) -> bool;
+    fn is_directive_continue(&self) -> bool;
+}
+
+impl BlifChar for u8 {
+    /// Returns `true` if the byte is ascii whitespace (excluding newlines),
+    /// else `false`.
+    #[inline]
+    fn is_line_whitespace(&self) -> bool {
+        *self != b'\n' && self.is_ascii_whitespace()
+    }
+
+    /// Returns `true` if the byte is the start of a directive ('.').
+    #[inline]
+    fn is_directive_start(&self) -> bool {
+        *self == b'.'
+    }
+
+    /// Returns `true` if the byte is a directive continue (alphabetic).
+    #[inline]
+    fn is_directive_continue(&self) -> bool {
+        self.is_ascii_alphabetic()
+    }
+}
+
 /// A location in BLIF text/bytes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SourceLocation {
-    /// Optional filename.
+    /// Filename, if known.
     pub file: Option<String>,
     /// 1-based line number.
     pub line: usize,
@@ -150,6 +177,7 @@ struct BlifLines {
 }
 
 impl BlifBuffer {
+    /// Create a new buffer with an optional filename.
     fn new<I>(bytes: I, filename: Option<String>) -> Self
     where
         I: IntoIterator<Item = u8>,
@@ -160,11 +188,12 @@ impl BlifBuffer {
         }
     }
 
+    /// Create a new buffer by copying a string.
     fn new_str(input: &str) -> Self {
         Self::new(input.bytes(), None)
     }
 
-    /// Calculate the 1-based line location and column offset at `offset`.
+    /// Calculate the 1-based line number and column offset at `offset`.
     ///
     /// Panics if `offset` is out of bounds.
     fn calculate_location(&self, offset: usize) -> SourceLocation {
@@ -191,13 +220,14 @@ impl BlifBuffer {
         }
     }
 
-    /// Preprocess the buffer.
+    /// Preprocess the buffer and replace newline escapes.
     ///
     /// Returns
     /// - a list of offsets to newline characters (excluding escaped
     ///   newlines).
     /// - a list of offsets to escaped newlines (along with the
     ///   offset to the associated escape character).
+    ///
     /// as a single struct, [BlifLines].
     fn preprocess(&mut self) -> BlifLines {
         let mut line_indices = Vec::new();
@@ -206,9 +236,10 @@ impl BlifBuffer {
         while !scanner.done() {
             let start = scanner.cursor();
             let line = scanner.eat_until(b'\n');
+            scanner.eat();
             // Check for a newline escape, i.e. "\\\n".
             // Also support arbitrary whitespace between the '\\' and '\n',
-            // including carriage returns (b'\r') used by older systems.
+            // including carriage returns ('\r') used by older systems.
             let maybe_escape_i = line.len()
                 - (1 + line
                     .iter()
@@ -295,28 +326,19 @@ struct FormalActual {
 /// A BLIF directive.
 #[derive(Debug, PartialEq)]
 enum Directive {
-    // .model <name>
-    Model {
-        name: Span,
-        span: Span,
-    },
-    // .inputs <name0> [<name1> ...]
-    Inputs {
-        list: SpanList,
-        span: Span,
-    },
-    // .outputs <name0> [<name1> ...]
-    Outputs {
-        list: SpanList,
-        span: Span,
-    },
-    // .names <in0> [<in1> ...] <out>
+    /// `.model <name>`
+    Model { name: Span, span: Span },
+    /// `.inputs <name0> [<name1> ...]`
+    Inputs { list: SpanList, span: Span },
+    /// `.outputs <name0> [<name1> ...]`
+    Outputs { list: SpanList, span: Span },
+    /// `.names <input0> [<input1> ...] <output>`
     Names {
-        inputs: SpanList,
+        input: SpanList,
         output: SpanList,
         span: Span,
     },
-    // .latch <input> <output> [<ty> <ctrl>] [<init>]
+    /// `.latch <input> <output> [<ty> <ctrl>] [<init>]`
     Latch {
         input: Span,
         output: Span,
@@ -325,15 +347,22 @@ enum Directive {
         init: Option<Span>,
         span: Span,
     },
-    // .subckt <name> <formal0=actual0> [<formal1=actual1> ...]
+    /// `.subckt <name> <formal0>=<actual0> [<formal1>=<actual1> ...]`
     Subckt {
         name: Span,
         formal_actual: Box<[FormalActual]>,
         span: Span,
     },
+    /// `.end`
+    ///
+    /// NOTE: `End` directives can be implicit and simply mark the location
+    /// where the model ends (in which case the offset is given in `span.start`
+    /// and `span.len == 0`).
+    End { span: Span },
 }
 
 impl Directive {
+    /// The entire span of the directive.
     fn span(&self) -> &Span {
         match self {
             Self::Model { span, .. } => span,
@@ -342,67 +371,145 @@ impl Directive {
             Self::Names { span, .. } => span,
             Self::Latch { span, .. } => span,
             Self::Subckt { span, .. } => span,
+            Self::End { span } => span,
         }
     }
 }
 
+/// A token -- roughly corrosponds to a single line in BLIF text/bytes.
 #[derive(Debug, PartialEq)]
 enum Token {
+    /// A [Directive] token.
     Directive(Directive),
+    /// An unknown directive (for error reporting).
+    UnknownDirective(Span),
+    /// A [Cover] token.
     Cover(Cover),
-    Newline(Span),
-    Comment(Span),
+    /// An implicit token yielded after the PLA description of a [Directive]
+    /// directive. `span.start` is the end of the final [Cover] token.
+    NamesEnd(Span),
 }
 
 impl Token {
+    /// The entire span of the token.
     fn span(&self) -> &Span {
         match self {
             Self::Directive(directive) => directive.span(),
+            Self::UnknownDirective(span) => span,
             Self::Cover(cover) => &cover.span,
-            Self::Newline(span) => span,
-            Self::Comment(span) => span,
+            Self::NamesEnd(span) => span,
         }
     }
 }
 
+/// An iterator over scanned tokens.
 struct Tokenizer<'a> {
     scanner: Scanner<'a>,
+    lines: BlifLines,
+    current_line: usize,
 }
 
 impl<'a> Tokenizer<'a> {
-    fn new(buffer: &'a BlifBuffer) -> Self {
+    /// Start a new tokenizer.
+    fn new(buffer: &'a BlifBuffer, lines: BlifLines) -> Self {
         Self {
             scanner: Scanner::new(&buffer.inner),
+            lines,
+            current_line: 0,
         }
+    }
+
+    /// Preprocess `buffer` and start a new tokenizer.
+    fn new_preprocess(buffer: &'a mut BlifBuffer) -> Self {
+        let lines = buffer.preprocess();
+        Self::new(buffer, lines)
+    }
+
+    /// The offset to the start of the current line in the buffer.
+    fn current_line_offset(&self) -> usize {
+        self.lines.line_indices[self.current_line]
     }
 }
 
 impl Iterator for Tokenizer<'_> {
     type Item = Token;
 
+    /// Get the next token in the buffer skipping whitespace, newlines and
+    /// comments.
     fn next(&mut self) -> Option<Self::Item> {
-        self.scanner.eat_whitespace();
-        let start = self.scanner.cursor();
-        // comments
-        if self.scanner.eat_if(b'#') {
-            self.scanner.eat_until(b'\n');
-            return Some(Token::Comment(Span::new_range(
-                start,
-                self.scanner.cursor(),
-            )));
+        let mut token = None;
+        while !self.scanner.done() && token.is_none() {
+            // Skip whitespace, excluding newlines.
+            self.scanner.eat_while(BlifChar::is_line_whitespace);
+            // Skip comments.
+            if self.scanner.eat_if(b'#') {
+                self.scanner.eat_until(b'\n');
+                self.scanner.eat();
+                self.current_line += 1;
+                continue;
+            }
+            // Skip newlines.
+            if self.scanner.eat_if(b'\n') {
+                self.current_line += 1;
+                continue;
+            }
+            let start = self.scanner.cursor();
+            // Tokenize directives.
+            if self.scanner.eat_if(BlifChar::is_directive_start) {
+                let directive = self.scanner.eat_while(BlifChar::is_directive_continue);
+                match directive {
+                    b"model" => {
+                        // TODO(rikus): handle model
+                        todo!()
+                    }
+                    b"inputs" => {
+                        // TODO(rikus): handle inputs
+                        todo!()
+                    }
+                    b"outputs" => {
+                        // TODO(rikus): handle outputs
+                        todo!()
+                    }
+                    b"names" => {
+                        // TODO(rikus): handle names
+                        todo!()
+                    }
+                    b"latch" => {
+                        // TODO(rikus): handle latch
+                        todo!()
+                    }
+                    b"subckt" => {
+                        // TODO(rikus): handle subckt
+                        todo!()
+                    }
+                    b"end" => {
+                        // TODO(rikus): handle end
+                        todo!()
+                    }
+                    _unknown => {
+                        // TODO(rikus): look out for directives that we don't
+                        // support and report those as separate errors.
+                        token = Some(Token::UnknownDirective(Span::new_range(
+                            start,
+                            self.scanner.cursor(),
+                        )));
+                    }
+                }
+                break;
+            }
+            // TODO(rikus): tokenize other cases and report unexpected bytes.
+            let eof = self.scanner.bytes().len();
+            self.scanner.jump(eof);
+            todo!()
         }
-        // newlines
-        if self.scanner.eat_if(b'\n') {
-            return Some(Token::Newline(Span::new(start, 1)));
-        }
-
-        todo!()
+        token
     }
 }
 
 impl BlifBuffer {
-    fn tokenize(&self) -> Tokenizer {
-        Tokenizer::new(self)
+    /// Preprocess and create a new [Tokenizer] from the buffer.
+    fn tokenize(&mut self) -> Tokenizer {
+        Tokenizer::new_preprocess(self)
     }
 }
 
@@ -431,7 +538,7 @@ impl BlifReader {
 
     pub fn parse_netlist(&mut self) -> Result<Netlist> {
         let tokenizer = self.buffer.tokenize();
-        // let _ = tokenizer.count();
+        let _ = tokenizer.count();
         todo!()
     }
 }

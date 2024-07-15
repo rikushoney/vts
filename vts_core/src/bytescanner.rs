@@ -198,6 +198,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// The subslice from `start` to the current cursor position.
+    ///
     /// - If `start` is greater than or equal to the current cursor position,
     ///   an empty slice is returned.
     #[inline]
@@ -207,6 +208,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// The subslice from the current cursor position to `end`.
+    ///
     /// - If `end` is less than or equal to the current cursor position, an
     ///   empty slice is returned.
     /// - If `end` is greater than or equal to the length of the bytes, a
@@ -219,6 +221,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// The subslice from `range.start` to `range.end`.
+    ///
     /// - If `range.end` is less than or equal to `range.start`, an empty
     ///   slice is returned.
     /// - If `range.end` is greater than or equal to the length of the bytes,
@@ -254,6 +257,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Consume a single byte.
+    ///
     /// Returns the byte right at the cursor if there are any bytes left.
     #[inline]
     pub fn eat(&mut self) -> Option<u8> {
@@ -265,6 +269,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Un-consume a single byte.
+    ///
     /// Returns the byte right before the cursor if the cursor is not at the
     /// start of the bytes.
     #[inline]
@@ -277,6 +282,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Consume bytes if they match `pattern`.
+    ///
     /// Returns `true` if bytes were consumed else `false`.
     #[inline]
     pub fn eat_if<T>(&mut self, mut pattern: impl Pattern<T>) -> bool {
@@ -289,6 +295,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Consume bytes while they match `pattern`.
+    ///
     /// Returns a slice of all the consumed bytes.
     #[inline]
     pub fn eat_while<T>(&mut self, mut pattern: impl Pattern<T>) -> &'a [u8] {
@@ -299,7 +306,8 @@ impl<'a> Scanner<'a> {
         self.from(start)
     }
 
-    /// Consume bytes until the next byte matches `pattern`.
+    /// Consume bytes until the next bytes match `pattern`.
+    ///
     /// Returns a slice of all the consumed bytes.
     #[inline]
     pub fn eat_until<T>(&mut self, mut pattern: impl Pattern<T>) -> &'a [u8] {
@@ -310,7 +318,23 @@ impl<'a> Scanner<'a> {
         self.from(start)
     }
 
-    /// Consume ascii whitespace bytes until the next non-ascii byte.
+    /// Consume bytes until the next bytes match `pattern`.
+    ///
+    /// Returns a slice of all the consumed bytes and the terminating bytes.
+    #[inline]
+    pub fn eat_until_terminator<T>(&mut self, mut pattern: impl Pattern<T>) -> &'a [u8] {
+        let start = self.cursor;
+        while !self.done() && pattern.matches(self.after()).is_none() {
+            self.cursor += 1;
+        }
+        if let Some(len) = pattern.matches(self.after()) {
+            self.cursor += len;
+        }
+        self.from(start)
+    }
+
+    /// Consume whitespace bytes until the next non-whitespace byte.
+    ///
     /// Returns a slice of the consumed whitespace.
     #[inline]
     pub fn eat_whitespace(&mut self) -> &'a [u8] {
