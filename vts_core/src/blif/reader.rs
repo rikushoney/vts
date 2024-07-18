@@ -104,6 +104,7 @@ pub struct TaggedParseError {
 }
 
 /// A reading error.
+// TODO(rikus): Merge with blif crate error.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
@@ -111,6 +112,8 @@ pub enum Error {
     #[error(transparent)]
     IO(#[from] std::io::Error),
 }
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
     fn new_parse<E>(err: E, location: SourceLocation) -> Self
@@ -123,8 +126,6 @@ impl Error {
         })
     }
 }
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
@@ -153,7 +154,7 @@ impl<T> ParseLocation<T> for ParseResult<T> {
 
 /// An owned buffer of BLIF text/bytes.
 #[derive(Debug, Default)]
-struct BlifBuffer {
+pub struct BlifBuffer {
     filename: Option<String>,
     inner: Box<[u8]>,
 }
@@ -196,6 +197,12 @@ impl BlifBuffer {
     /// The length of the buffer, in bytes.
     fn len(&self) -> usize {
         self.inner.len()
+    }
+
+    /// View the bytes in `extent`.
+    pub fn view(&self, extent: Span) -> &[u8] {
+        let end = extent.start + extent.len;
+        &self.inner[extent.start..end]
     }
 
     /// Calculate the 1-based line number and column offset at `offset`.
@@ -428,7 +435,7 @@ where
 
 /// An extent of the buffer.
 #[derive(Debug, PartialEq)]
-struct Span {
+pub struct Span {
     start: usize,
     len: usize,
 }
