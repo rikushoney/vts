@@ -91,7 +91,7 @@ where
     }
 }
 
-/// Something a blob of bytes can start with
+/// Something a blob of bytes can start with.
 pub trait Pattern<T>: sealed::Sealed<T> {}
 
 impl Pattern<()> for u8 {}
@@ -212,7 +212,7 @@ impl<'a> Scanner<'a> {
     /// - If `end` is less than or equal to the current cursor position, an
     ///   empty slice is returned.
     /// - If `end` is greater than or equal to the length of the bytes, a
-    ///   slice of all the bytes starting at the current cursor position is
+    ///   slice of all the bytes starting from the current cursor position is
     ///   returned.
     #[inline]
     pub fn to(&self, end: usize) -> &'a [u8] {
@@ -225,7 +225,7 @@ impl<'a> Scanner<'a> {
     /// - If `range.end` is less than or equal to `range.start`, an empty
     ///   slice is returned.
     /// - If `range.end` is greater than or equal to the length of the bytes,
-    ///   a slice of all of the bytes starting at `range.start` is returned.
+    ///   a slice of all of the bytes starting from `range.start` is returned.
     #[inline]
     pub fn get(&self, range: Range<usize>) -> &'a [u8] {
         let end = range.end.min(self.bytes.len());
@@ -239,8 +239,8 @@ impl<'a> Scanner<'a> {
         self.after().iter().next().copied()
     }
 
-    /// Returns `true` if the bytes right at the cursor match `pattern`, else
-    /// `false`.
+    /// Returns `true` if the bytes right after the cursor match `pattern`,
+    /// else `false`.
     #[inline]
     pub fn at<T>(&self, mut pattern: impl Pattern<T>) -> bool {
         pattern.matches(self.after()).is_some()
@@ -258,7 +258,7 @@ impl<'a> Scanner<'a> {
 
     /// Consume a single byte.
     ///
-    /// Returns the byte right at the cursor if there are any bytes left.
+    /// Returns the consumed byte if there are any bytes left.
     #[inline]
     pub fn eat(&mut self) -> Option<u8> {
         let peeked = self.peek();
@@ -270,8 +270,8 @@ impl<'a> Scanner<'a> {
 
     /// Un-consume a single byte.
     ///
-    /// Returns the byte right before the cursor if the cursor is not at the
-    /// start of the bytes.
+    /// Returns the un-consumed byte if the cursor is not at the start of the
+    /// bytes.
     #[inline]
     pub fn uneat(&mut self) -> Option<u8> {
         let unpeeked = self.before().iter().next_back().copied();

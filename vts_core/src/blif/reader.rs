@@ -12,30 +12,30 @@ use crate::bytescanner::Scanner;
 
 trait BlifChar {
     fn is_line_whitespace(&self) -> bool;
-    fn is_directive_start(&self) -> bool;
-    fn is_directive_continue(&self) -> bool;
 }
 
 impl BlifChar for u8 {
-    /// Returns `true` if the byte is ascii whitespace (excluding newlines),
+    /// Returns `true` if the byte is whitespace (excluding newlines),
     /// else `false`.
     #[inline]
     fn is_line_whitespace(&self) -> bool {
-        *self != b'\n' && self.is_ascii_whitespace()
+        matches!(*self, b'\t' | b'\x0C' | b'\r' | b' ')
+    }
+}
+
+trait BlifScanner<'a> {
+    fn eat_line_whitespace(&mut self) -> &'a [u8];
+
+    fn eat_until_whitespace(&mut self) -> &'a [u8];
+}
+
+impl<'a> BlifScanner<'a> for Scanner<'a> {
+    fn eat_line_whitespace(&mut self) -> &'a [u8] {
+        self.eat_while(BlifChar::is_line_whitespace)
     }
 
-    /// Returns `true` if the byte is the start of a directive ('.'),
-    /// else `false`.
-    #[inline]
-    fn is_directive_start(&self) -> bool {
-        *self == b'.'
-    }
-
-    /// Returns `true` if the byte is a directive continue (ascii alphabetic),
-    /// else `false`.
-    #[inline]
-    fn is_directive_continue(&self) -> bool {
-        self.is_ascii_alphabetic()
+    fn eat_until_whitespace(&mut self) -> &'a [u8] {
+        self.eat_until(u8::is_ascii_whitespace)
     }
 }
 
@@ -84,20 +84,14 @@ impl fmt::Display for SourceLocation {
     }
 }
 
-#[derive(Clone, Debug, Error)]
-pub enum SyntaxError {
-    #[error("expected escaped character after '\\'")]
-    InvalidEscape,
-}
-
+/// A parsing error.
 #[derive(Clone, Debug, Error)]
 pub enum ParseError {
     #[error(r#"unknown directive "{0}""#)]
     UnknownDirective(String),
-    #[error(transparent)]
-    Syntax(#[from] SyntaxError),
 }
 
+/// A parsing error, tagged with an associated source location.
 #[derive(Clone, Debug, Error)]
 #[error(
     r#"{error}
@@ -109,6 +103,7 @@ pub struct TaggedParseError {
     location: SourceLocation,
 }
 
+/// A reading error.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
@@ -133,7 +128,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
-pub(super) trait ParseLocation<T> {
+trait ParseLocation<T> {
     fn location(self, location: SourceLocation) -> Result<T>;
 
     fn with_location<F>(self, make_location: F) -> Result<T>
@@ -147,10 +142,7 @@ impl<T> ParseLocation<T> for ParseResult<T> {
         self.map_err(|error| Error::new_parse(error, location))
     }
 
-    /// Tag a `ParseResult` with a location.
-    ///
-    /// In contrast with [location](#method.location), the location is evaluated
-    /// lazily.
+    /// Tag a `ParseResult` with a location calculated by `make_location`.
     fn with_location<F>(self, mut make_location: F) -> Result<T>
     where
         F: FnMut() -> SourceLocation,
@@ -166,25 +158,21 @@ struct BlifBuffer {
     inner: Box<[u8]>,
 }
 
-#[derive(Debug, PartialEq)]
-struct EscapedNewline {
-    escape_i: usize,
-    newline_i: usize,
-}
-
-impl From<(usize, usize)> for EscapedNewline {
-    fn from(indices: (usize, usize)) -> Self {
-        Self {
-            escape_i: indices.0,
-            newline_i: indices.1,
-        }
-    }
-}
-
+/// An escape offset/newline offset pair.
 #[derive(Debug)]
-struct BlifLines {
-    line_indices: Box<[usize]>,
-    escaped_newlines: Box<[EscapedNewline]>,
+struct NewlineEscape {
+    escape_offset: usize,
+    newline_offset: usize,
+}
+
+/// An iterator over logical buffer lines.
+#[derive(Debug)]
+struct BlifLines<'a> {
+    buffer: &'a BlifBuffer,
+    line_offsets: Box<[usize]>,
+    next_line_i: usize,
+    newline_escapes: Box<[NewlineEscape]>,
+    next_escape_i: usize,
 }
 
 impl BlifBuffer {
@@ -195,18 +183,25 @@ impl BlifBuffer {
     {
         Self {
             filename,
-            inner: bytes.into_iter().collect(),
+            inner: Box::from_iter(bytes),
         }
     }
 
     /// Create a new buffer by copying a string.
+    #[cfg(test)]
     fn new_str(input: &str) -> Self {
         Self::new(input.bytes(), None)
+    }
+
+    /// The length of the buffer, in bytes.
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 
     /// Calculate the 1-based line number and column offset at `offset`.
     ///
     /// Panics if `offset` is out of bounds.
+    #[cfg(test)]
     fn calculate_location(&self, offset: usize) -> SourceLocation {
         assert!(offset < self.inner.len());
         let line = self
@@ -231,56 +226,191 @@ impl BlifBuffer {
         }
     }
 
-    /// Preprocess the buffer and replace newline escapes.
+    /// Preprocess the buffer.
     ///
-    /// Returns
-    /// - a list of offsets to the start of lines (excluding escaped
-    ///   newlines).
-    /// - a list of offsets to escaped newlines (along with the
-    ///   offset to the associated escape character).
-    ///
-    /// as a single struct, [BlifLines].
-    fn preprocess(&mut self) -> BlifLines {
-        let mut line_indices = Vec::new();
-        let mut escaped_newline_indices = Vec::new();
+    /// Returns an iterator over the lines of the buffer. Whitespace at the
+    /// start of each line is trimmed but a line can end in whitespace.
+    fn preprocess(&self) -> BlifLines<'_> {
         let mut scanner = Scanner::new(&self.inner);
+        let mut line_offsets = Vec::new();
+        let mut newline_escapes = Vec::new();
+        // Prime the first line.
+        scanner.eat_whitespace();
+        let mut line_start = scanner.cursor();
         while !scanner.done() {
-            let start = scanner.cursor();
-            let line = scanner.eat_until(b'\n');
-            scanner.eat();
-            // Check for a newline escape, i.e. "\\\n".
-            // Also support arbitrary whitespace between the '\\' and '\n',
-            // including carriage returns ('\r') used by older systems.
-            let maybe_escape_i = line.len()
-                - (1 + line
-                    .iter()
-                    .rev()
-                    .take_while(|b| b.is_ascii_whitespace())
-                    .count());
-            if line[maybe_escape_i] == b'\\' {
-                let escape_i = start + maybe_escape_i;
-                let newline_i = start + line.len();
-                escaped_newline_indices.push((escape_i, newline_i));
-            } else {
-                line_indices.push(start);
+            scanner.eat_until((b'\n', b'\\', b'#'));
+            if scanner.eat_if(b'#') {
+                // Comments do not escape newlines.
+                scanner.eat_until(b'\n');
+            }
+            if scanner.done() || scanner.eat_if(b'\n') {
+                line_offsets.push(line_start);
+                // Prime the next line.
+                scanner.eat_whitespace();
+                line_start = scanner.cursor();
+                continue;
+            }
+            // Check for a potential newline escape.
+            let escape_offset = scanner.cursor();
+            scanner.expect(b'\\');
+            // TODO: Should we be more strict about allowed characters between
+            // the '\\' and '\n'?
+            scanner.eat_line_whitespace();
+            let newline_offset = scanner.cursor();
+            if scanner.eat_if(b'\n') {
+                newline_escapes.push(NewlineEscape {
+                    escape_offset,
+                    newline_offset,
+                });
             }
         }
-        // Replace escaped newlines (and associated escape character) with
-        // spaces to simplify the implementation of the tokenizer.
-        // TODO(rikus): Investigate performance of handling this in-line the
-        // tokenizer.
-        for (escape_i, newline_i) in escaped_newline_indices.iter() {
-            self.inner[*escape_i] = b' ';
-            self.inner[*newline_i] = b' ';
-        }
         BlifLines {
-            line_indices: Box::from_iter(line_indices),
-            escaped_newlines: Box::from_iter(
-                escaped_newline_indices
-                    .into_iter()
-                    .map(EscapedNewline::from),
-            ),
+            buffer: self,
+            line_offsets: Box::from_iter(line_offsets),
+            next_line_i: 0,
+            newline_escapes: Box::from_iter(newline_escapes),
+            next_escape_i: 0,
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum LineStorageInner<'a> {
+    Owned(Box<[u8]>),
+    Borrowed(&'a [u8]),
+}
+
+/// A copy-on-write reference to owned or borrowed bytes.
+#[derive(Clone, Debug)]
+struct LineStorage<'a> {
+    inner: LineStorageInner<'a>,
+    start_offset: usize,
+}
+
+impl<'a> LineStorage<'a> {
+    /// Create new owned storage.
+    fn new_owned(owned: Box<[u8]>, start_offset: usize) -> Self {
+        Self {
+            inner: LineStorageInner::Owned(owned),
+            start_offset,
+        }
+    }
+
+    /// Create new borrowed storage.
+    fn new_ref(bytes: &'a [u8], start_offset: usize) -> Self {
+        Self {
+            inner: LineStorageInner::Borrowed(bytes),
+            start_offset,
+        }
+    }
+
+    /// The bytes of the line, independent of storage kind.
+    fn get_bytes(&self) -> &[u8] {
+        match &self.inner {
+            LineStorageInner::Owned(owned) => owned,
+            LineStorageInner::Borrowed(bytes) => bytes,
+        }
+    }
+
+    /// Get a mutable reference to the underlying owned storage, if owned.
+    fn get_owned(&mut self) -> Option<&mut Box<[u8]>> {
+        match self.inner {
+            LineStorageInner::Owned(ref mut owned) => Some(owned),
+            LineStorageInner::Borrowed(_) => None,
+        }
+    }
+
+    /// Get a reference to the underlying borrowed bytes, if borrowed.
+    fn get_borrowed(&self) -> Option<&[u8]> {
+        match self.inner {
+            LineStorageInner::Owned(_) => None,
+            LineStorageInner::Borrowed(bytes) => Some(bytes),
+        }
+    }
+
+    /// Copy borrowed bytes to an owned buffer, if borrowed, or do nothing.
+    fn make_owned(&mut self) {
+        if let Some(bytes) = self.get_borrowed() {
+            *self = Self::new_owned(Box::from_iter(bytes.iter().copied()), self.start_offset);
+        }
+    }
+
+    /// Invoke the callback with a mutable reference to owned bytes.
+    ///
+    /// Borrowed bytes are first copied to an owned buffer, which is then passed
+    /// to the callback. Owned bytes are passed as is.
+    fn make_owned_and<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut Box<[u8]>),
+    {
+        match self.inner {
+            LineStorageInner::Owned(ref mut owned) => {
+                f(owned);
+            }
+            LineStorageInner::Borrowed(bytes) => {
+                let mut bytes = Box::from_iter(bytes.iter().copied());
+                f(&mut bytes);
+                *self = Self::new_owned(bytes, self.start_offset);
+            }
+        }
+    }
+}
+
+impl AsRef<[u8]> for LineStorage<'_> {
+    fn as_ref(&self) -> &[u8] {
+        self.get_bytes()
+    }
+}
+
+impl<'a> Iterator for BlifLines<'a> {
+    type Item = LineStorage<'a>;
+
+    /// Get the next logical line.
+    ///
+    /// Escaped newlines and the associated escape characters are replaced by
+    /// whitespace.
+    fn next(&mut self) -> Option<Self::Item> {
+        debug_assert!(self.next_line_i <= self.line_offsets.len());
+        if self.next_line_i == self.line_offsets.len() {
+            return None;
+        }
+        let next_line_start = self.line_offsets[self.next_line_i];
+        // The next line should end at the offset to the start of the line
+        // following the next line. For the final line there is no following line
+        // and thus the end of the buffer is used.
+        let next_line_end = self
+            .line_offsets
+            .get(self.next_line_i + 1)
+            .copied()
+            .unwrap_or(self.buffer.len());
+        let next_line = &self.buffer.inner[next_line_start..next_line_end];
+        let mut storage = LineStorage::new_ref(next_line, next_line_start);
+        // Check for newline escapes in the current line.
+        for &NewlineEscape {
+            escape_offset,
+            newline_offset,
+        } in self.newline_escapes.iter().skip(self.next_escape_i)
+        {
+            if (next_line_start..next_line_end).contains(&newline_offset) {
+                // Create a copy of the line (if not owned already) and patch
+                // the escape character and the escaped newline.
+                storage.make_owned_and(|bytes| {
+                    bytes[escape_offset - next_line_start] = b' ';
+                    bytes[newline_offset - next_line_start] = b' ';
+                });
+                self.next_escape_i += 1;
+            } else {
+                break;
+            }
+        }
+        self.next_line_i += 1;
+        Some(storage)
+    }
+
+    /// Due to pre-processing we always know how many lines are left for iteration.
+    /// Some lines might be empty or comments, though.
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.line_offsets.len() - self.next_line_i))
     }
 }
 
@@ -296,7 +426,7 @@ where
     }
 }
 
-/// A spanned location in the buffer.
+/// An extent of the buffer.
 #[derive(Debug, PartialEq)]
 struct Span {
     start: usize,
@@ -304,254 +434,164 @@ struct Span {
 }
 
 impl Span {
+    /// Create a new span.
     fn new(start: usize, len: usize) -> Self {
         Self { start, len }
     }
 
+    /// Create a new span at `start` with length `end - start`.
     fn new_range(start: usize, end: usize) -> Self {
         Self::new(start, end - start)
     }
-}
 
-/// A list of [Span]s.
-#[derive(Debug, PartialEq)]
-struct SpanList {
-    spans: Box<[Span]>,
-}
-
-/// A multi-input, single-output PLA description.
-#[derive(Debug, PartialEq)]
-struct Cover {
-    input: Span,
-    output: Span,
-    span: Span,
-}
-
-/// A `formal=actual` pair in a subcircuit instantiation.
-#[derive(Debug, PartialEq)]
-struct FormalActual {
-    input: Span,
-    output: Span,
-}
-
-/// A BLIF directive.
-#[derive(Debug, PartialEq)]
-enum Directive {
-    /// `.model <name>`
-    Model { name: Span, span: Span },
-    /// `.inputs <name0> [<name1> ...]`
-    Inputs { list: SpanList, span: Span },
-    /// `.outputs <name0> [<name1> ...]`
-    Outputs { list: SpanList, span: Span },
-    /// `.names <input0> [<input1> ...] <output>`
-    Names {
-        input: SpanList,
-        output: SpanList,
-        span: Span,
-    },
-    /// `.latch <input> <output> [<ty> <ctrl>] [<init>]`
-    Latch {
-        input: Span,
-        output: Span,
-        ty: Option<Span>,
-        ctrl: Option<Span>,
-        init: Option<Span>,
-        span: Span,
-    },
-    /// `.subckt <name> <formal0>=<actual0> [<formal1>=<actual1> ...]`
-    Subckt {
-        name: Span,
-        formal_actual: Box<[FormalActual]>,
-        span: Span,
-    },
-    /// `.end`
-    ///
-    /// NOTE: `End` directives can be implicit and simply mark the location
-    /// where the model ends (in which case the offset is given in `span.start`
-    /// and `span.len == 0`).
-    End { span: Span },
-}
-
-impl Directive {
-    /// The entire span of the directive.
-    fn span(&self) -> &Span {
-        match self {
-            Self::Model { span, .. } => span,
-            Self::Inputs { span, .. } => span,
-            Self::Outputs { span, .. } => span,
-            Self::Names { span, .. } => span,
-            Self::Latch { span, .. } => span,
-            Self::Subckt { span, .. } => span,
-            Self::End { span } => span,
-        }
+    /// Shift the span start by `delta`.
+    fn rebase(mut self, delta: usize) -> Self {
+        self.start += delta;
+        self
     }
 }
 
-/// A token -- roughly corrosponds to a single line in BLIF text/bytes.
+/// The scanned token kind.
 #[derive(Debug, PartialEq)]
-enum Token {
-    /// A [Directive] token.
-    Directive(Directive),
-    /// An unknown directive (for error reporting).
-    UnknownDirective(Span),
-    /// A [Cover] token.
-    Cover(Cover),
-    /// An implicit token yielded after the PLA description of a [Directive]
-    /// directive. `span.start` is the end of the final [Cover] token.
-    NamesEnd(Span),
+enum TokenKind {
+    /// A command.
+    Command,
+    /// A cube.
+    Cube,
 }
 
-impl Token {
-    /// The entire span of the token.
-    fn span(&self) -> &Span {
-        match self {
-            Self::Directive(directive) => directive.span(),
-            Self::UnknownDirective(span) => span,
-            Self::Cover(cover) => &cover.span,
-            Self::NamesEnd(span) => span,
-        }
-    }
+// A scanned token.
+#[derive(Debug, PartialEq)]
+struct Token {
+    kind: TokenKind,
+    trivia: Box<[Span]>,
+    extent: Span,
 }
 
 /// An iterator over scanned tokens.
 struct Tokenizer<'a> {
-    scanner: Scanner<'a>,
-    lines: BlifLines,
-    current_line: usize,
+    lines: BlifLines<'a>,
 }
 
 impl<'a> Tokenizer<'a> {
     /// Start a new tokenizer.
-    fn new(buffer: &'a BlifBuffer, lines: BlifLines) -> Self {
-        Self {
-            scanner: Scanner::new(&buffer.inner),
-            lines,
-            current_line: 0,
-        }
+    fn new(lines: BlifLines<'a>) -> Self {
+        Self { lines }
     }
 
-    /// Preprocess `buffer` and start a new tokenizer.
-    fn new_preprocess(buffer: &'a mut BlifBuffer) -> Self {
-        let lines = buffer.preprocess();
-        Self::new(buffer, lines)
-    }
-
-    /// The offset to the start of the current line in the buffer.
-    fn current_line_start_offset(&self) -> usize {
-        self.lines.line_indices[self.current_line]
-    }
-
-    /// Model ::= ".model" S+ ident
-    fn tokenize_model_line(&mut self) -> Token {
-        debug_assert!(self.scanner.before().ends_with(b".model"));
-        self.scanner.eat_while(BlifChar::is_line_whitespace);
-        todo!()
-    }
-
-    /// Inputs ::= ".inputs" S+ ident (S+ ident)*
-    fn tokenize_inputs_line(&mut self) -> Token {
-        debug_assert!(self.scanner.before().ends_with(b".inputs"));
-        self.scanner.eat_while(BlifChar::is_line_whitespace);
-        todo!()
-    }
-
-    /// Outputs ::= ".outputs" S+ ident (S+ ident)*
-    fn tokenize_outputs_line(&mut self) -> Token {
-        debug_assert!(self.scanner.before().ends_with(b".outputs"));
-        self.scanner.eat_while(BlifChar::is_line_whitespace);
-        todo!()
-    }
-
-    /// Names ::= ".names" S+ ident S+ ident (S+ ident)*
-    fn tokenize_names_line(&mut self) -> Token {
-        debug_assert!(self.scanner.before().ends_with(b".names"));
-        self.scanner.eat_while(BlifChar::is_line_whitespace);
-        todo!()
-    }
-
-    /// latch-type ::= "re" | "fe" | "ah" | "al" | "as"
-    /// latch-ctrl ::= S+ latch-type S+ ident
-    /// latch-init ::= S+ [0-3]
-    /// Latch ::= ".latch" S+ ident S+ ident latch-ctrl? latch-init?
-    fn tokenize_latch_line(&mut self) -> Token {
-        debug_assert!(self.scanner.before().ends_with(b".latch"));
-        self.scanner.eat_while(BlifChar::is_line_whitespace);
-        todo!()
-    }
-
-    /// Subckt ::= ".subckt" S+ ident S+ ident "=" ident (S+ ident "=" ident)*
-    fn tokenize_subckt_line(&mut self) -> Token {
-        debug_assert!(self.scanner.before().ends_with(b".subckt"));
-        self.scanner.eat_while(BlifChar::is_line_whitespace);
-        todo!()
-    }
-
-    /// End ::= ".end"
-    fn tokenize_end_line(&mut self) -> Token {
-        debug_assert!(self.scanner.before().ends_with(b".end"));
-        // TODO(rikus): Check if we expect a `.end` line and issue a
-        // warning/error otherwise.
-        let line_start = self.current_line_start_offset();
-        Token::Directive(Directive::End {
-            span: Span::new(line_start, ".end".len()),
-        })
+    /// Pre-process and start a new tokenizer.
+    fn new_preprocess(buffer: &'a BlifBuffer) -> Self {
+        Self::new(buffer.preprocess())
     }
 }
 
-impl Iterator for Tokenizer<'_> {
-    type Item = Token;
+/// Command ::= "." name (S+ arg0 (S+ argn)*)?
+fn tokenize_command_line(line: &[u8], start_offset: usize) -> Result<Token> {
+    let mut scanner = Scanner::new(line);
+    scanner.expect(b'.');
+    scanner.eat_until_whitespace();
+    let mut token_end = scanner.cursor();
+    if token_end < 2 {
+        // TODO(rikus): Report empty command name.
+        panic!("empty command name");
+    }
+    scanner.eat_whitespace();
+    // Start `trivia` with a span of the command name.
+    let mut trivia = vec![Span::new(start_offset, token_end)];
+    let mut trivia_start = scanner.cursor();
+    // NOTE: Trivia beyond the command name is assumed to be optional.
+    while !scanner.done() {
+        scanner.eat_until_whitespace();
+        token_end = scanner.cursor();
+        trivia.push(Span::new(
+            start_offset + trivia_start,
+            token_end - trivia_start,
+        ));
+        scanner.eat_whitespace();
+        trivia_start = scanner.cursor();
+    }
+    Ok(Token {
+        kind: TokenKind::Command,
+        trivia: Box::from_iter(trivia),
+        extent: Span::new(start_offset, token_end),
+    })
+}
 
-    /// Get the next token in the buffer skipping whitespace, newlines and
-    /// comments.
+/// Cube ::= ("0" | "1" | "-")+ S+ ("0" | "1")
+fn tokenize_cube_line(line: &[u8], start_offset: usize) -> Result<Token> {
+    let valid_input = (b'0', b'1', b'-');
+    let valid_output = (b'0', b'1');
+    let mut scanner = Scanner::new(line);
+    // NOTE: This function is only called after encountering a valid cube input.
+    // This implies that there will _always_ be at least a single input -- no
+    // check for empty input necessary.
+    debug_assert!(scanner.at(valid_input));
+    scanner.eat_while(valid_input);
+    let input_end = scanner.cursor();
+    if scanner.eat_whitespace().is_empty() {
+        // TODO(rikus): Handle expected whitespace.
+        panic!("expected whitespace");
+    }
+    let output_start = scanner.cursor();
+    // NOTE: Multi-bit outputs will be detected as errors by the parsing stage.
+    scanner.eat_while(valid_output);
+    let token_end = scanner.cursor();
+    if output_start == token_end {
+        // TODO(rikus): Handle empty output.
+        panic!("expected '0' or '1'");
+    }
+    scanner.eat_whitespace();
+    if !scanner.done() {
+        // TODO(rikus): Handle unexpected trailing.
+        panic!("unexpected {:?}", &line[scanner.cursor()..]);
+    }
+    Ok(Token {
+        kind: TokenKind::Cube,
+        trivia: Box::from_iter([
+            Span::new(start_offset, input_end),
+            Span::new(output_start, token_end - output_start).rebase(start_offset),
+        ]),
+        extent: Span::new(start_offset, token_end),
+    })
+}
+
+impl Iterator for Tokenizer<'_> {
+    type Item = Result<Token>;
+
+    /// Get the next line's tokens from the tokenizer.
     fn next(&mut self) -> Option<Self::Item> {
-        let mut token = None;
-        while !self.scanner.done() && token.is_none() {
-            // Skip whitespace, excluding newlines.
-            self.scanner.eat_while(BlifChar::is_line_whitespace);
-            // Skip comments.
-            if self.scanner.eat_if(b'#') {
-                self.scanner.eat_until(b'\n');
-                self.scanner.eat();
-                self.current_line += 1;
-                continue;
+        for line in self.lines.by_ref() {
+            // Trim comments.
+            let window_end = match line.get_bytes().iter().position(|&b| b == b'#') {
+                Some(end) => end,
+                None => line.get_bytes().len(),
+            };
+            let window = &line.get_bytes()[0..window_end];
+            let mut scanner = Scanner::new(window);
+            match scanner.peek() {
+                Some(b'.') => {
+                    return Some(tokenize_command_line(window, line.start_offset));
+                }
+                Some(_logic @ (b'0' | b'1' | b'-')) => {
+                    return Some(tokenize_cube_line(window, line.start_offset));
+                }
+                None => {
+                    // Empty lines are ignored.
+                    continue;
+                }
+                Some(unexpected) => {
+                    // TODO: Handle unexpected.
+                    panic!("unexpected {:?}", unexpected);
+                }
             }
-            // Skip newlines.
-            if self.scanner.eat_if(b'\n') {
-                self.current_line += 1;
-                continue;
-            }
-            let start = self.scanner.cursor();
-            // Tokenize directives.
-            if self.scanner.eat_if(BlifChar::is_directive_start) {
-                let directive = self.scanner.eat_while(BlifChar::is_directive_continue);
-                token = Some(match directive {
-                    b"model" => self.tokenize_model_line(),
-                    b"inputs" => self.tokenize_inputs_line(),
-                    b"outputs" => self.tokenize_outputs_line(),
-                    b"names" => self.tokenize_names_line(),
-                    b"latch" => self.tokenize_latch_line(),
-                    b"subckt" => self.tokenize_subckt_line(),
-                    b"end" => self.tokenize_end_line(),
-                    _unknown => {
-                        // TODO(rikus): Look out for directives that we don't
-                        // support and report those as separate errors.
-                        Token::UnknownDirective(Span::new_range(start, self.scanner.cursor()))
-                    }
-                });
-                break;
-            }
-            // TODO(rikus): Tokenize other cases and report unexpected bytes.
-            let eof = self.scanner.bytes().len();
-            self.scanner.jump(eof);
-            todo!()
         }
-        token
+        None
     }
 }
 
 impl BlifBuffer {
     /// Preprocess and create a new [Tokenizer] from the buffer.
-    fn tokenize(&mut self) -> Tokenizer {
+    fn tokenize(&self) -> Tokenizer {
         Tokenizer::new_preprocess(self)
     }
 }
@@ -590,102 +630,168 @@ impl BlifReader {
 mod tests {
     use super::*;
 
-    macro_rules! loc {
-        ($line:expr, $col:expr) => {
-            SourceLocation {
-                line: $line,
-                column: $col,
-                file: None,
-            }
-        };
-    }
+    mod source_location {
+        use super::*;
 
-    #[test]
-    fn test_calculate_source_location() {
-        let buffer = BlifBuffer::new_str(
-            r#".model top
+        macro_rules! loc {
+            ($line:expr, $col:expr) => {
+                SourceLocation {
+                    line: $line,
+                    column: $col,
+                    file: None,
+                }
+            };
+        }
+
+        #[test]
+        fn test_calculate_location() {
+            let buffer = BlifBuffer::new_str(
+                r#".model top
 .inputs a b c
 .outputs d
 .names a b c d
 000 1
 .end
 "#,
-        );
-        assert_eq!(buffer.calculate_location(0), loc!(1, 1));
-        assert_eq!(buffer.calculate_location(9), loc!(1, 10));
-        assert_eq!(buffer.calculate_location(10), loc!(1, 11));
-        assert_eq!(buffer.calculate_location(11), loc!(2, 1));
-        assert_eq!(buffer.calculate_location(25), loc!(3, 1));
-        assert_eq!(buffer.inner.len(), 62);
-        assert_eq!(buffer.calculate_location(60), loc!(6, 4));
+            );
+            assert_eq!(buffer.calculate_location(0), loc!(1, 1));
+            assert_eq!(buffer.calculate_location(9), loc!(1, 10));
+            assert_eq!(buffer.calculate_location(10), loc!(1, 11));
+            assert_eq!(buffer.calculate_location(11), loc!(2, 1));
+            assert_eq!(buffer.calculate_location(25), loc!(3, 1));
+            assert_eq!(buffer.len(), 62);
+            assert_eq!(buffer.calculate_location(60), loc!(6, 4));
 
-        let buffer = BlifBuffer::new_str("\na");
-        assert_eq!(buffer.calculate_location(0), loc!(1, 1));
-        assert_eq!(buffer.calculate_location(1), loc!(2, 1));
+            let buffer = BlifBuffer::new_str("\na");
+            assert_eq!(buffer.calculate_location(0), loc!(1, 1));
+            assert_eq!(buffer.calculate_location(1), loc!(2, 1));
+        }
     }
 
-    //     macro_rules! tok {
-    //         (newline @ $offset:expr) => {
-    //             Token::Newline($offset)
-    //         };
-    //         (ident @ ( $offset:expr, $len:expr )) => {
-    //             Token::Ident {
-    //                 offset: $offset,
-    //                 len: $len,
-    //             }
-    //         };
-    //     }
+    mod preprocess {
+        use super::*;
 
-    //     #[test]
-    //     fn test_tokenizer() {
-    //         let buffer = BlifBuffer::from(
-    //             r#"a b c
-    // 1 2 \
-    // 34
-    // "#,
-    //         );
-    //         let expected = [
-    //             tok!(ident @ (0, 1)),
-    //             tok!(ident @ (2, 1)),
-    //             tok!(ident @ (4, 1)),
-    //             tok!(newline @ 5),
-    //             tok!(ident @ (6, 1)),
-    //             tok!(ident @ (8, 1)),
-    //             tok!(ident @ (12, 2)),
-    //             tok!(newline @ 14),
-    //         ];
-    //         assert_eq!(
-    //             buffer.tokenize().map(Result::unwrap).collect::<Vec<_>>(),
-    //             &expected
-    //         );
-    //     }
+        #[test]
+        fn test_empty() {
+            let buffer = BlifBuffer::new_str("  \n# empty\n  \\\n  ");
+            let mut lines = buffer.preprocess();
+            assert_eq!(lines.next().unwrap().get_bytes(), b"# empty\n  ");
+            assert_eq!(lines.next().unwrap().get_bytes(), b"    ");
+            assert!(lines.next().is_none());
+        }
+    }
 
-    //     #[test]
-    //     fn test_tokenize_comments() {
-    //         let buffer = BlifBuffer::from(
-    //             r#"# foo bar
-    // a b # c d
-    // # baz \
-    // 1 2
-    // lorem ipsum
-    // "#,
-    //         );
-    //         let expected = [
-    //             tok!(newline @ 9),
-    //             tok!(ident @ (10, 1)),
-    //             tok!(ident @ (12, 1)),
-    //             tok!(newline @ 19),
-    //             tok!(newline @ 27),
-    //             tok!(ident @ (28, 1)),
-    //             tok!(ident @ (30, 1)),
-    //             tok!(newline @ 31),
-    //             tok!(ident @ (32, 5)),
-    //             tok!(ident @ (38, 5)),
-    //             tok!(newline @ 43),
-    //         ];
-    //         assert_eq!(
-    //             buffer.tokenize().map(Result::unwrap).collect::<Vec<_>>(),
-    //             &expected
-    //         );
-    //     }
+    mod tokenizer {
+        use super::*;
+
+        macro_rules! span {
+            ($start:expr, $len:expr) => {
+                Span::new($start, $len)
+            };
+        }
+
+        macro_rules! check_token {
+            ($tokens:expr => command [$(($start:expr, $len:expr)),+$(,)?] @ ($tok_start:expr, $tok_len:expr)) => {
+                check_token!($tokens => TokenKind::Command [$(($start, $len)),+] @ ($tok_start, $tok_len))
+            };
+            ($tokens:expr => cube [$(($start:expr, $len:expr)),+$(,)?] @ ($tok_start:expr, $tok_len:expr)) => {
+                check_token!($tokens => TokenKind::Cube [$(($start, $len)),+] @ ($tok_start, $tok_len))
+            };
+            ($tokens:expr => $kind:path [$(($start:expr, $len:expr)),+$(,)?] @ ($tok_start:expr, $tok_len:expr)) => {
+                assert_eq!(
+                    $tokens.next().unwrap().unwrap(),
+                    Token {
+                        kind: $kind,
+                        trivia: Box::from_iter([$(span!($start, $len),)+]),
+                        extent: span!($tok_start, $tok_len)
+                    }
+                );
+            };
+        }
+
+        #[test]
+        fn test_command() {
+            let buffer = BlifBuffer::new_str(".test a1 b2 3");
+            let mut tokenizer = buffer.tokenize();
+            let test_start = 0;
+            let test_end = test_start + b".test".len();
+            let test_len = test_end - test_start;
+            let a1_start = test_end + 1;
+            let a1_end = a1_start + b"a1".len();
+            let a1_len = a1_end - a1_start;
+            let b2_start = a1_end + 1;
+            let b2_end = b2_start + b"b2".len();
+            let b2_len = b2_end - b2_start;
+            let _3_start = b2_end + 1;
+            let _3_end = _3_start + b"3".len();
+            let _3_len = _3_end - _3_start;
+            check_token!(tokenizer => command
+                [
+                    (test_start, test_len),
+                    (a1_start, a1_len),
+                    (b2_start, b2_len),
+                    (_3_start, _3_len)
+                ]
+                @ (0, buffer.len())
+            );
+        }
+
+        #[test]
+        fn test_strange_syntax() {
+            let buffer = BlifBuffer::new_str(
+                r#".test a b \
+c # test \
+
+### BREAK
+
+.test a \
+      b \
+      c
+"#,
+            );
+            let mut tokenizer = buffer.tokenize();
+            let test_start = 0;
+            let test_end = test_start + b".test".len();
+            let test_len = test_end - test_start;
+            let a_start = test_end + 1;
+            let a_end = a_start + 1;
+            let a_len = a_end - a_start;
+            let b_start = a_end + 1;
+            let b_end = b_start + 1;
+            let b_len = b_end - b_start;
+            let c_start = b_end + b" \\\n".len();
+            let c_end = c_start + 1;
+            let c_len = c_end - c_start;
+            check_token!(tokenizer => command
+                [
+                    (test_start, test_len),
+                    (a_start, a_len),
+                    (b_start, b_len),
+                    (c_start, c_len)
+                ]
+                @ (test_start, c_end)
+            );
+            let test_start = c_end + " # test \\\n\n### BREAK\n\n".len();
+            let test_end = test_start + b".test".len();
+            let a_start = test_end + 1;
+            let a_end = a_start + 1;
+            let a_len = a_end - a_start;
+            let b_start = a_end + b" \\\n      ".len();
+            let b_end = b_start + 1;
+            let b_len = b_end - b_start;
+            let c_start = b_end + b" \\\n      ".len();
+            let c_end = c_start + 1;
+            let c_len = c_end - c_start;
+            check_token!(tokenizer => command
+                [
+                    (test_start, test_len),
+                    (a_start, a_len),
+                    (b_start, b_len),
+                    (c_start, c_len)
+                ]
+                @ (test_start, c_end - test_start)
+            );
+            assert!(tokenizer.next().is_none());
+        }
+    }
 }

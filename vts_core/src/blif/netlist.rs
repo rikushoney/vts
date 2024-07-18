@@ -1,4 +1,5 @@
 pub struct Netlist {
+    #[allow(dead_code)]
     pub(super) model_name: Option<String>,
 }
 
