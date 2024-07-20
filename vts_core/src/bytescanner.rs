@@ -318,21 +318,6 @@ impl<'a> Scanner<'a> {
         self.from(start)
     }
 
-    /// Consume bytes until the next bytes match `pattern`.
-    ///
-    /// Returns a slice of all the consumed bytes and the terminating bytes.
-    #[inline]
-    pub fn eat_until_terminator<T>(&mut self, mut pattern: impl Pattern<T>) -> &'a [u8] {
-        let start = self.cursor;
-        while !self.done() && pattern.matches(self.after()).is_none() {
-            self.cursor += 1;
-        }
-        if let Some(len) = pattern.matches(self.after()) {
-            self.cursor += len;
-        }
-        self.from(start)
-    }
-
     /// Consume whitespace bytes until the next non-whitespace byte.
     ///
     /// Returns a slice of the consumed whitespace.
@@ -351,10 +336,18 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    #[inline]
     /// Jump the cursor position to `cursor`.
+    ///
+    /// If `cursor` is out of bounds, the cursor is set to the end of the bytes.
+    #[inline]
     pub fn jump(&mut self, cursor: usize) {
         self.cursor = cursor.min(self.bytes.len());
+    }
+
+    /// Jump the cursor position to the end of the bytes.
+    #[inline]
+    pub fn jump_end(&mut self) {
+        self.cursor = self.bytes.len();
     }
 }
 

@@ -12,6 +12,12 @@ use crate::bytescanner::Scanner;
 
 trait BlifChar {
     fn is_line_whitespace(&self) -> bool;
+
+    fn is_token_terminator(&self) -> bool;
+
+    fn is_cube_input(&self) -> bool;
+
+    fn is_cube_output(&self) -> bool;
 }
 
 impl BlifChar for u8 {
@@ -19,41 +25,80 @@ impl BlifChar for u8 {
     /// else `false`.
     #[inline]
     fn is_line_whitespace(&self) -> bool {
+        // TODO: Confirm this with other tools.
         matches!(*self, b'\t' | b'\x0C' | b'\r' | b' ')
+    }
+
+    /// Returns `true` if the byte would end a single token, else `false`.
+    #[inline]
+    fn is_token_terminator(&self) -> bool {
+        // TODO: Confirm this with other tools.
+        matches!(*self, b'\t' | b'\x0C' | b'\r' | b' ' | b'\n' | b'#')
+    }
+
+    /// Returns `true` if the byte is a valid cube input value, else `false`.
+    #[inline]
+    fn is_cube_input(&self) -> bool {
+        matches!(*self, b'0' | b'1' | b'-')
+    }
+
+    /// Returns `true` if the byte is a valid cube output value, else `false`.
+    #[inline]
+    fn is_cube_output(&self) -> bool {
+        matches!(*self, b'0' | b'1')
     }
 }
 
 trait BlifScanner<'a> {
     fn eat_line_whitespace(&mut self) -> &'a [u8];
 
-    fn eat_until_whitespace(&mut self) -> &'a [u8];
+    fn eat_non_whitespace(&mut self) -> &'a [u8];
+
+    fn eat_token(&mut self) -> &'a [u8];
+
+    fn at_token_terminator(&self) -> bool;
 }
 
 impl<'a> BlifScanner<'a> for Scanner<'a> {
+    /// Consume whitespace, excluding newlines.
+    #[inline]
     fn eat_line_whitespace(&mut self) -> &'a [u8] {
         self.eat_while(BlifChar::is_line_whitespace)
     }
 
-    fn eat_until_whitespace(&mut self) -> &'a [u8] {
+    /// Consume non-whitespace.
+    #[inline]
+    fn eat_non_whitespace(&mut self) -> &'a [u8] {
         self.eat_until(u8::is_ascii_whitespace)
+    }
+
+    /// Consume a single token.
+    #[inline]
+    fn eat_token(&mut self) -> &'a [u8] {
+        self.eat_until(BlifChar::is_token_terminator)
+    }
+
+    /// Returns `true` if the scanner is currently at a token terminator, else
+    /// `false`.
+    fn at_token_terminator(&self) -> bool {
+        self.at(BlifChar::is_token_terminator)
     }
 }
 
 /// A location in BLIF text/bytes.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceLocation {
     /// Filename, if known.
-    pub file: Option<String>,
+    pub filename: Option<String>,
     /// 1-based line number.
     pub line: usize,
     /// 1-based column offset.
     pub column: usize,
 }
 
-impl Eq for SourceLocation {}
-
 impl fmt::Display for SourceLocation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO(rikus): Move this out of the fn.
         struct Filename<'a>(&'a str);
 
         impl fmt::Display for Filename<'_> {
@@ -67,7 +112,7 @@ impl fmt::Display for SourceLocation {
         }
 
         let filename = self
-            .file
+            .filename
             .as_ref()
             .map(|name| match name.as_str() {
                 "-" => "<stdin>",
@@ -156,126 +201,148 @@ impl<T> ParseLocation<T> for ParseResult<T> {
 #[derive(Debug, Default)]
 pub struct BlifBuffer {
     filename: Option<String>,
-    inner: Box<[u8]>,
+    inner: Vec<u8>,
 }
 
-/// An escape offset/newline offset pair.
+/// A buffer byte position.
+///
+/// NOTE: A `BytePos` should always remain relative to the original buffer extent
+/// and never a subslice of it.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct BytePos(usize);
+
+impl BytePos {
+    /// Shift the byte position "up" by `delta`.
+    #[must_use]
+    fn rebase(mut self, delta: usize) -> Self {
+        self.0 += delta;
+        self
+    }
+
+    /// Get the distance to jump from `other` to `self`.
+    ///
+    /// Panics if `self` is less than `other`.
+    fn diff(&self, other: BytePos) -> usize {
+        assert!(self.0 >= other.0);
+        self.0 - other.0
+    }
+}
+
+/// The position of a newline escape character and the associated escaped newline.
 #[derive(Debug)]
 struct NewlineEscape {
-    escape_offset: usize,
-    newline_offset: usize,
+    escape_pos: BytePos,
+    newline_pos: BytePos,
 }
 
 /// An iterator over logical buffer lines.
 #[derive(Debug)]
 struct BlifLines<'a> {
     buffer: &'a BlifBuffer,
-    line_offsets: Box<[usize]>,
+    line_starts: Vec<BytePos>,
     next_line_i: usize,
-    newline_escapes: Box<[NewlineEscape]>,
+    newline_escapes: Vec<NewlineEscape>,
     next_escape_i: usize,
 }
 
 impl BlifBuffer {
     /// Create a new buffer with an optional filename.
-    fn new<I>(bytes: I, filename: Option<String>) -> Self
+    pub fn new<I>(bytes: I, filename: Option<String>) -> Self
     where
         I: IntoIterator<Item = u8>,
     {
         Self {
             filename,
-            inner: Box::from_iter(bytes),
+            inner: Vec::from_iter(bytes),
         }
     }
 
     /// Create a new buffer by copying a string.
-    #[cfg(test)]
-    fn new_str(input: &str) -> Self {
+    pub fn new_str(input: &str) -> Self {
         Self::new(input.bytes(), None)
     }
 
     /// The length of the buffer, in bytes.
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    /// View the bytes in `extent`.
-    pub fn view(&self, extent: Span) -> &[u8] {
-        let end = extent.start + extent.len;
-        &self.inner[extent.start..end]
+    /// Create an iterator over the buffer bytes.
+    pub fn iter(&self) -> std::slice::Iter<'_, u8> {
+        self.inner.iter()
     }
 
-    /// Calculate the 1-based line number and column offset at `offset`.
+    /// Get a slice of the bytes in `extent`.
+    pub fn view(&self, extent: Span) -> &[u8] {
+        let end = extent.start_pos.0 + extent.len;
+        &self.inner[extent.start_pos.0..end]
+    }
+
+    /// Calculate the 1-based line number and column offset at `pos`.
     ///
-    /// Panics if `offset` is out of bounds.
+    /// Panics if `pos` is out of bounds.
     #[cfg(test)]
-    fn calculate_location(&self, offset: usize) -> SourceLocation {
-        assert!(offset < self.inner.len());
-        let line = self
-            .inner
-            .iter()
-            .take(offset)
-            .filter(|&&b| b == b'\n')
-            .count()
-            + 1;
+    fn calculate_location(&self, pos: usize) -> SourceLocation {
+        assert!(pos < self.len());
+        let line = self.iter().take(pos).filter(|&&b| b == b'\n').count() + 1;
         let column = self
-            .inner
             .iter()
             .rev()
-            .skip(self.inner.len() - offset)
+            .skip(self.len() - pos)
             .take_while(|&&b| b != b'\n')
             .count()
             + 1;
         SourceLocation {
             line,
             column,
-            file: self.filename.clone(),
+            filename: self.filename.clone(),
         }
     }
 
     /// Preprocess the buffer.
     ///
-    /// Returns an iterator over the lines of the buffer. Whitespace at the
-    /// start of each line is trimmed but a line can end in whitespace.
+    /// Returns an iterator over the lines of the buffer. Whitespace at
+    /// the start of each line is trimmed but a line can end in arbitrary
+    /// whitespace (or a comment).
     fn preprocess(&self) -> BlifLines<'_> {
         let mut scanner = Scanner::new(&self.inner);
-        let mut line_offsets = Vec::new();
+        let mut line_starts = Vec::new();
         let mut newline_escapes = Vec::new();
         // Prime the first line.
         scanner.eat_whitespace();
-        let mut line_start = scanner.cursor();
+        let mut line_start = BytePos(scanner.cursor());
         while !scanner.done() {
-            scanner.eat_until((b'\n', b'\\', b'#'));
+            scanner.eat_until((b'#', b'\n', b'\\'));
             if scanner.eat_if(b'#') {
                 // Comments do not escape newlines.
                 scanner.eat_until(b'\n');
             }
             if scanner.done() || scanner.eat_if(b'\n') {
-                line_offsets.push(line_start);
+                line_starts.push(line_start);
                 // Prime the next line.
                 scanner.eat_whitespace();
-                line_start = scanner.cursor();
+                line_start = BytePos(scanner.cursor());
                 continue;
             }
             // Check for a potential newline escape.
-            let escape_offset = scanner.cursor();
+            let escape_pos = BytePos(scanner.cursor());
             scanner.expect(b'\\');
             // TODO: Should we be more strict about allowed characters between
             // the '\\' and '\n'?
             scanner.eat_line_whitespace();
-            let newline_offset = scanner.cursor();
+            let newline_pos = BytePos(scanner.cursor());
             if scanner.eat_if(b'\n') {
                 newline_escapes.push(NewlineEscape {
-                    escape_offset,
-                    newline_offset,
+                    escape_pos,
+                    newline_pos,
                 });
             }
         }
         BlifLines {
             buffer: self,
-            line_offsets: Box::from_iter(line_offsets),
+            line_starts,
             next_line_i: 0,
-            newline_escapes: Box::from_iter(newline_escapes),
+            newline_escapes,
             next_escape_i: 0,
         }
     }
@@ -283,31 +350,34 @@ impl BlifBuffer {
 
 #[derive(Clone, Debug)]
 enum LineStorageInner<'a> {
-    Owned(Box<[u8]>),
+    Owned(Vec<u8>),
     Borrowed(&'a [u8]),
 }
 
-/// A copy-on-write reference to owned or borrowed bytes.
+/// A copy-on-write reference to borrowed bytes or an owned buffer.
 #[derive(Clone, Debug)]
 struct LineStorage<'a> {
     inner: LineStorageInner<'a>,
-    start_offset: usize,
+    start_pos: BytePos,
 }
 
 impl<'a> LineStorage<'a> {
     /// Create new owned storage.
-    fn new_owned(owned: Box<[u8]>, start_offset: usize) -> Self {
+    fn new_owned<I>(bytes: I, start_pos: BytePos) -> Self
+    where
+        I: IntoIterator<Item = u8>,
+    {
         Self {
-            inner: LineStorageInner::Owned(owned),
-            start_offset,
+            inner: LineStorageInner::Owned(Vec::from_iter(bytes)),
+            start_pos,
         }
     }
 
     /// Create new borrowed storage.
-    fn new_ref(bytes: &'a [u8], start_offset: usize) -> Self {
+    fn new_ref(bytes: &'a [u8], start: BytePos) -> Self {
         Self {
             inner: LineStorageInner::Borrowed(bytes),
-            start_offset,
+            start_pos: start,
         }
     }
 
@@ -320,7 +390,9 @@ impl<'a> LineStorage<'a> {
     }
 
     /// Get a mutable reference to the underlying owned storage, if owned.
-    fn get_owned(&mut self) -> Option<&mut Box<[u8]>> {
+    ///
+    /// NOTE: For a non-`mut` version, use [get_bytes](Self::get_bytes).
+    fn get_owned(&mut self) -> Option<&mut Vec<u8>> {
         match self.inner {
             LineStorageInner::Owned(ref mut owned) => Some(owned),
             LineStorageInner::Borrowed(_) => None,
@@ -338,7 +410,7 @@ impl<'a> LineStorage<'a> {
     /// Copy borrowed bytes to an owned buffer, if borrowed, or do nothing.
     fn make_owned(&mut self) {
         if let Some(bytes) = self.get_borrowed() {
-            *self = Self::new_owned(Box::from_iter(bytes.iter().copied()), self.start_offset);
+            *self = Self::new_owned(Vec::from_iter(bytes.iter().copied()), self.start_pos);
         }
     }
 
@@ -348,16 +420,16 @@ impl<'a> LineStorage<'a> {
     /// to the callback. Owned bytes are passed as is.
     fn make_owned_and<F>(&mut self, mut f: F)
     where
-        F: FnMut(&mut Box<[u8]>),
+        F: FnMut(&mut Vec<u8>),
     {
         match self.inner {
             LineStorageInner::Owned(ref mut owned) => {
                 f(owned);
             }
             LineStorageInner::Borrowed(bytes) => {
-                let mut bytes = Box::from_iter(bytes.iter().copied());
+                let mut bytes = Vec::from_iter(bytes.iter().copied());
                 f(&mut bytes);
-                *self = Self::new_owned(bytes, self.start_offset);
+                *self = Self::new_owned(bytes, self.start_pos);
             }
         }
     }
@@ -369,6 +441,72 @@ impl AsRef<[u8]> for LineStorage<'_> {
     }
 }
 
+// The next line should end at the position of the start of the line
+// following the next line. For the final line there is no following line
+// and thus the end of the buffer is used.
+//               next_line_end
+//               |     buffer_len
+//               |     |
+// "these\n are\n lines"
+//         |
+//         next_line_start
+impl<'a> BlifLines<'a> {
+    /// Get the start position of the next line, if any lines remain.
+    fn next_line_start(&self) -> Option<BytePos> {
+        debug_assert!(self.next_line_i <= self.line_starts.len());
+        if self.next_line_i < self.line_starts.len() {
+            Some(self.line_starts[self.next_line_i])
+        } else {
+            None
+        }
+    }
+
+    /// Get the end position of the next line.
+    fn next_line_end(&self) -> BytePos {
+        debug_assert!(self.next_line_i <= self.line_starts.len());
+        let next_next_line_i = self.next_line_i + 1;
+        if next_next_line_i < self.line_starts.len() {
+            self.line_starts[next_next_line_i]
+        } else {
+            BytePos(self.buffer.len())
+        }
+    }
+
+    fn get_line(&self, start_pos: BytePos, end_pos: BytePos) -> &'a [u8] {
+        &self.buffer.inner[start_pos.0..end_pos.0]
+    }
+
+    /// Replace escape characters and associated newlines in `storage` with
+    /// whitespace.
+    ///
+    /// `end_pos` marks the end position of the line storage in the buffer.
+    fn patch_newline_escapes(&mut self, storage: &mut LineStorage<'_>, end_pos: BytePos) {
+        let start_pos = storage.start_pos;
+        let remaining_newline_escapes = self.newline_escapes.iter().skip(self.next_escape_i);
+        let line_extent = start_pos.0..end_pos.0;
+        for &NewlineEscape {
+            escape_pos,
+            newline_pos,
+        } in remaining_newline_escapes
+        {
+            debug_assert!(escape_pos < newline_pos);
+            if line_extent.contains(&newline_pos.0) {
+                // Create a copy of the line (if not already owned) and patch
+                // the escape character and associated escaped newline.
+                storage.make_owned_and(|bytes| {
+                    // NOTE: Substract `start_pos` since `escape_pos` and
+                    // `newline_pos` is relative to it.
+                    bytes[escape_pos.diff(start_pos)] = b' ';
+                    bytes[newline_pos.diff(start_pos)] = b' ';
+                });
+                self.next_escape_i += 1;
+            } else {
+                break;
+            }
+        }
+    }
+}
+
 impl<'a> Iterator for BlifLines<'a> {
     type Item = LineStorage<'a>;
 
@@ -377,47 +515,19 @@ impl<'a> Iterator for BlifLines<'a> {
     /// Escaped newlines and the associated escape characters are replaced by
     /// whitespace.
     fn next(&mut self) -> Option<Self::Item> {
-        debug_assert!(self.next_line_i <= self.line_offsets.len());
-        if self.next_line_i == self.line_offsets.len() {
-            return None;
-        }
-        let next_line_start = self.line_offsets[self.next_line_i];
-        // The next line should end at the offset to the start of the line
-        // following the next line. For the final line there is no following line
-        // and thus the end of the buffer is used.
-        let next_line_end = self
-            .line_offsets
-            .get(self.next_line_i + 1)
-            .copied()
-            .unwrap_or(self.buffer.len());
-        let next_line = &self.buffer.inner[next_line_start..next_line_end];
+        let next_line_start = self.next_line_start()?;
+        let next_line_end = self.next_line_end();
+        let next_line = self.get_line(next_line_start, next_line_end);
         let mut storage = LineStorage::new_ref(next_line, next_line_start);
-        // Check for newline escapes in the current line.
-        for &NewlineEscape {
-            escape_offset,
-            newline_offset,
-        } in self.newline_escapes.iter().skip(self.next_escape_i)
-        {
-            if (next_line_start..next_line_end).contains(&newline_offset) {
-                // Create a copy of the line (if not owned already) and patch
-                // the escape character and the escaped newline.
-                storage.make_owned_and(|bytes| {
-                    bytes[escape_offset - next_line_start] = b' ';
-                    bytes[newline_offset - next_line_start] = b' ';
-                });
-                self.next_escape_i += 1;
-            } else {
-                break;
-            }
-        }
+        self.patch_newline_escapes(&mut storage, next_line_end);
         self.next_line_i += 1;
         Some(storage)
     }
 
-    /// Due to pre-processing we always know how many lines are left for iteration.
-    /// Some lines might be empty or comments, though.
+    // Due to pre-processing we always know how many lines are left for iteration.
+    // Some lines might be empty or comments, though.
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.line_offsets.len() - self.next_line_i))
+        (0, Some(self.line_starts.len() - self.next_line_i))
     }
 }
 
@@ -428,33 +538,40 @@ where
     fn from(input: I) -> Self {
         Self {
             filename: None,
-            inner: Box::from_iter(input),
+            inner: Vec::from_iter(input),
         }
     }
 }
 
-/// An extent of the buffer.
-#[derive(Debug, PartialEq)]
+/// A buffer extent.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Span {
-    start: usize,
+    start_pos: BytePos,
     len: usize,
 }
 
 impl Span {
     /// Create a new span.
-    fn new(start: usize, len: usize) -> Self {
-        Self { start, len }
+    fn new(start_pos: BytePos, len: usize) -> Self {
+        Self { start_pos, len }
     }
 
     /// Create a new span at `start` with length `end - start`.
-    fn new_range(start: usize, end: usize) -> Self {
-        Self::new(start, end - start)
+    fn new_range(start_pos: BytePos, end: BytePos) -> Self {
+        Self::new(start_pos, end.0 - start_pos.0)
     }
 
-    /// Shift the span start by `delta`.
+    /// Shift the span start "up" by `delta`.
+    #[must_use]
     fn rebase(mut self, delta: usize) -> Self {
-        self.start += delta;
+        self.start_pos = self.start_pos.rebase(delta);
         self
+    }
+
+    /// Create a new span starting at `base` shifted "up" by `start` and length
+    /// `end - start`.
+    fn new_rebased_range(base: BytePos, start_pos: usize, end_pos: usize) -> Self {
+        Span::new(base, end_pos - start_pos).rebase(start_pos)
     }
 }
 
@@ -471,7 +588,7 @@ enum TokenKind {
 #[derive(Debug, PartialEq)]
 struct Token {
     kind: TokenKind,
-    trivia: Box<[Span]>,
+    trivia: Vec<Span>,
     extent: Span,
 }
 
@@ -481,7 +598,7 @@ struct Tokenizer<'a> {
 }
 
 impl<'a> Tokenizer<'a> {
-    /// Start a new tokenizer.
+    /// Start a new tokenizer over `lines`.
     fn new(lines: BlifLines<'a>) -> Self {
         Self { lines }
     }
@@ -492,11 +609,11 @@ impl<'a> Tokenizer<'a> {
     }
 }
 
-/// Command ::= "." name (S+ arg0 (S+ argn)*)?
-fn tokenize_command_line(line: &[u8], start_offset: usize) -> Result<Token> {
+/// `Command ::= "." name (S+ arg0 (S+ argn)*)?`
+fn tokenize_command_line(line: &[u8], start_pos: BytePos) -> Result<Token> {
     let mut scanner = Scanner::new(line);
     scanner.expect(b'.');
-    scanner.eat_until_whitespace();
+    scanner.eat_token();
     let mut token_end = scanner.cursor();
     if token_end < 2 {
         // TODO(rikus): Report empty command name.
@@ -504,36 +621,28 @@ fn tokenize_command_line(line: &[u8], start_offset: usize) -> Result<Token> {
     }
     scanner.eat_whitespace();
     // Start `trivia` with a span of the command name.
-    let mut trivia = vec![Span::new(start_offset, token_end)];
+    let mut trivia = vec![Span::new(start_pos, token_end)];
     let mut trivia_start = scanner.cursor();
     // NOTE: Trivia beyond the command name is assumed to be optional.
-    while !scanner.done() {
-        scanner.eat_until_whitespace();
+    while !scanner.done() && !scanner.at_token_terminator() {
+        scanner.eat_token();
         token_end = scanner.cursor();
-        trivia.push(Span::new(
-            start_offset + trivia_start,
-            token_end - trivia_start,
-        ));
+        trivia.push(Span::new_rebased_range(start_pos, trivia_start, token_end));
         scanner.eat_whitespace();
         trivia_start = scanner.cursor();
     }
     Ok(Token {
         kind: TokenKind::Command,
-        trivia: Box::from_iter(trivia),
-        extent: Span::new(start_offset, token_end),
+        trivia,
+        extent: Span::new(start_pos, token_end),
     })
 }
 
-/// Cube ::= ("0" | "1" | "-")+ S+ ("0" | "1")
-fn tokenize_cube_line(line: &[u8], start_offset: usize) -> Result<Token> {
-    let valid_input = (b'0', b'1', b'-');
-    let valid_output = (b'0', b'1');
+/// `Cube ::= ("0" | "1" | "-")+ S+ ("0" | "1")`
+fn tokenize_cube_line(line: &[u8], start_pos: BytePos) -> Result<Token> {
     let mut scanner = Scanner::new(line);
-    // NOTE: This function is only called after encountering a valid cube input.
-    // This implies that there will _always_ be at least a single input -- no
-    // check for empty input necessary.
-    debug_assert!(scanner.at(valid_input));
-    scanner.eat_while(valid_input);
+    scanner.expect(BlifChar::is_cube_input);
+    scanner.eat_while(BlifChar::is_cube_input);
     let input_end = scanner.cursor();
     if scanner.eat_whitespace().is_empty() {
         // TODO(rikus): Handle expected whitespace.
@@ -541,24 +650,27 @@ fn tokenize_cube_line(line: &[u8], start_offset: usize) -> Result<Token> {
     }
     let output_start = scanner.cursor();
     // NOTE: Multi-bit outputs will be detected as errors by the parsing stage.
-    scanner.eat_while(valid_output);
+    scanner.eat_while(BlifChar::is_cube_output);
     let token_end = scanner.cursor();
     if output_start == token_end {
         // TODO(rikus): Handle empty output.
         panic!("expected '0' or '1'");
     }
     scanner.eat_whitespace();
+    if scanner.at(b'#') {
+        scanner.jump_end();
+    }
     if !scanner.done() {
-        // TODO(rikus): Handle unexpected trailing.
+        // TODO(rikus): Handle unexpected trailing bytes.
         panic!("unexpected {:?}", &line[scanner.cursor()..]);
     }
     Ok(Token {
         kind: TokenKind::Cube,
-        trivia: Box::from_iter([
-            Span::new(start_offset, input_end),
-            Span::new(output_start, token_end - output_start).rebase(start_offset),
+        trivia: Vec::from_iter([
+            Span::new(start_pos, input_end),
+            Span::new_rebased_range(start_pos, output_start, token_end),
         ]),
-        extent: Span::new(start_offset, token_end),
+        extent: Span::new(start_pos, token_end),
     })
 }
 
@@ -568,27 +680,26 @@ impl Iterator for Tokenizer<'_> {
     /// Get the next line's tokens from the tokenizer.
     fn next(&mut self) -> Option<Self::Item> {
         for line in self.lines.by_ref() {
-            // Trim comments.
-            let window_end = match line.get_bytes().iter().position(|&b| b == b'#') {
-                Some(end) => end,
-                None => line.get_bytes().len(),
-            };
-            let window = &line.get_bytes()[0..window_end];
-            let mut scanner = Scanner::new(window);
+            let line_bytes = line.get_bytes();
+            let mut scanner = Scanner::new(line_bytes);
             match scanner.peek() {
                 Some(b'.') => {
-                    return Some(tokenize_command_line(window, line.start_offset));
+                    return Some(tokenize_command_line(line_bytes, line.start_pos));
                 }
-                Some(_logic @ (b'0' | b'1' | b'-')) => {
-                    return Some(tokenize_cube_line(window, line.start_offset));
+                Some(logic) if logic.is_cube_input() => {
+                    return Some(tokenize_cube_line(line_bytes, line.start_pos));
                 }
-                None => {
-                    // Empty lines are ignored.
+                Some(b'#') => {
+                    // Comment lines are ignored.
                     continue;
                 }
                 Some(unexpected) => {
                     // TODO: Handle unexpected.
                     panic!("unexpected {:?}", unexpected);
+                }
+                None => {
+                    // TODO: Should this be `unreachable!`?
+                    panic!("unexpected empty line");
                 }
             }
         }
@@ -603,6 +714,7 @@ impl BlifBuffer {
     }
 }
 
+/// A BLIF file reader.
 #[derive(Debug)]
 pub struct BlifReader {
     buffer: BlifBuffer,
@@ -615,7 +727,7 @@ impl BlifReader {
         Ok(Self {
             buffer: BlifBuffer {
                 filename: filename.map(str::to_string),
-                inner: Box::from_iter(buffer),
+                inner: buffer,
             },
         })
     }
@@ -645,7 +757,7 @@ mod tests {
                 SourceLocation {
                     line: $line,
                     column: $col,
-                    file: None,
+                    filename: None,
                 }
             };
         }
@@ -680,6 +792,10 @@ mod tests {
 
         #[test]
         fn test_empty() {
+            let buffer = BlifBuffer::new_str("\n");
+            let mut lines = buffer.preprocess();
+            assert!(lines.next().is_none());
+
             let buffer = BlifBuffer::new_str("  \n# empty\n  \\\n  ");
             let mut lines = buffer.preprocess();
             assert_eq!(lines.next().unwrap().get_bytes(), b"# empty\n  ");
@@ -693,7 +809,7 @@ mod tests {
 
         macro_rules! span {
             ($start:expr, $len:expr) => {
-                Span::new($start, $len)
+                Span::new(BytePos($start), $len)
             };
         }
 
@@ -709,7 +825,7 @@ mod tests {
                     $tokens.next().unwrap().unwrap(),
                     Token {
                         kind: $kind,
-                        trivia: Box::from_iter([$(span!($start, $len),)+]),
+                        trivia: vec![$(span!($start, $len),)+],
                         extent: span!($tok_start, $tok_len)
                     }
                 );
