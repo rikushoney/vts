@@ -1,6 +1,7 @@
 use thiserror::Error;
 
-use super::reader::{BlifBuffer, SourceLocation, Span};
+use super::buffer::{BlifBuffer, Span};
+use super::error::SourceLocation;
 
 #[derive(Debug, Error)]
 pub enum ParseError {

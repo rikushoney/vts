@@ -6,7 +6,7 @@ use clap::Subcommand;
 use thiserror::Error;
 
 use vts_abc::{Abc, BlifLutMapper};
-use vts_core::blif::reader as blif_reader;
+use vts_core::blif;
 use vts_core::blif::BlifReader;
 
 const GITHUB_REPO_ISSUES: &str = "https://github.com/rikushoney/vts/issues";
@@ -20,7 +20,7 @@ pub(super) enum Error {
     #[error(transparent)]
     Abc(#[from] vts_abc::Error),
     #[error(transparent)]
-    BlifRead(#[from] blif_reader::Error),
+    BlifRead(#[from] blif::Error),
     #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error(
@@ -70,7 +70,7 @@ pub(super) enum Command {
     },
 }
 
-fn check_file_is_not_pipe(filename: &PathBuf) -> Result<()> {
+fn check_file_is_not_pipe(filename: &Path) -> Result<()> {
     if matches!(filename.to_str(), Some("-")) {
         Err(Error::RequiresAbcBlifReadString)
     } else {
@@ -96,9 +96,7 @@ fn check(input_filename: &PathBuf) -> Result<()> {
             let _netlist = reader.parse_netlist()?;
             Ok(())
         }
-        _ => {
-            return Err(Error::RequiresYosys);
-        }
+        _ => Err(Error::RequiresYosys),
     }
 }
 

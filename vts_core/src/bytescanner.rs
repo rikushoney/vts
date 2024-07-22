@@ -360,21 +360,21 @@ mod tests {
         let mut s = Scanner::new(&[]);
         s.jump(10);
         assert_eq!(s.cursor(), 0);
-        assert_eq!(s.done(), true);
+        assert!(s.done());
         assert_eq!(s.before(), b"");
         assert_eq!(s.after(), b"");
         assert_eq!(s.from(0), b"");
         assert_eq!(s.to(10), b"");
         assert_eq!(s.get(10..20), b"");
-        assert_eq!(s.at(|_| true), false);
-        assert_eq!(s.at(b""), true);
-        assert_eq!(s.at(b'a'), false);
+        assert!(s.at(|_| true));
+        assert!(s.at(b""));
+        assert!(!s.at(b'a'));
         assert_eq!(s.scout(-1), None);
         assert_eq!(s.scout(1), None);
         assert_eq!(s.eat(), None);
         assert_eq!(s.uneat(), None);
-        assert_eq!(s.eat_if(b""), true);
-        assert_eq!(s.eat_if(b'a'), false);
+        assert!(s.eat_if(b""));
+        assert!(!s.eat_if(b'a'));
         assert_eq!(s.eat_while(b""), b"");
         assert_eq!(s.eat_while(b'a'), b"");
         assert_eq!(s.eat_until(b""), b"");
@@ -387,6 +387,6 @@ mod tests {
         let pat = (b'a', b'b');
         s.expect(pat);
         s.expect(pat);
-        assert_eq!(s.at(pat), false);
+        assert!(!s.at(pat));
     }
 }
