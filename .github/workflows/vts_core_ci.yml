@@ -1,0 +1,36 @@
+on:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-check:
+    name: Cargo check
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo check --package vts_core
+
+  cargo-build:
+    name: Cargo build
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo build --verbose --package vts_core
+
+  cargo-test:
+    name: Cargo test
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --verbose --package vts_core
+
+  cargo-clippy:
+    name: Cargo clippy
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo clippy --package vts_core
