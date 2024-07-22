@@ -1,7 +1,9 @@
 use std::fmt;
+use std::path::Path;
 
 use thiserror::Error;
 
+/// A BLIF error.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
@@ -12,12 +14,14 @@ pub enum Error {
     Unknown(String),
 }
 
+/// A BLIF parsing error.
 #[derive(Clone, Debug, Error)]
 pub enum ParseError {
     #[error("an unexpected parsing error occurred: {0}")]
     Unknown(String),
 }
 
+/// A BLIF parsing error, with a tagged source location.
 #[derive(Clone, Debug, Error)]
 #[error(
     r#"{error}
@@ -29,19 +33,36 @@ pub struct TaggedParseError {
     location: SourceLocation,
 }
 
+/// Generic, known and unknown file names.
 // TODO(rikus): Should this be moved out of `blif` and to own submodule?
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum Filename {
     /// A generic filename.
-    File(String),
+    ///
+    /// NOTE: The filename does not necessary correspond to a real file on the
+    /// filesystem, although it is expected to be a valid file name, such that
+    /// it can be converted to a [Path] if necessary. See
+    /// [get_path](Filename::get_path).
+    Generic(String),
     /// Standard input.
     Stdin,
+    // TODO(rikus): Stdout?
     /// An unknown source.
     #[default]
     Unknown,
     /// A test.
     #[cfg(test)]
     Test,
+}
+
+impl Filename {
+    /// Get the filename as a [Path], if it is a generic filename.
+    pub fn get_path(&self) -> Option<&Path> {
+        match self {
+            Self::Generic(filename) => Some(Path::new(filename)),
+            _ => None,
+        }
+    }
 }
 
 impl From<String> for Filename {
@@ -51,7 +72,7 @@ impl From<String> for Filename {
             "<unknown>" => Filename::Unknown,
             #[cfg(test)]
             "<test>" => Filename::Test,
-            _ => Self::File(filename),
+            _ => Self::Generic(filename),
         }
     }
 }
@@ -69,7 +90,7 @@ impl From<Option<String>> for Filename {
 impl fmt::Display for Filename {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::File(filename) => {
+            Self::Generic(filename) => {
                 if filename.chars().any(char::is_whitespace) {
                     write!(formatter, "\"{}\"", filename)
                 } else {
