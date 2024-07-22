@@ -29,11 +29,66 @@ pub struct TaggedParseError {
     location: SourceLocation,
 }
 
+// TODO(rikus): Should this be moved out of `blif` and to own submodule?
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum Filename {
+    /// A generic filename.
+    File(String),
+    /// Standard input.
+    Stdin,
+    /// An unknown source.
+    #[default]
+    Unknown,
+    /// A test.
+    #[cfg(test)]
+    Test,
+}
+
+impl From<String> for Filename {
+    fn from(filename: String) -> Self {
+        match filename.as_str() {
+            "-" | "<stdin>" => Filename::Stdin,
+            "<unknown>" => Filename::Unknown,
+            #[cfg(test)]
+            "<test>" => Filename::Test,
+            _ => Self::File(filename),
+        }
+    }
+}
+
+impl From<Option<String>> for Filename {
+    fn from(filename: Option<String>) -> Self {
+        if let Some(filename) = filename {
+            Self::from(filename)
+        } else {
+            Self::Unknown
+        }
+    }
+}
+
+impl fmt::Display for Filename {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::File(filename) => {
+                if filename.chars().any(char::is_whitespace) {
+                    write!(formatter, "\"{}\"", filename)
+                } else {
+                    formatter.write_str(filename)
+                }
+            }
+            Self::Stdin => formatter.write_str("<stdin>"),
+            Self::Unknown => formatter.write_str("<unknown>"),
+            #[cfg(test)]
+            Self::Test => formatter.write_str("<test>"),
+        }
+    }
+}
+
 /// A location in BLIF text/bytes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceLocation {
-    /// Filename, if known.
-    pub filename: Option<String>,
+    /// The source file name.
+    pub filename: Filename,
     /// 1-based line number.
     pub line: usize,
     /// 1-based column offset.
@@ -42,34 +97,7 @@ pub struct SourceLocation {
 
 impl fmt::Display for SourceLocation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO(rikus): Move this out of the fn.
-        struct Filename<'a>(&'a str);
-
-        impl fmt::Display for Filename<'_> {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                if self.0.chars().any(char::is_whitespace) {
-                    write!(formatter, "\"{}\"", self.0)
-                } else {
-                    write!(formatter, "{}", self.0)
-                }
-            }
-        }
-
-        let filename = self
-            .filename
-            .as_ref()
-            .map(|name| match name.as_str() {
-                "-" => "<stdin>",
-                name => name,
-            })
-            .unwrap_or("<unknown>");
-        write!(
-            formatter,
-            "{}:{}:{}",
-            Filename(filename),
-            self.line,
-            self.column
-        )
+        write!(formatter, "{}:{}:{}", self.filename, self.line, self.column)
     }
 }
 
@@ -124,7 +152,7 @@ mod tests {
                 SourceLocation {
                     line: $line,
                     column: $col,
-                    filename: None,
+                    filename: Filename::Test,
                 }
             );
         };

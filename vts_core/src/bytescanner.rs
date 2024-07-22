@@ -336,7 +336,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Jump the cursor position to `cursor`.
+    /// Set the cursor position to `cursor`.
     ///
     /// If `cursor` is out of bounds, the cursor is set to the end of the bytes.
     #[inline]
@@ -344,7 +344,7 @@ impl<'a> Scanner<'a> {
         self.cursor = cursor.min(self.bytes.len());
     }
 
-    /// Jump the cursor position to the end of the bytes.
+    /// Set the cursor position to the end of the bytes.
     #[inline]
     pub fn jump_end(&mut self) {
         self.cursor = self.bytes.len();

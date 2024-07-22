@@ -2,7 +2,7 @@ use std::io::Read;
 
 use crate::bytescanner::Scanner;
 
-use super::error::{Result, SourceLocation};
+use super::error::{Filename, Result, SourceLocation};
 use super::token::{BlifScanner, Tokenizer};
 
 /// An owned buffer of BLIF text/bytes.
@@ -119,7 +119,7 @@ impl BlifBuffer {
         SourceLocation {
             line,
             column,
-            filename: self.filename.clone(),
+            filename: Filename::from(self.filename.clone()),
         }
     }
 
