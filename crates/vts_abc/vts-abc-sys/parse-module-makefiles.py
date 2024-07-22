@@ -85,7 +85,7 @@ def main() -> int:
         libname = "Abc" + "".join(part.capitalize() for part in module.name.split("/"))
         abc_lib_sources[libname] = []
         for mod_source in module.sources:
-            if mod_source in ABC_BLACKLISTED_SOURCES:
+            if mod_source.removeprefix("src/") in ABC_BLACKLISTED_SOURCES:
                 continue
             abc_lib_sources[libname].append(mod_source)
         abc_lib_sources[libname].sort()
