@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use super::buffer::BlifBuffer;
-use super::error::Result;
+use super::error::{Filename, Result};
 use super::netlist::Netlist;
 
 /// A BLIF file reader.
@@ -19,7 +19,7 @@ impl BlifReader {
 
     pub fn from_str(input: &str, filename: Option<&str>) -> Self {
         let mut buffer = BlifBuffer::new_str(input);
-        buffer.filename = filename.map(str::to_string);
+        buffer.filename = Filename::from(filename.map(str::to_string));
         Self { buffer }
     }
 

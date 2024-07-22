@@ -166,6 +166,14 @@ mod tests {
     use super::*;
     use crate::blif::buffer::{BlifBuffer, BytePos};
 
+    macro_rules! buffer {
+        ($contents:expr $(,)?) => {{
+            let mut buffer = BlifBuffer::new_str($contents);
+            buffer.filename = Filename::Test;
+            buffer
+        }};
+    }
+
     macro_rules! check_loc {
         ($buffer:expr, $pos:expr => ($line:expr, $col:expr)) => {
             assert_eq!(
@@ -181,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_calculate_location() {
-        let buffer = BlifBuffer::new_str(
+        let buffer = buffer!(
             r#".model top
 .inputs a b c
 .outputs d
@@ -198,7 +206,7 @@ mod tests {
         assert_eq!(buffer.len(), 62);
         check_loc!(buffer, 60 => (6, 4));
 
-        let buffer = BlifBuffer::new_str("\na");
+        let buffer = buffer!("\na");
         check_loc!(buffer, 0 => (1, 1));
         check_loc!(buffer, 1 => (2, 1));
     }

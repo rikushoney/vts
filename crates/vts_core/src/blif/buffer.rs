@@ -5,15 +5,6 @@ use crate::bytescanner::Scanner;
 use super::error::{Filename, Result, SourceLocation};
 use super::token::{BlifScanner, Tokenizer};
 
-/// An owned buffer of BLIF text/bytes.
-#[derive(Debug, Default)]
-pub struct BlifBuffer {
-    pub(super) filename: Option<String>,
-    pub(super) inner: Vec<u8>,
-}
-
-impl BlifBuffer {}
-
 /// A buffer byte position.
 ///
 /// NOTE: A `BytePos` should always remain relative to the original buffer extent
@@ -38,6 +29,13 @@ impl BytePos {
     }
 }
 
+/// An owned buffer of BLIF text/bytes.
+#[derive(Debug, Default)]
+pub struct BlifBuffer {
+    pub(super) filename: Filename,
+    pub(super) inner: Vec<u8>,
+}
+
 /// The position of a newline escape character and the associated escaped newline.
 #[derive(Debug)]
 struct NewlineEscape {
@@ -57,12 +55,12 @@ pub(super) struct BlifLines<'a> {
 
 impl BlifBuffer {
     /// Create a new buffer with an optional filename.
-    pub fn new<I>(bytes: I, filename: Option<String>) -> Self
+    pub fn new<I>(bytes: I, filename: Option<&str>) -> Self
     where
         I: IntoIterator<Item = u8>,
     {
         Self {
-            filename,
+            filename: Filename::from(filename.map(str::to_string)),
             inner: Vec::from_iter(bytes),
         }
     }
@@ -70,14 +68,17 @@ impl BlifBuffer {
     /// Create a new buffer by reading from `reader`.
     pub fn from_reader<R: Read>(mut reader: R, filename: Option<&str>) -> Result<Self> {
         let mut buffer = Self {
+            filename: Filename::from(filename.map(str::to_string)),
             inner: Vec::new(),
-            filename: filename.map(str::to_string),
         };
         reader.read_to_end(&mut buffer.inner)?;
         Ok(buffer)
     }
 
     /// Create a new buffer by copying a string.
+    ///
+    /// NOTE: The filename of the returned buffer is [Unknown]
+    /// (Filename::Unknown).
     pub fn new_str(input: &str) -> Self {
         Self::new(input.bytes(), None)
     }
@@ -119,7 +120,7 @@ impl BlifBuffer {
         SourceLocation {
             line,
             column,
-            filename: Filename::from(self.filename.clone()),
+            filename: self.filename.clone(),
         }
     }
 
@@ -364,9 +365,10 @@ impl<I> From<I> for BlifBuffer
 where
     I: IntoIterator<Item = u8>,
 {
+    /// NOTE: The resulting buffer's filename is set to [Unknown](Filename::Unknown).
     fn from(input: I) -> Self {
         Self {
-            filename: None,
+            filename: Filename::Unknown,
             inner: Vec::from_iter(input),
         }
     }

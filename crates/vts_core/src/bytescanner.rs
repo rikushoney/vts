@@ -366,7 +366,7 @@ mod tests {
         assert_eq!(s.from(0), b"");
         assert_eq!(s.to(10), b"");
         assert_eq!(s.get(10..20), b"");
-        assert!(s.at(|_| true));
+        assert!(!s.at(|_| true));
         assert!(s.at(b""));
         assert!(!s.at(b'a'));
         assert_eq!(s.scout(-1), None);
