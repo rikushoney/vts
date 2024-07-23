@@ -1,8 +1,10 @@
 use std::io::Read;
 
 use super::buffer::BlifBuffer;
+use super::command::Command;
 use super::error::{Filename, Result};
 use super::netlist::Netlist;
+use super::token::TokenKind;
 
 /// A BLIF file reader.
 #[derive(Debug)]
@@ -24,8 +26,20 @@ impl BlifReader {
     }
 
     pub fn parse_netlist(&mut self) -> Result<Netlist> {
-        let tokenizer = self.buffer.tokenize();
-        let _ = tokenizer.count();
+        let mut tokenizer = self.buffer.tokenize();
+        while let Some(token) = tokenizer.next().transpose()? {
+            match token.kind {
+                TokenKind::Command => {
+                    let _command =
+                        Command::parse_trivia(token.trivia.iter().copied(), &self.buffer)?;
+                    todo!();
+                }
+                TokenKind::Cube => {
+                    // TODO(rikus): Parse cubes.
+                    todo!();
+                }
+            }
+        }
         todo!()
     }
 }

@@ -7,8 +7,8 @@ use super::token::{BlifScanner, Tokenizer};
 
 /// A buffer byte position.
 ///
-/// NOTE: A `BytePos` should always remain relative to the original buffer extent
-/// and never a subslice of it.
+/// NOTE: A `BytePos` is always assumed to remain relative to the original
+/// buffer extent and never a subslice of it.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct BytePos(pub(super) usize);
 
@@ -77,8 +77,8 @@ impl BlifBuffer {
 
     /// Create a new buffer by copying a string.
     ///
-    /// NOTE: The filename of the returned buffer is [Unknown]
-    /// (Filename::Unknown).
+    /// NOTE: The filename of the returned buffer is
+    /// [Unknown](Filename::Unknown).
     pub fn new_str(input: &str) -> Self {
         Self::new(input.bytes(), None)
     }
@@ -100,8 +100,7 @@ impl BlifBuffer {
 
     /// Get a slice of the bytes in `extent`.
     pub fn view(&self, extent: Span) -> &[u8] {
-        let end = extent.start_pos.0 + extent.len;
-        &self.inner[extent.start_pos.0..end]
+        &self.inner[extent.start_pos().0..extent.end_pos().0]
     }
 
     /// Calculate the 1-based line number and column offset at `pos`.
@@ -354,8 +353,8 @@ impl<'a> Iterator for BlifLines<'a> {
         Some(storage)
     }
 
-    // Due to pre-processing we always know how many lines are left for iteration.
-    // Some lines might be empty or comments, though.
+    // NOTE: Due to pre-processing we always know how many lines are left for
+    // iteration. Some lines might be empty or comments, though.
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, Some(self.line_starts.len() - self.next_line_i))
     }
@@ -365,7 +364,8 @@ impl<I> From<I> for BlifBuffer
 where
     I: IntoIterator<Item = u8>,
 {
-    /// NOTE: The resulting buffer's filename is set to [Unknown](Filename::Unknown).
+    /// NOTE: The filename of the returned buffer is
+    /// [Unknown](Filename::Unknown).
     fn from(input: I) -> Self {
         Self {
             filename: Filename::Unknown,
@@ -375,7 +375,7 @@ where
 }
 
 /// A buffer extent.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Span {
     start_pos: BytePos,
     len: usize,
@@ -399,10 +399,40 @@ impl Span {
         self
     }
 
-    /// Create a new span starting at `base` shifted "up" by `start` and length
+    /// Create a new span starting at `base`, shifted "up" by `start` and length
     /// `end - start`.
     pub(super) fn new_rebased_range(base: BytePos, start_pos: usize, end_pos: usize) -> Self {
         Span::new(base, end_pos - start_pos).rebase(start_pos)
+    }
+
+    /// Create a new span ranging from the start of `first` to the end of `last`.
+    ///
+    /// Panics if `first.start_pos + first.len > last.start_pos`
+    pub fn new_token_range(first: &Self, last: &Self) -> Self {
+        assert!(first.start_pos.rebase(first.len) <= last.start_pos);
+        if first == last {
+            *first
+        } else {
+            let len = last.start_pos.diff(first.start_pos) + last.len;
+            Self::new(first.start_pos, len)
+        }
+    }
+
+    /// The start byte position of the span.
+    pub fn start_pos(&self) -> BytePos {
+        self.start_pos
+    }
+
+    /// The length of the span.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// The end byte position of the span.
+    ///
+    /// This is equivalent to `self.start_pos` + `self.len`.
+    pub fn end_pos(&self) -> BytePos {
+        BytePos(self.start_pos().0 + self.len())
     }
 }
 
@@ -522,7 +552,7 @@ c # test \
                     (b_start, b_len),
                     (c_start, c_len)
                 ]
-                @ (test_start, c_end)
+                @ (test_start, c_end - test_start)
             );
             let test_start = c_end + " # test \\\n\n### BREAK\n\n".len();
             let test_end = test_start + b".test".len();

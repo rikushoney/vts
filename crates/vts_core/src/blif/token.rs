@@ -112,7 +112,7 @@ impl<'a> Tokenizer<'a> {
     }
 }
 
-/// `Command ::= "." name (S+ arg0 (S+ argn)*)?`
+/// `Command ::= "." cmd-name (S+ arg0 (S+ argn)*)?`
 fn tokenize_command_line(line: &[u8], start_pos: BytePos) -> Result<Token> {
     let mut scanner = Scanner::new(line);
     scanner.expect(b'.');
@@ -148,15 +148,15 @@ fn tokenize_cube_line(line: &[u8], start_pos: BytePos) -> Result<Token> {
     scanner.eat_while(BlifChar::is_cube_input);
     let input_end = scanner.cursor();
     if scanner.eat_whitespace().is_empty() {
-        // TODO(rikus): Handle expected whitespace.
+        // TODO(rikus): Report expected whitespace.
         panic!("expected whitespace");
     }
     let output_start = scanner.cursor();
-    // NOTE: Multi-bit outputs will be detected as errors by the parsing stage.
+    // NOTE: Report multi-bit outputs as errors.
     scanner.eat_while(BlifChar::is_cube_output);
     let token_end = scanner.cursor();
     if output_start == token_end {
-        // TODO(rikus): Handle empty output.
+        // TODO(rikus): Report empty output.
         panic!("expected '0' or '1'");
     }
     scanner.eat_whitespace();
@@ -164,7 +164,7 @@ fn tokenize_cube_line(line: &[u8], start_pos: BytePos) -> Result<Token> {
         scanner.jump_end();
     }
     if !scanner.done() {
-        // TODO(rikus): Handle unexpected trailing bytes.
+        // TODO(rikus): Report unexpected bytes.
         panic!("unexpected {:?}", &line[scanner.cursor()..]);
     }
     Ok(Token {
@@ -197,11 +197,11 @@ impl Iterator for Tokenizer<'_> {
                     continue;
                 }
                 Some(unexpected) => {
-                    // TODO: Handle unexpected.
+                    // TODO(rikus): Report unexpected byte.
                     panic!("unexpected {:?}", unexpected);
                 }
                 None => {
-                    // TODO: Should this be `unreachable!`?
+                    // TODO(rikus): Should this be `unreachable!`?
                     panic!("unexpected empty line");
                 }
             }
