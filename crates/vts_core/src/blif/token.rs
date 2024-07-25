@@ -22,7 +22,7 @@ impl BlifChar for u8 {
         matches!(*self, b'\t' | b'\x0C' | b'\r' | b' ')
     }
 
-    /// Returns `true` if the byte would end a single token, else `false`.
+    /// Returns `true` if the byte would end a token, else `false`.
     #[inline]
     fn is_token_terminator(&self) -> bool {
         // TODO: Confirm this with other tools.
@@ -73,13 +73,14 @@ impl<'a> BlifScanner<'a> for Scanner<'a> {
 
     /// Returns `true` if the scanner is currently at a token terminator, else
     /// `false`.
+    #[inline]
     fn at_token_terminator(&self) -> bool {
         self.at(BlifChar::is_token_terminator)
     }
 }
 
 /// The scanned token kind.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum TokenKind {
     /// A command.
     Command,
@@ -89,13 +90,14 @@ pub(super) enum TokenKind {
 
 // A scanned token.
 #[derive(Debug, PartialEq)]
-pub(super) struct Token {
+pub struct Token {
     pub(super) kind: TokenKind,
     pub(super) trivia: Vec<Span>,
     pub(super) extent: Span,
 }
 
 /// An iterator over scanned tokens.
+#[derive(Debug)]
 pub(super) struct Tokenizer<'a> {
     lines: BlifLines<'a>,
 }

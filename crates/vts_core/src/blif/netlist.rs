@@ -1,9 +1,17 @@
-pub struct Netlist {
-    #[allow(dead_code)]
-    pub(super) model_name: Option<String>,
+use ustr::Ustr;
+
+/// A "logic" value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Logic {
+    /// "Zero", `0` or "low".
+    Zero,
+    /// "One", `1` or "high".
+    One,
+    /// "Don't care", "DC" or `-`.
+    DC,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LatchTrigger {
     /// Alias "re".
     RisingEdge,
@@ -35,4 +43,19 @@ impl std::str::FromStr for LatchTrigger {
             _ => Err(input.to_string()),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Latch {
+    input: Ustr,
+    output: Ustr,
+    trigger: Option<LatchTrigger>,
+    ctrl: Option<Ustr>,
+    init: Option<Logic>,
+}
+
+pub struct Netlist {
+    pub(super) model_name: Option<Ustr>,
+    pub(super) inputs: Vec<Ustr>,
+    pub(super) outputs: Vec<Ustr>,
 }

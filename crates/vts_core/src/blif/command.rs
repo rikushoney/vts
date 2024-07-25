@@ -1,5 +1,3 @@
-//! The "AST" for a BLIF file.
-
 use super::buffer::{BlifBuffer, Span};
 use super::error::{Error, Result};
 
@@ -31,11 +29,11 @@ pub enum Command {
         output: Span,
         span: Span,
     },
-    /// `Latch ::= ".latch" S+ input S+ output (S+ type S+ ctrl)? (S+ init)?`
+    /// `Latch ::= ".latch" S+ input S+ output (S+ trigger S+ ctrl)? (S+ init)?`
     Latch {
         input: Span,
         output: Span,
-        ty: Option<Span>,
+        trigger: Option<Span>,
         ctrl: Option<Span>,
         init: Option<Span>,
         span: Span,
@@ -47,7 +45,7 @@ pub enum Command {
     /// `formal-actual ::= lvalue "=" rvalue`
     Subckt {
         name: Span,
-        formal_actual: Vec<Assignment>,
+        bindings: Vec<Assignment>,
         span: Span,
     },
     /// `End ::= ".end"`
@@ -149,19 +147,20 @@ impl Command {
             span: Span::new_token_range(&cmd_name, &last_token),
             input,
             output,
-            ty,
+            trigger: ty,
             ctrl,
             init,
         })
     }
 
     /// Try to parse a `.subckt` line.
+    #[inline]
     fn parse_subckt<I>(cmd_name: Span, mut trivia: I, buffer: &BlifBuffer) -> Result<Self>
     where
         I: Iterator<Item = Span>,
     {
         let model_name = trivia.next().expect("expected `.subckt` model name");
-        let formal_actual = trivia.try_fold(Vec::new(), |mut list, assignment| {
+        let bindings = trivia.try_fold(Vec::new(), |mut list, assignment| {
             // TODO(rikus): Report expected assignment.
             let needle_pos = buffer
                 .view(assignment)
@@ -176,7 +175,7 @@ impl Command {
             Ok::<_, Error>(list)
         })?;
         // TODO(rikus): Is empty `formal=actual` an error?
-        let last_token = formal_actual
+        let last_token = bindings
             .iter()
             .last()
             .map(|assignment| assignment.rvalue)
@@ -184,7 +183,7 @@ impl Command {
         Ok(Self::Subckt {
             span: Span::new_token_range(&cmd_name, &last_token),
             name: model_name,
-            formal_actual,
+            bindings,
         })
     }
 
@@ -194,6 +193,7 @@ impl Command {
     /// Panics if:
     /// - `trivia` does not yield at least a single token
     /// - the first token does not start with a `.`
+    #[inline]
     pub fn parse_trivia<I>(mut trivia: I, buffer: &BlifBuffer) -> Result<Self>
     where
         I: Iterator<Item = Span>,
