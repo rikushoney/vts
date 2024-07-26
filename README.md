@@ -8,13 +8,16 @@ field-programmable gate array (SFPGA) architecture exploration.
 VTS is composed of many sub-projects. More information about each sub-project
 is available under its respective subdirectory:
 
-| Name            | Directory                          | Language |
-| --------------- | ---------------------------------- | -------- |
-| `vts_abc`       | [crates/vts_abc](crates/vts_abc)   | Rust     |
-| `vts_api`       | [crates/vts_api](crates/vts_api)   | Rust     |
-| `vts_cli`       | [crates/vts_cli](crates/vts_cli)   | Rust     |
-| `vts_core`      | [crates/vts_core](crates/vts_core) | Rust     |
-| Python bindings | [python/vts](python/vts)           | Python   |
+| Name            | Directory                          | Status        | Language |
+| --------------- | ---------------------------------- | ------------- | -------- |
+| `vts_abc`       | [crates/vts_abc](crates/vts_abc)   |               | Rust     |
+| `vts_api`       | [crates/vts_api](crates/vts_api)   |               | Rust     |
+| `vts_cli`       | [crates/vts_cli](crates/vts_cli)   |               | Rust     |
+| `vts_core`      | [crates/vts_core](crates/vts_core) | [![CI][2]][1] | Rust     |
+| Python bindings | [python/vts](python/vts)           |               | Python   |
+
+[1]: https://github.com/rikushoney/vts/actions/workflows/vts_core_ci.yml
+[2]: https://github.com/rikushoney/vts/actions/workflows/vts_core_ci.yml/badge.svg
 
 ## License
 
