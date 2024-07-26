@@ -1,0 +1,7 @@
+[package]
+name = "vts_yosys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vts-yosys-sys = { path = "./vts-yosys-sys" }

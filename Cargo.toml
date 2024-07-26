@@ -3,7 +3,8 @@ members = [
   "crates/vts_core",
   "crates/vts_api",
   "crates/vts_cli",
-  "crates/vts_abc"
+  "crates/vts_abc",
+  "crates/vts_yosys"
 ]
 resolver = "2"
 
