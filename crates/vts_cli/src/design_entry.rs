@@ -1,13 +1,9 @@
-use std::fs;
-use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
 use thiserror::Error;
 
 use vts_abc::{Abc, BlifLutMapper};
-use vts_core::blif;
-use vts_core::blif::BlifReader;
 
 const GITHUB_REPO_ISSUES: &str = "https://github.com/rikushoney/vts/issues";
 
@@ -19,8 +15,6 @@ pub(super) enum Error {
     UnknownFileFormat,
     #[error(transparent)]
     Abc(#[from] vts_abc::Error),
-    #[error(transparent)]
-    BlifRead(#[from] blif::Error),
     #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error(
@@ -87,17 +81,8 @@ fn check_file_exists_and_guess_format(filename: &PathBuf) -> Result<FileFormat> 
 
 fn check(input_filename: &PathBuf) -> Result<()> {
     check_file_is_not_pipe(input_filename)?;
-    let input_format = check_file_exists_and_guess_format(input_filename)?;
-    match input_format {
-        FileFormat::Blif => {
-            let input_file = fs::File::open(input_filename)?;
-            let mut reader =
-                BlifReader::from_reader(BufReader::new(input_file), input_filename.to_str())?;
-            let _netlist = reader.parse_netlist()?;
-            Ok(())
-        }
-        _ => Err(Error::RequiresYosys),
-    }
+    let _input_format = check_file_exists_and_guess_format(input_filename)?;
+    Err(Error::RequiresYosys)
 }
 
 fn lutmap(input_filename: &PathBuf, output_filename: &PathBuf) -> Result<()> {
