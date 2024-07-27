@@ -35,24 +35,28 @@ def process_line(line: str) -> Iterator[str]:
     yield from filter(isvalid, map(cleanup, line.split()))
 
 
+def _parse_module_make(module_make_file: Path) -> Iterator[str]:
+    lines = module_make_file.read_text().splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if line.startswith("SRC"):
+            needle = "+="
+            jump = line.find(needle) + len(needle)
+            if jump < len(needle):
+                raise ValueError(f'expected "{needle}" on line {i + 1}:"{line}"')
+            line = line[jump:].lstrip()
+            yield from process_line(line)
+            while line.endswith("\\"):
+                i += 1
+                line = lines[i].strip()
+                yield from process_line(line)
+        i += 1
+
+
 def parse_module_make(module_make_file: Path) -> Iterator[str]:
     try:
-        lines = module_make_file.read_text().splitlines()
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-            if line.startswith("SRC"):
-                needle = "+="
-                jump = line.find(needle) + len(needle)
-                if jump < len(needle):
-                    raise ValueError(f'expected "{needle}" on line {i + 1}:"{line}"')
-                line = line[jump:].lstrip()
-                yield from process_line(line)
-                while line.endswith("\\"):
-                    i += 1
-                    line = lines[i].strip()
-                    yield from process_line(line)
-            i += 1
+        yield from _parse_module_make(module_make_file)
     except Exception as err:
         raise RuntimeError(f"Failed to parse {module_make_file}") from err
 
