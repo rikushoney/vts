@@ -105,7 +105,7 @@ def main() -> int:
         indent=2,
         sort_keys=True,
     )
-    yosys_lib_names = "".join(map(append_newline, yosys_lib_sources.keys()))
+    yosys_lib_names = "".join(map(append_newline, sorted(yosys_lib_sources.keys())))
     yosys_lib_sources_json = VTS_YOSYS_SYS_DIR / "yosys_lib_sources.json"
     yosys_lib_names_txt = VTS_YOSYS_SYS_DIR / "yosys_lib_names.txt"
     lib_sources_should_update = (
