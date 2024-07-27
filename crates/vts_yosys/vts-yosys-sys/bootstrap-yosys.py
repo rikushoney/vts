@@ -15,6 +15,10 @@ YOSYS_BLACKLISTED_SOURCES: set[str] = {
     "frontends/rtlil/rtlil_parser.tab.cc",
     "frontends/verilog/verilog_lexer.cc",
     "frontends/verilog/verilog_parser.tab.cc",
+    "passes/techmap/abc.cc",
+    "passes/techmap/abc9.cc",
+    "passes/techmap/abc9_exe.cc",
+    "passes/techmap/abc9_ops.cc",
 }
 
 
@@ -96,7 +100,11 @@ def main() -> int:
                 continue
             yosys_lib_sources[libname].append(mod_source)
         yosys_lib_sources[libname].sort()
-    yosys_lib_sources_serialized = json.dumps(yosys_lib_sources, indent=2)
+    yosys_lib_sources_serialized = json.dumps(
+        yosys_lib_sources,
+        indent=2,
+        sort_keys=True,
+    )
     yosys_lib_names = "".join(map(append_newline, yosys_lib_sources.keys()))
     yosys_lib_sources_json = VTS_YOSYS_SYS_DIR / "yosys_lib_sources.json"
     yosys_lib_names_txt = VTS_YOSYS_SYS_DIR / "yosys_lib_names.txt"

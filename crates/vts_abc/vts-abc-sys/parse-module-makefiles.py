@@ -93,8 +93,12 @@ def main() -> int:
                 continue
             abc_lib_sources[libname].append(mod_source)
         abc_lib_sources[libname].sort()
-    abc_lib_sources_serialized = json.dumps(abc_lib_sources, indent=2)
-    abc_lib_names = "".join(map(append_newline, abc_lib_sources.keys()))
+    abc_lib_sources_serialized = json.dumps(
+        abc_lib_sources,
+        indent=2,
+        sort_keys=True,
+    )
+    abc_lib_names = "".join(map(append_newline, sorted(abc_lib_sources.keys())))
     abc_lib_sources_json = VTS_ABC_SYS_DIR / "abc_lib_sources.json"
     abc_lib_names_txt = VTS_ABC_SYS_DIR / "abc_lib_names.txt"
     lib_sources_should_update = (
