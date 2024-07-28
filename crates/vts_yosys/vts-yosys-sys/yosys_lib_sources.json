@@ -217,14 +217,6 @@
     "passes/opt/share.cc",
     "passes/opt/wreduce.cc"
   ],
-  "YosysPassesPmgen": [
-    "passes/pmgen/ice40_dsp.cc",
-    "passes/pmgen/ice40_wrapcarry.cc",
-    "passes/pmgen/peepopt.cc",
-    "passes/pmgen/test_pmgen.cc",
-    "passes/pmgen/xilinx_dsp.cc",
-    "passes/pmgen/xilinx_srl.cc"
-  ],
   "YosysPassesProc": [
     "passes/proc/proc.cc",
     "passes/proc/proc_arst.cc",

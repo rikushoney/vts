@@ -30,7 +30,6 @@ YosysPassesFsm
 YosysPassesHierarchy
 YosysPassesMemory
 YosysPassesOpt
-YosysPassesPmgen
 YosysPassesProc
 YosysPassesSat
 YosysPassesTechmap

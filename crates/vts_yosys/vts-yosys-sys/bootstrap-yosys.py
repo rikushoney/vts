@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Iterator, NamedTuple
@@ -9,6 +11,7 @@ VTS_YOSYS_SYS_DIR: Path = Path(__file__).parent
 YOSYS_ROOT_DIR: Path = VTS_YOSYS_SYS_DIR / "yosys"
 YOSYS_MAKEFILE_INC: str = "Makefile.inc"
 YOSYS_BASE_MODULES: set[str] = {"backends", "frontends", "libs", "passes"}
+YOSYS_BLACKLISTED_MODULES: set[str] = {"passes/pmgen"}
 YOSYS_BLACKLISTED_SOURCES: set[str] = {
     "kernel/driver.cc",
     "frontends/rtlil/rtlil_lexer.cc",
@@ -20,6 +23,12 @@ YOSYS_BLACKLISTED_SOURCES: set[str] = {
     "passes/techmap/abc9_exe.cc",
     "passes/techmap/abc9_ops.cc",
 }
+YOSYS_BUILD_INCLUDE_DIR: Path = VTS_YOSYS_SYS_DIR / "include"
+YOSYS_BUILD_LIB_DIR: Path = VTS_YOSYS_SYS_DIR / "lib"
+YOSYS_GENERATE_FRONTENDS: set[str] = {"rtlil", "verilog"}
+YOSYS_GENERATE_CELLHELP: set[str] = {"simlib.v", "simcells.v"}
+YOSYS_TECHLIBS_COMMON: Path = YOSYS_ROOT_DIR / "techlibs" / "common"
+YOSYS_CELLHELP_PY: Path = YOSYS_TECHLIBS_COMMON / "cellhelp.py"
 
 
 def eprint(*args: Any, **kwargs: Any) -> None:
@@ -86,10 +95,70 @@ def append_newline(line: str) -> str:
     return line + "\n"
 
 
+def check_generate(command: str, *args: Any) -> None:
+    proc = subprocess.run([command, *args])
+    if (code := proc.returncode) != 0:
+        stderr = proc.stderr.decode("utf-8")
+        msg = f"`{command}` returned a non-zero exit code ({code}): {stderr}"
+        raise RuntimeError(msg)
+
+
+def generate_lexer(sourcefile: Path, outfile: Path) -> None:
+    check_generate("flex", "-o", outfile, "-L", sourcefile)
+
+
+def generate_parser(sourcefile: Path, outfile: Path) -> None:
+    outname = outfile.with_suffix("")
+    while len(outname.suffixes) > 0:
+        outname = outname.with_suffix("")
+    check_generate(
+        "bison",
+        "-o",
+        outfile,
+        "-l",
+        "-d",
+        "-b",
+        outname,
+        sourcefile,
+    )
+
+
+_FRONTEND_INCLUDE_PATTERN = re.compile(r'#include "(frontends/[^"]*)"')
+
+
+def generate_frontend(frontend: str) -> None:
+    frontend_dir = Path("frontends") / frontend
+    sourcedir = YOSYS_ROOT_DIR / frontend_dir
+    destdir = YOSYS_BUILD_LIB_DIR / frontend_dir
+    lexer_source = sourcedir / f"{frontend}_lexer.l"
+    lexer_dest = destdir / f"{frontend}_lexer.cc"
+    generate_lexer(lexer_source, lexer_dest)
+    parser_source = sourcedir / f"{frontend}_parser.y"
+    parser_dest = destdir / f"{frontend}_parser.tab.cc"
+    generate_parser(parser_source, parser_dest)
+    parser_code = parser_dest.read_text()
+
+    def patch_parser_include(include: re.Match) -> str:
+        header_path = Path(include.group(include.lastindex or 0))
+        if header_path.stem == parser_dest.stem:
+            return f'#include "{header_path.name}"'
+        else:
+            return include.group(0)
+
+    patched_code = _FRONTEND_INCLUDE_PATTERN.sub(patch_parser_include, parser_code)
+    parser_dest.write_text(patched_code)
+
+
+def generate_help(sourcefile: Path, outfile: Path) -> None:
+    helpbytes = subprocess.check_output([sys.executable, YOSYS_CELLHELP_PY, sourcefile])
+    outfile.write_text(helpbytes.decode("utf-8"))
+
+
 def main() -> int:
     yosys_lib_sources: dict[str, list[str]] = {}
     for module in walk_yosys_modules(YOSYS_ROOT_DIR):
-        if len(module.sources) == 0:
+        blacklisted = module.name in YOSYS_BLACKLISTED_MODULES
+        if blacklisted or len(module.sources) == 0:
             continue
         libname = "Yosys" + "".join(
             part.capitalize() for part in module.name.split("/")
@@ -126,6 +195,14 @@ def main() -> int:
         (VTS_YOSYS_SYS_DIR / "CMakeLists.txt").touch()
     else:
         eprint("nothing updated")
+    # TODO: Update iff changed.
+    for frontend in YOSYS_GENERATE_FRONTENDS:
+        generate_frontend(frontend)
+    for cellhelp in YOSYS_GENERATE_CELLHELP:
+        help_source = YOSYS_TECHLIBS_COMMON / cellhelp
+        help_outname = help_source.stem + "_help.inc"
+        help_dest = YOSYS_BUILD_INCLUDE_DIR / "techlibs" / "common" / help_outname
+        generate_help(help_source, help_dest)
     return 0
 
 

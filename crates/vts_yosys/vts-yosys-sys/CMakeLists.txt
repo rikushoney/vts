@@ -60,6 +60,7 @@ function(add_yosys_library lib_name)
     ${lib_name}
     PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/yosys"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
   )
 
   target_compile_definitions(
@@ -86,6 +87,20 @@ file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/yosys_lib_names.txt" yosys_lib_names)
 foreach(lib_name ${yosys_lib_names})
   add_yosys_library(${lib_name})
 endforeach()
+
+target_sources(
+  YosysFrontendsRtlil
+  PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/rtlil/rtlil_lexer.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/rtlil/rtlil_parser.tab.cc"
+)
+
+target_sources(
+  YosysFrontendsVerilog
+  PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/verilog/verilog_lexer.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/verilog/verilog_parser.tab.cc"
+)
 
 install(
   TARGETS ${yosys_lib_names}
