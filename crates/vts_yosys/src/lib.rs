@@ -1,4 +1,5 @@
 use std::ffi::{c_char, CString};
+use std::marker::{PhantomData, PhantomPinned};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use thiserror::Error;
@@ -13,7 +14,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 static YOSYS_LOCKED: AtomicBool = AtomicBool::new(false);
 
-pub struct Yosys;
+pub struct Yosys {
+    _data: [u8; 0],
+    _marker: PhantomData<(*mut u8, PhantomPinned)>,
+}
 
 fn yosys_setup() {
     unsafe { vts_yosys_sys::vts_yosys_setup() }
@@ -40,7 +44,10 @@ impl Yosys {
         let locked = YOSYS_LOCKED.swap(true, Ordering::SeqCst);
         if !locked {
             yosys_setup();
-            Ok(Self)
+            Ok(Self {
+                _data: [],
+                _marker: PhantomData,
+            })
         } else {
             Err(Error::InstanceExists)
         }
