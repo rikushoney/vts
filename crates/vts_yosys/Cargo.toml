@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+thiserror.workspace = true
 vts-yosys-sys = { path = "./vts-yosys-sys" }
+
+[dev-dependencies]
+serial_test.workspace = true

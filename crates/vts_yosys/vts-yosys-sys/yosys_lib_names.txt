@@ -24,6 +24,12 @@ YosysFrontendsRtlil
 YosysFrontendsVerific
 YosysFrontendsVerilog
 YosysKernel
+YosysLibsBigInt
+YosysLibsEzSat
+YosysLibsJson11
+YosysLibsMiniSat
+YosysLibsSha1
+YosysLibsSubcircuit
 YosysPassesCmds
 YosysPassesEquiv
 YosysPassesFsm

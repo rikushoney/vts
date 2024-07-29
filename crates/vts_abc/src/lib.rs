@@ -52,7 +52,7 @@ fn abc_frame_set_lut_library(framework: *mut AbcFrame, library: *const c_char) -
 }
 
 impl Abc {
-    pub fn new() -> Result<Abc> {
+    pub fn new() -> Result<Self> {
         let locked = ABC_LOCKED.swap(true, Ordering::SeqCst);
         if !locked {
             abc_start();

@@ -9,7 +9,7 @@ from typing import Any, Iterator, NamedTuple
 VTS_YOSYS_SYS_DIR: Path = Path(__file__).parent
 YOSYS_ROOT_DIR: Path = VTS_YOSYS_SYS_DIR / "yosys"
 YOSYS_MAKEFILE_INC: str = "Makefile.inc"
-YOSYS_BASE_MODULES: set[str] = {"backends", "frontends", "libs", "passes"}
+YOSYS_BASE_MODULES: set[str] = {"backends", "frontends", "passes"}
 YOSYS_BLACKLISTED_MODULES: set[str] = {"passes/pmgen"}
 YOSYS_BLACKLISTED_SOURCES: set[str] = {
     "kernel/driver.cc",
@@ -17,6 +17,7 @@ YOSYS_BLACKLISTED_SOURCES: set[str] = {
     "frontends/rtlil/rtlil_parser.tab.cc",
     "frontends/verilog/verilog_lexer.cc",
     "frontends/verilog/verilog_parser.tab.cc",
+    "passes/sat/sim.cc",
     "passes/techmap/abc.cc",
     "passes/techmap/abc9.cc",
     "passes/techmap/abc9_exe.cc",
@@ -26,6 +27,28 @@ YOSYS_BUILD_INCLUDE_DIR: Path = VTS_YOSYS_SYS_DIR / "include"
 YOSYS_GENERATE_CELLHELP: set[str] = {"simlib.v", "simcells.v"}
 YOSYS_TECHLIBS_COMMON: Path = YOSYS_ROOT_DIR / "techlibs" / "common"
 YOSYS_CELLHELP_PY: Path = YOSYS_TECHLIBS_COMMON / "cellhelp.py"
+YOSYS_EXTRA_LIBS: dict[str, set[str]] = {
+    "YosysLibsBigInt": {
+        "libs/bigint/BigIntegerAlgorithms.cc",
+        "libs/bigint/BigInteger.cc",
+        "libs/bigint/BigIntegerUtils.cc",
+        "libs/bigint/BigUnsigned.cc",
+        "libs/bigint/BigUnsignedInABase.cc",
+    },
+    "YosysLibsEzSat": {
+        "libs/ezsat/ezsat.cc",
+        "libs/ezsat/ezminisat.cc",
+    },
+    "YosysLibsJson11": {"libs/json11/json11.cpp"},
+    "YosysLibsMiniSat": {
+        "libs/minisat/Options.cc",
+        "libs/minisat/SimpSolver.cc",
+        "libs/minisat/Solver.cc",
+        "libs/minisat/System.cc",
+    },
+    "YosysLibsSha1": {"libs/sha1/sha1.cpp"},
+    "YosysLibsSubcircuit": {"libs/subcircuit/subcircuit.cc"},
+}
 
 
 def eprint(*args: Any, **kwargs: Any) -> None:
@@ -92,44 +115,19 @@ def append_newline(line: str) -> str:
     return line + "\n"
 
 
-def check_generate(command: str, *args: Any) -> None:
-    proc = subprocess.run([command, *args])
-    if (code := proc.returncode) != 0:
-        stderr = proc.stderr.decode("utf-8")
-        msg = f"`{command}` returned a non-zero exit code ({code}): {stderr}"
-        raise RuntimeError(msg)
-
-
-def generate_lexer(sourcefile: Path, outfile: Path) -> None:
-    check_generate("flex", "-o", outfile, "-L", sourcefile)
-
-
-def generate_parser(sourcefile: Path, outfile: Path) -> None:
-    outname = outfile.with_suffix("")
-    while len(outname.suffixes) > 0:
-        outname = outname.with_suffix("")
-    check_generate(
-        "bison",
-        "-o",
-        outfile,
-        "-l",
-        "-d",
-        "-b",
-        outname,
-        sourcefile,
-    )
-
-
 def generate_help(sourcefile: Path, outfile: Path) -> bool:
     helpbytes = subprocess.check_output([sys.executable, YOSYS_CELLHELP_PY, sourcefile])
     outdated = not outfile.exists() or outfile.read_bytes() != helpbytes
     if outdated:
+        eprint(f"updating {outfile}")
         outfile.write_text(helpbytes.decode("utf-8"))
     return outdated
 
 
 def main() -> int:
-    yosys_lib_sources: dict[str, list[str]] = {}
+    yosys_lib_sources: dict[str, list[str]] = {
+        name: list(sources) for name, sources in YOSYS_EXTRA_LIBS.items()
+    }
     for module in walk_yosys_modules(YOSYS_ROOT_DIR):
         blacklisted = module.name in YOSYS_BLACKLISTED_MODULES
         if blacklisted or len(module.sources) == 0:

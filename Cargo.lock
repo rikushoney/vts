@@ -811,6 +811,8 @@ dependencies = [
 name = "vts_yosys"
 version = "0.1.0"
 dependencies = [
+ "serial_test",
+ "thiserror",
  "vts-yosys-sys",
 ]
 

@@ -8,4 +8,4 @@ thiserror.workspace = true
 vts-abc-sys = { path = "./vts-abc-sys" }
 
 [dev-dependencies]
-serial_test = "3"
+serial_test.workspace = true

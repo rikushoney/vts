@@ -87,6 +87,7 @@
     "kernel/calc.cc",
     "kernel/cellaigs.cc",
     "kernel/celledges.cc",
+    "kernel/cost.cc",
     "kernel/ff.cc",
     "kernel/ffmerge.cc",
     "kernel/fmt.cc",
@@ -101,6 +102,32 @@
     "kernel/scopeinfo.cc",
     "kernel/yosys.cc",
     "kernel/yw.cc"
+  ],
+  "YosysLibsBigInt": [
+    "libs/bigint/BigIntegerAlgorithms.cc",
+    "libs/bigint/BigIntegerUtils.cc",
+    "libs/bigint/BigInteger.cc",
+    "libs/bigint/BigUnsignedInABase.cc",
+    "libs/bigint/BigUnsigned.cc"
+  ],
+  "YosysLibsEzSat": [
+    "libs/ezsat/ezsat.cc",
+    "libs/ezsat/ezminisat.cc"
+  ],
+  "YosysLibsJson11": [
+    "libs/json11/json11.cpp"
+  ],
+  "YosysLibsMiniSat": [
+    "libs/minisat/Options.cc",
+    "libs/minisat/Solver.cc",
+    "libs/minisat/SimpSolver.cc",
+    "libs/minisat/System.cc"
+  ],
+  "YosysLibsSha1": [
+    "libs/sha1/sha1.cpp"
+  ],
+  "YosysLibsSubcircuit": [
+    "libs/subcircuit/subcircuit.cc"
   ],
   "YosysPassesCmds": [
     "passes/cmds/add.cc",
@@ -176,6 +203,7 @@
   ],
   "YosysPassesHierarchy": [
     "passes/hierarchy/hierarchy.cc",
+    "passes/hierarchy/keep_hierarchy.cc",
     "passes/hierarchy/submod.cc",
     "passes/hierarchy/uniquify.cc"
   ],
@@ -246,7 +274,6 @@
     "passes/sat/qbfsat.cc",
     "passes/sat/recover_names.cc",
     "passes/sat/sat.cc",
-    "passes/sat/sim.cc",
     "passes/sat/supercover.cc",
     "passes/sat/synthprop.cc"
   ],

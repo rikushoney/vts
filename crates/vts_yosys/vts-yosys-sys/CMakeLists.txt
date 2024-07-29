@@ -92,6 +92,12 @@ foreach(lib_name ${yosys_lib_names})
   add_yosys_library(${lib_name})
 endforeach()
 
+target_sources(
+  YosysKernel
+  PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/lib/kernel/version_vts.cc"
+)
+
 find_package(BISON REQUIRED)
 find_package(FLEX REQUIRED)
 

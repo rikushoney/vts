@@ -21,6 +21,7 @@ fn main() {
         None => cmake::build(vts_yosys_sys_dir),
     };
     println!("cargo:rerun-if-changed=wrapper.cpp");
+    println!("cargo:rerun-if-changed=wrapper.h");
     cc::Build::new()
         .cpp(true)
         .file("wrapper.cpp")
