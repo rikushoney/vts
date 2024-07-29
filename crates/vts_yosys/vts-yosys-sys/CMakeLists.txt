@@ -42,7 +42,11 @@ set(
   "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}"
 )
 
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/yosys_lib_sources.json" yosys_lib_sources)
+file(
+  READ
+  "${CMAKE_CURRENT_SOURCE_DIR}/yosys_lib_sources.json"
+  yosys_lib_sources
+)
 
 function(add_yosys_library lib_name)
   string(JSON lib_sources_json GET "${yosys_lib_sources}" "${lib_name}")
@@ -88,18 +92,85 @@ foreach(lib_name ${yosys_lib_names})
   add_yosys_library(${lib_name})
 endforeach()
 
+find_package(BISON REQUIRED)
+find_package(FLEX REQUIRED)
+
+bison_target(
+  rtlil_parser
+  "${CMAKE_SOURCE_DIR}/yosys/frontends/rtlil/rtlil_parser.y"
+  "${CMAKE_BINARY_DIR}/yosys/frontends/rtlil/rtlil_parser.tab.cc"
+  DEFINES_FILE
+  "${CMAKE_BINARY_DIR}/yosys/frontends/rtlil/rtlil_parser.tab.hh"
+)
+
+if(NOT DEFINED BISON_rtlil_parser_DEFINED)
+  message(FATAL_ERROR "failed to generate rtlil parser")
+endif()
+
+flex_target(
+  rtlil_lexer
+  "${CMAKE_SOURCE_DIR}/yosys/frontends/rtlil/rtlil_lexer.l"
+  "${CMAKE_BINARY_DIR}/yosys/frontends/rtlil/rtlil_lexer.cc"
+  DEFINES_FILE
+  "${CMAKE_BINARY_DIR}/yosys/frontends/rtlil/rtlil_lexer.hh"
+)
+
+if(NOT DEFINED FLEX_rtlil_lexer_DEFINED)
+  message(FATAL_ERROR "failed to generate rtlil lexer")
+endif()
+
+add_flex_bison_dependency(rtlil_lexer rtlil_parser)
+
+target_include_directories(
+  YosysFrontendsRtlil
+  PRIVATE
+  "${CMAKE_CURRENT_BINARY_DIR}/yosys"
+)
+
 target_sources(
   YosysFrontendsRtlil
   PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/rtlil/rtlil_lexer.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/rtlil/rtlil_parser.tab.cc"
+  ${BISON_rtlil_parser_OUTPUT_SOURCE}
+  ${FLEX_rtlil_lexer_OUTPUTS}
+)
+
+bison_target(
+  verilog_parser
+  "${CMAKE_SOURCE_DIR}/yosys/frontends/verilog/verilog_parser.y"
+  "${CMAKE_BINARY_DIR}/yosys/frontends/verilog/verilog_parser.tab.cc"
+  DEFINES_FILE
+  "${CMAKE_BINARY_DIR}/yosys/frontends/verilog/verilog_parser.tab.hh"
+)
+
+if(NOT DEFINED BISON_verilog_parser_DEFINED)
+  message(FATAL_ERROR "failed to generate verilog parser")
+endif()
+
+flex_target(
+  verilog_lexer
+  "${CMAKE_SOURCE_DIR}/yosys/frontends/verilog/verilog_lexer.l"
+  "${CMAKE_BINARY_DIR}/yosys/frontends/verilog/verilog_lexer.cc"
+  DEFINES_FILE
+  "${CMAKE_BINARY_DIR}/yosys/frontends/verilog/verilog_lexer.hh"
+)
+
+if(NOT DEFINED FLEX_verilog_lexer_DEFINED)
+  message(FATAL_ERROR "failed to generate verilog lexer")
+endif()
+
+add_flex_bison_dependency(verilog_lexer verilog_parser)
+
+target_include_directories(
+  YosysFrontendsVerilog
+  PRIVATE
+  "${CMAKE_CURRENT_BINARY_DIR}/yosys"
 )
 
 target_sources(
   YosysFrontendsVerilog
   PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/verilog/verilog_lexer.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/lib/frontends/verilog/verilog_parser.tab.cc"
+  ${BISON_verilog_parser_OUTPUT_SOURCE}
+  ${FLEX_verilog_lexer_OUTPUTS}
 )
 
 install(

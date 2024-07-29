@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,8 +23,6 @@ YOSYS_BLACKLISTED_SOURCES: set[str] = {
     "passes/techmap/abc9_ops.cc",
 }
 YOSYS_BUILD_INCLUDE_DIR: Path = VTS_YOSYS_SYS_DIR / "include"
-YOSYS_BUILD_LIB_DIR: Path = VTS_YOSYS_SYS_DIR / "lib"
-YOSYS_GENERATE_FRONTENDS: set[str] = {"rtlil", "verilog"}
 YOSYS_GENERATE_CELLHELP: set[str] = {"simlib.v", "simcells.v"}
 YOSYS_TECHLIBS_COMMON: Path = YOSYS_ROOT_DIR / "techlibs" / "common"
 YOSYS_CELLHELP_PY: Path = YOSYS_TECHLIBS_COMMON / "cellhelp.py"
@@ -123,35 +120,12 @@ def generate_parser(sourcefile: Path, outfile: Path) -> None:
     )
 
 
-_FRONTEND_INCLUDE_PATTERN = re.compile(r'#include "(frontends/[^"]*)"')
-
-
-def generate_frontend(frontend: str) -> None:
-    frontend_dir = Path("frontends") / frontend
-    sourcedir = YOSYS_ROOT_DIR / frontend_dir
-    destdir = YOSYS_BUILD_LIB_DIR / frontend_dir
-    lexer_source = sourcedir / f"{frontend}_lexer.l"
-    lexer_dest = destdir / f"{frontend}_lexer.cc"
-    generate_lexer(lexer_source, lexer_dest)
-    parser_source = sourcedir / f"{frontend}_parser.y"
-    parser_dest = destdir / f"{frontend}_parser.tab.cc"
-    generate_parser(parser_source, parser_dest)
-    parser_code = parser_dest.read_text()
-
-    def patch_parser_include(include: re.Match) -> str:
-        header_path = Path(include.group(include.lastindex or 0))
-        if header_path.stem == parser_dest.stem:
-            return f'#include "{header_path.name}"'
-        else:
-            return include.group(0)
-
-    patched_code = _FRONTEND_INCLUDE_PATTERN.sub(patch_parser_include, parser_code)
-    parser_dest.write_text(patched_code)
-
-
-def generate_help(sourcefile: Path, outfile: Path) -> None:
+def generate_help(sourcefile: Path, outfile: Path) -> bool:
     helpbytes = subprocess.check_output([sys.executable, YOSYS_CELLHELP_PY, sourcefile])
-    outfile.write_text(helpbytes.decode("utf-8"))
+    outdated = not outfile.exists() or outfile.read_bytes() != helpbytes
+    if outdated:
+        outfile.write_text(helpbytes.decode("utf-8"))
+    return outdated
 
 
 def main() -> int:
@@ -193,16 +167,14 @@ def main() -> int:
         yosys_lib_names_txt.write_text(yosys_lib_names)
     if lib_sources_should_update or lib_names_should_update:
         (VTS_YOSYS_SYS_DIR / "CMakeLists.txt").touch()
-    else:
-        eprint("nothing updated")
-    # TODO: Update iff changed.
-    for frontend in YOSYS_GENERATE_FRONTENDS:
-        generate_frontend(frontend)
+    updated = lib_sources_should_update or lib_names_should_update
     for cellhelp in YOSYS_GENERATE_CELLHELP:
         help_source = YOSYS_TECHLIBS_COMMON / cellhelp
         help_outname = help_source.stem + "_help.inc"
         help_dest = YOSYS_BUILD_INCLUDE_DIR / "techlibs" / "common" / help_outname
-        generate_help(help_source, help_dest)
+        updated |= generate_help(help_source, help_dest)
+    if not updated:
+        eprint("nothing updated")
     return 0
 
 
