@@ -35,24 +35,28 @@ def process_line(line: str) -> Iterator[str]:
     yield from filter(isvalid, map(cleanup, line.split()))
 
 
+def _parse_module_make(module_make_file: Path) -> Iterator[str]:
+    lines = module_make_file.read_text().splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if line.startswith("SRC"):
+            needle = "+="
+            jump = line.find(needle) + len(needle)
+            if jump < len(needle):
+                raise ValueError(f'expected "{needle}" on line {i + 1}:"{line}"')
+            line = line[jump:].lstrip()
+            yield from process_line(line)
+            while line.endswith("\\"):
+                i += 1
+                line = lines[i].strip()
+                yield from process_line(line)
+        i += 1
+
+
 def parse_module_make(module_make_file: Path) -> Iterator[str]:
     try:
-        lines = module_make_file.read_text().splitlines()
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-            if line.startswith("SRC"):
-                needle = "+="
-                jump = line.find(needle) + len(needle)
-                if jump < len(needle):
-                    raise ValueError(f'expected "{needle}" on line {i + 1}:"{line}"')
-                line = line[jump:].lstrip()
-                yield from process_line(line)
-                while line.endswith("\\"):
-                    i += 1
-                    line = lines[i].strip()
-                    yield from process_line(line)
-            i += 1
+        yield from _parse_module_make(module_make_file)
     except Exception as err:
         raise RuntimeError(f"Failed to parse {module_make_file}") from err
 
@@ -89,8 +93,12 @@ def main() -> int:
                 continue
             abc_lib_sources[libname].append(mod_source)
         abc_lib_sources[libname].sort()
-    abc_lib_sources_serialized = json.dumps(abc_lib_sources, indent=2)
-    abc_lib_names = "".join(map(append_newline, abc_lib_sources.keys()))
+    abc_lib_sources_serialized = json.dumps(
+        abc_lib_sources,
+        indent=2,
+        sort_keys=True,
+    )
+    abc_lib_names = "".join(map(append_newline, sorted(abc_lib_sources.keys())))
     abc_lib_sources_json = VTS_ABC_SYS_DIR / "abc_lib_sources.json"
     abc_lib_names_txt = VTS_ABC_SYS_DIR / "abc_lib_names.txt"
     lib_sources_should_update = (

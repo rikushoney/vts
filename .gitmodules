@@ -2,3 +2,7 @@
 	path = crates/vts_abc/vts-abc-sys/abc
 	url = git@github.com:rikushoney/abc
 	branch = vts
+[submodule "crates/vts_yosys/vts-yosys-sys/yosys"]
+	path = crates/vts_yosys/vts-yosys-sys/yosys
+	url = git@github.com:rikushoney/yosys
+	branch = vts

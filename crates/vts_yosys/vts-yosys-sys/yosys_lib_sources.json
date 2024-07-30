@@ -1,0 +1,323 @@
+{
+  "YosysBackendsAiger": [
+    "backends/aiger/aiger.cc",
+    "backends/aiger/xaiger.cc"
+  ],
+  "YosysBackendsBlif": [
+    "backends/blif/blif.cc"
+  ],
+  "YosysBackendsBtor": [
+    "backends/btor/btor.cc"
+  ],
+  "YosysBackendsCxxrtl": [
+    "backends/cxxrtl/cxxrtl_backend.cc"
+  ],
+  "YosysBackendsEdif": [
+    "backends/edif/edif.cc"
+  ],
+  "YosysBackendsFirrtl": [
+    "backends/firrtl/firrtl.cc"
+  ],
+  "YosysBackendsIntersynth": [
+    "backends/intersynth/intersynth.cc"
+  ],
+  "YosysBackendsJny": [
+    "backends/jny/jny.cc"
+  ],
+  "YosysBackendsJson": [
+    "backends/json/json.cc"
+  ],
+  "YosysBackendsRtlil": [
+    "backends/rtlil/rtlil_backend.cc"
+  ],
+  "YosysBackendsSimplec": [
+    "backends/simplec/simplec.cc"
+  ],
+  "YosysBackendsSmt2": [
+    "backends/smt2/smt2.cc"
+  ],
+  "YosysBackendsSmv": [
+    "backends/smv/smv.cc"
+  ],
+  "YosysBackendsSpice": [
+    "backends/spice/spice.cc"
+  ],
+  "YosysBackendsTable": [
+    "backends/table/table.cc"
+  ],
+  "YosysBackendsVerilog": [
+    "backends/verilog/verilog_backend.cc"
+  ],
+  "YosysFrontendsAiger": [
+    "frontends/aiger/aigerparse.cc"
+  ],
+  "YosysFrontendsAst": [
+    "frontends/ast/ast.cc",
+    "frontends/ast/ast_binding.cc",
+    "frontends/ast/dpicall.cc",
+    "frontends/ast/genrtlil.cc",
+    "frontends/ast/simplify.cc"
+  ],
+  "YosysFrontendsBlif": [
+    "frontends/blif/blifparse.cc"
+  ],
+  "YosysFrontendsJson": [
+    "frontends/json/jsonparse.cc"
+  ],
+  "YosysFrontendsLiberty": [
+    "frontends/liberty/liberty.cc"
+  ],
+  "YosysFrontendsRpc": [
+    "frontends/rpc/rpc_frontend.cc"
+  ],
+  "YosysFrontendsRtlil": [
+    "frontends/rtlil/rtlil_frontend.cc"
+  ],
+  "YosysFrontendsVerific": [
+    "frontends/verific/verific.cc",
+    "frontends/verific/verificsva.cc"
+  ],
+  "YosysFrontendsVerilog": [
+    "frontends/verilog/const2ast.cc",
+    "frontends/verilog/preproc.cc",
+    "frontends/verilog/verilog_frontend.cc"
+  ],
+  "YosysKernel": [
+    "kernel/binding.cc",
+    "kernel/calc.cc",
+    "kernel/cellaigs.cc",
+    "kernel/celledges.cc",
+    "kernel/cost.cc",
+    "kernel/ff.cc",
+    "kernel/ffmerge.cc",
+    "kernel/fmt.cc",
+    "kernel/fstdata.cc",
+    "kernel/json.cc",
+    "kernel/log.cc",
+    "kernel/mem.cc",
+    "kernel/qcsat.cc",
+    "kernel/register.cc",
+    "kernel/rtlil.cc",
+    "kernel/satgen.cc",
+    "kernel/scopeinfo.cc",
+    "kernel/yosys.cc",
+    "kernel/yw.cc"
+  ],
+  "YosysLibsBigInt": [
+    "libs/bigint/BigIntegerAlgorithms.cc",
+    "libs/bigint/BigIntegerUtils.cc",
+    "libs/bigint/BigInteger.cc",
+    "libs/bigint/BigUnsignedInABase.cc",
+    "libs/bigint/BigUnsigned.cc"
+  ],
+  "YosysLibsEzSat": [
+    "libs/ezsat/ezsat.cc",
+    "libs/ezsat/ezminisat.cc"
+  ],
+  "YosysLibsJson11": [
+    "libs/json11/json11.cpp"
+  ],
+  "YosysLibsMiniSat": [
+    "libs/minisat/Options.cc",
+    "libs/minisat/Solver.cc",
+    "libs/minisat/SimpSolver.cc",
+    "libs/minisat/System.cc"
+  ],
+  "YosysLibsSha1": [
+    "libs/sha1/sha1.cpp"
+  ],
+  "YosysLibsSubcircuit": [
+    "libs/subcircuit/subcircuit.cc"
+  ],
+  "YosysPassesCmds": [
+    "passes/cmds/add.cc",
+    "passes/cmds/autoname.cc",
+    "passes/cmds/blackbox.cc",
+    "passes/cmds/box_derive.cc",
+    "passes/cmds/bugpoint.cc",
+    "passes/cmds/check.cc",
+    "passes/cmds/chformal.cc",
+    "passes/cmds/chtype.cc",
+    "passes/cmds/clean_zerowidth.cc",
+    "passes/cmds/connect.cc",
+    "passes/cmds/connwrappers.cc",
+    "passes/cmds/copy.cc",
+    "passes/cmds/cover.cc",
+    "passes/cmds/delete.cc",
+    "passes/cmds/design.cc",
+    "passes/cmds/dft_tag.cc",
+    "passes/cmds/edgetypes.cc",
+    "passes/cmds/exec.cc",
+    "passes/cmds/future.cc",
+    "passes/cmds/glift.cc",
+    "passes/cmds/logcmd.cc",
+    "passes/cmds/logger.cc",
+    "passes/cmds/ltp.cc",
+    "passes/cmds/plugin.cc",
+    "passes/cmds/portlist.cc",
+    "passes/cmds/printattrs.cc",
+    "passes/cmds/qwp.cc",
+    "passes/cmds/rename.cc",
+    "passes/cmds/scatter.cc",
+    "passes/cmds/scc.cc",
+    "passes/cmds/scratchpad.cc",
+    "passes/cmds/select.cc",
+    "passes/cmds/setattr.cc",
+    "passes/cmds/setundef.cc",
+    "passes/cmds/show.cc",
+    "passes/cmds/splice.cc",
+    "passes/cmds/splitcells.cc",
+    "passes/cmds/splitnets.cc",
+    "passes/cmds/sta.cc",
+    "passes/cmds/stat.cc",
+    "passes/cmds/tee.cc",
+    "passes/cmds/torder.cc",
+    "passes/cmds/trace.cc",
+    "passes/cmds/viz.cc",
+    "passes/cmds/write_file.cc",
+    "passes/cmds/xprop.cc"
+  ],
+  "YosysPassesEquiv": [
+    "passes/equiv/equiv_add.cc",
+    "passes/equiv/equiv_induct.cc",
+    "passes/equiv/equiv_make.cc",
+    "passes/equiv/equiv_mark.cc",
+    "passes/equiv/equiv_miter.cc",
+    "passes/equiv/equiv_opt.cc",
+    "passes/equiv/equiv_purge.cc",
+    "passes/equiv/equiv_remove.cc",
+    "passes/equiv/equiv_simple.cc",
+    "passes/equiv/equiv_status.cc",
+    "passes/equiv/equiv_struct.cc"
+  ],
+  "YosysPassesFsm": [
+    "passes/fsm/fsm.cc",
+    "passes/fsm/fsm_detect.cc",
+    "passes/fsm/fsm_expand.cc",
+    "passes/fsm/fsm_export.cc",
+    "passes/fsm/fsm_extract.cc",
+    "passes/fsm/fsm_info.cc",
+    "passes/fsm/fsm_map.cc",
+    "passes/fsm/fsm_opt.cc",
+    "passes/fsm/fsm_recode.cc"
+  ],
+  "YosysPassesHierarchy": [
+    "passes/hierarchy/hierarchy.cc",
+    "passes/hierarchy/keep_hierarchy.cc",
+    "passes/hierarchy/submod.cc",
+    "passes/hierarchy/uniquify.cc"
+  ],
+  "YosysPassesMemory": [
+    "passes/memory/memlib.cc",
+    "passes/memory/memory.cc",
+    "passes/memory/memory_bmux2rom.cc",
+    "passes/memory/memory_bram.cc",
+    "passes/memory/memory_collect.cc",
+    "passes/memory/memory_dff.cc",
+    "passes/memory/memory_libmap.cc",
+    "passes/memory/memory_map.cc",
+    "passes/memory/memory_memx.cc",
+    "passes/memory/memory_narrow.cc",
+    "passes/memory/memory_nordff.cc",
+    "passes/memory/memory_share.cc",
+    "passes/memory/memory_unpack.cc"
+  ],
+  "YosysPassesOpt": [
+    "passes/opt/muxpack.cc",
+    "passes/opt/opt.cc",
+    "passes/opt/opt_clean.cc",
+    "passes/opt/opt_demorgan.cc",
+    "passes/opt/opt_dff.cc",
+    "passes/opt/opt_expr.cc",
+    "passes/opt/opt_ffinv.cc",
+    "passes/opt/opt_lut.cc",
+    "passes/opt/opt_lut_ins.cc",
+    "passes/opt/opt_mem.cc",
+    "passes/opt/opt_mem_feedback.cc",
+    "passes/opt/opt_mem_priority.cc",
+    "passes/opt/opt_mem_widen.cc",
+    "passes/opt/opt_merge.cc",
+    "passes/opt/opt_muxtree.cc",
+    "passes/opt/opt_reduce.cc",
+    "passes/opt/opt_share.cc",
+    "passes/opt/pmux2shiftx.cc",
+    "passes/opt/rmports.cc",
+    "passes/opt/share.cc",
+    "passes/opt/wreduce.cc"
+  ],
+  "YosysPassesProc": [
+    "passes/proc/proc.cc",
+    "passes/proc/proc_arst.cc",
+    "passes/proc/proc_clean.cc",
+    "passes/proc/proc_dff.cc",
+    "passes/proc/proc_dlatch.cc",
+    "passes/proc/proc_init.cc",
+    "passes/proc/proc_memwr.cc",
+    "passes/proc/proc_mux.cc",
+    "passes/proc/proc_prune.cc",
+    "passes/proc/proc_rmdead.cc",
+    "passes/proc/proc_rom.cc"
+  ],
+  "YosysPassesSat": [
+    "passes/sat/assertpmux.cc",
+    "passes/sat/async2sync.cc",
+    "passes/sat/clk2fflogic.cc",
+    "passes/sat/cutpoint.cc",
+    "passes/sat/eval.cc",
+    "passes/sat/expose.cc",
+    "passes/sat/fmcombine.cc",
+    "passes/sat/fminit.cc",
+    "passes/sat/formalff.cc",
+    "passes/sat/freduce.cc",
+    "passes/sat/miter.cc",
+    "passes/sat/mutate.cc",
+    "passes/sat/qbfsat.cc",
+    "passes/sat/recover_names.cc",
+    "passes/sat/sat.cc",
+    "passes/sat/supercover.cc",
+    "passes/sat/synthprop.cc"
+  ],
+  "YosysPassesTechmap": [
+    "passes/techmap/aigmap.cc",
+    "passes/techmap/alumacc.cc",
+    "passes/techmap/attrmap.cc",
+    "passes/techmap/attrmvcp.cc",
+    "passes/techmap/bmuxmap.cc",
+    "passes/techmap/booth.cc",
+    "passes/techmap/bwmuxmap.cc",
+    "passes/techmap/cellmatch.cc",
+    "passes/techmap/clkbufmap.cc",
+    "passes/techmap/deminout.cc",
+    "passes/techmap/demuxmap.cc",
+    "passes/techmap/dffinit.cc",
+    "passes/techmap/dfflegalize.cc",
+    "passes/techmap/dfflibmap.cc",
+    "passes/techmap/dffunmap.cc",
+    "passes/techmap/extract.cc",
+    "passes/techmap/extract_counter.cc",
+    "passes/techmap/extract_fa.cc",
+    "passes/techmap/extract_reduce.cc",
+    "passes/techmap/extractinv.cc",
+    "passes/techmap/flatten.cc",
+    "passes/techmap/flowmap.cc",
+    "passes/techmap/hilomap.cc",
+    "passes/techmap/insbuf.cc",
+    "passes/techmap/iopadmap.cc",
+    "passes/techmap/libparse.cc",
+    "passes/techmap/lut2mux.cc",
+    "passes/techmap/maccmap.cc",
+    "passes/techmap/muxcover.cc",
+    "passes/techmap/nlutmap.cc",
+    "passes/techmap/pmuxtree.cc",
+    "passes/techmap/shregmap.cc",
+    "passes/techmap/simplemap.cc",
+    "passes/techmap/techmap.cc",
+    "passes/techmap/tribuf.cc",
+    "passes/techmap/zinit.cc"
+  ],
+  "YosysPassesTests": [
+    "passes/tests/test_abcloop.cc",
+    "passes/tests/test_autotb.cc",
+    "passes/tests/test_cell.cc"
+  ]
+}

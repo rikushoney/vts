@@ -3,15 +3,19 @@ members = [
   "crates/vts_core",
   "crates/vts_api",
   "crates/vts_cli",
-  "crates/vts_abc"
+  "crates/vts_abc",
+  "crates/vts_yosys"
 ]
 resolver = "2"
 
 [workspace.dependencies]
+cc = "1.1"
+cmake = "0.1"
 fnv = "1.0"
-itertools = "0.13.0"
+itertools = "0.13"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serial_test = "3"
 thiserror = "1.0"
 vts_abc = { path = "crates/vts_abc" }
 vts_core = { path = "crates/vts_core" }
