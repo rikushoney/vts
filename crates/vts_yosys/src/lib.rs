@@ -12,8 +12,6 @@ pub enum Error {
     InstanceExists,
     #[error("Yosys requires an input filename")]
     MissingInput,
-    #[error("Yosys requires an output filename")]
-    MissingOutput,
     #[error("unknown file format \"{0}\"")]
     UnknownFormat(PathBuf),
     #[error("unsupported input file format \"{0}\"")]
@@ -156,11 +154,12 @@ macro_rules! impl_backend {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FileFormat {
-    Verilog,
-    SV,
     Blif,
     Json,
+    SV,
+    Verilog,
 }
 
 impl FileFormat {
@@ -169,10 +168,10 @@ impl FileFormat {
             .extension()
             .ok_or(Error::UnknownFormat(filename.to_path_buf()))?;
         Ok(match extension.to_string_lossy().as_ref() {
-            "v" => Self::Verilog,
-            "sv" => Self::SV,
             "blif" => Self::Blif,
             "json" => Self::Json,
+            "sv" => Self::SV,
+            "v" => Self::Verilog,
             _ => {
                 return Err(Error::UnknownFormat(filename.to_path_buf()));
             }
@@ -213,33 +212,36 @@ impl Command {
     pub fn execute(&mut self, yosys: &Yosys) -> Result<()> {
         let input_filename = self.input_filename.as_ref().ok_or(Error::MissingInput)?;
         let input_format = FileFormat::guess(input_filename)?;
-        let output_filename = self.output_filename.as_ref().ok_or(Error::MissingOutput)?;
-        let output_format = FileFormat::guess(output_filename)?;
         // TODO(rikus): Check and report yosys errors.
         match input_format {
-            FileFormat::Verilog => {
-                impl_frontend!(yosys => input_filename : "read_verilog");
+            FileFormat::Blif => {
+                impl_frontend!(yosys => input_filename : "blif");
             }
             FileFormat::SV => {
-                impl_frontend!(yosys => input_filename : "read_verilog -sv");
+                impl_frontend!(yosys => input_filename : "verilog -sv");
             }
-            FileFormat::Blif => {
-                impl_frontend!(yosys => input_filename : "read_blif");
+            FileFormat::Verilog => {
+                impl_frontend!(yosys => input_filename : "verilog");
             }
             _ => {
                 return Err(Error::UnsupportedInput(input_filename.to_path_buf()));
             }
         }
-        yosys.run_pass(&self.command_buffer);
-        match output_format {
-            FileFormat::Blif => {
-                impl_backend!(yosys => output_filename : "write_blif");
-            }
-            FileFormat::Json => {
-                impl_backend!(yosys => output_filename : "write_json");
-            }
-            _ => {
-                return Err(Error::UnsupportedOutput(output_filename.to_path_buf()));
+        if !self.command_buffer.is_empty() {
+            yosys.run_pass(&self.command_buffer);
+        }
+        if let Some(output_filename) = self.output_filename.as_ref() {
+            let output_format = FileFormat::guess(output_filename)?;
+            match output_format {
+                FileFormat::Blif => {
+                    impl_backend!(yosys => output_filename : "blif");
+                }
+                FileFormat::Json => {
+                    impl_backend!(yosys => output_filename : "json");
+                }
+                _ => {
+                    return Err(Error::UnsupportedOutput(output_filename.to_path_buf()));
+                }
             }
         }
         Ok(())

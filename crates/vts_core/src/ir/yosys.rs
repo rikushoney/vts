@@ -11,8 +11,23 @@
 
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-use std::{error, fmt, fs, io::Read, path::Path, str::FromStr};
+use std::fmt;
+use std::fs;
+use std::io::Read;
+use std::path::Path;
+use std::str::FromStr;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+    #[error(transparent)]
+    Read(#[from] serde_json::Error),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// A structural description of a circuit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -25,34 +40,34 @@ pub struct Netlist {
 
 impl Netlist {
     /// Read a netlist from a file
-    pub fn from_file<P>(path: P) -> Result<Self, Box<dyn error::Error>>
+    pub fn from_file<P>(path: P) -> Result<Self>
     where
         P: AsRef<Path>,
     {
         let json = fs::read_to_string(path)?;
-        Self::from_str(json.as_str()).map_err(Box::from)
+        Self::from_str(json.as_str())
     }
 
     /// Read a netlist from the contents of a byte slice
-    pub fn from_slice(s: &[u8]) -> serde_json::Result<Self> {
-        serde_json::from_slice(s)
+    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+        Ok(serde_json::from_slice(bytes)?)
     }
 
     /// Read a netlist using a reader
-    pub fn from_reader<R>(r: R) -> serde_json::Result<Self>
+    pub fn from_reader<R>(reader: R) -> Result<Self>
     where
         R: Read,
     {
-        serde_json::from_reader(r)
+        Ok(serde_json::from_reader(reader)?)
     }
 }
 
 impl FromStr for Netlist {
-    type Err = serde_json::Error;
+    type Err = Error;
 
     /// Read a netlist from a string
-    fn from_str(s: &str) -> serde_json::Result<Self> {
-        serde_json::from_str(s)
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(serde_json::from_str(s)?)
     }
 }
 

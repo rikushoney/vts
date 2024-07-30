@@ -14,3 +14,4 @@ serde_json.workspace = true
 thiserror.workspace = true
 vts_abc.workspace = true
 vts_core.workspace = true
+vts_yosys.workspace = true

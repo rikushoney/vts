@@ -19,3 +19,4 @@ serial_test = "3"
 thiserror = "1.0"
 vts_abc = { path = "crates/vts_abc" }
 vts_core = { path = "crates/vts_core" }
+vts_yosys = { path = "crates/vts_yosys" }

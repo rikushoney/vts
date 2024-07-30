@@ -1,4 +1,6 @@
+#include <cstdio>
 #include <string>
+#include <vector>
 
 #include "wrapper.h"
 
@@ -13,6 +15,8 @@ void yosys_setup();
 void yosys_shutdown();
 
 extern RTLIL::Design *yosys_design;
+extern std::vector<FILE *> log_files;
+extern bool log_error_stderr;
 
 RTLIL::Design *yosys_get_design();
 
@@ -27,7 +31,11 @@ void run_backend(std::string filename, std::string command,
 
 } // namespace Yosys
 
-void vts_yosys_setup() { Yosys::yosys_setup(); }
+void vts_yosys_setup() {
+  Yosys::log_files.push_back(stdout);
+  Yosys::log_error_stderr = true;
+  Yosys::yosys_setup();
+}
 
 void vts_yosys_shutdown() { Yosys::yosys_shutdown(); }
 

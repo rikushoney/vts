@@ -790,6 +790,7 @@ dependencies = [
  "thiserror",
  "vts_abc",
  "vts_core",
+ "vts_yosys",
 ]
 
 [[package]]
