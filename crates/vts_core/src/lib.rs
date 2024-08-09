@@ -6,4 +6,7 @@ pub mod place;
 pub mod route;
 pub mod synth;
 
-pub trait Flow {}
+use place::Placer;
+use route::Router;
+
+pub trait Flow<PS: place::State, P: Placer<PS>, RS: route::State, R: Router<RS>> {}
