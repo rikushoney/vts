@@ -1,21 +1,10 @@
-//! Yosys JSON netlist format
-//!
-//! # Usage
-//! The top-most data type is a [`Netlist`] which is read from
-//! a [JSON](https://www.json.org/) file. There are various
-//! `from` methods available to read a JSON file into a netlist.
-//! See [`Netlist::from_str`], [`Netlist::from_file`], [`Netlist::from_slice`]
-//! and [`Netlist::from_reader`].
-//!
-//! Reference: <https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/write_json.html>
-
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use std::fmt;
 use std::fs;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::path::Path;
 use std::str::FromStr;
 
@@ -29,31 +18,25 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// A structural description of a circuit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Netlist {
-    /// The program that created the netlist
     pub creator: String,
-    /// A mapping from module names to [`Module`] instances
     pub modules: FnvHashMap<String, Module>,
 }
 
 impl Netlist {
-    /// Read a netlist from a file
     pub fn from_file<P>(path: P) -> Result<Self>
     where
         P: AsRef<Path>,
     {
-        let json = fs::read_to_string(path)?;
-        Self::from_str(json.as_str())
+        let file = fs::File::open(path)?;
+        Self::from_reader(BufReader::new(file))
     }
 
-    /// Read a netlist from the contents of a byte slice
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
         Ok(serde_json::from_slice(bytes)?)
     }
 
-    /// Read a netlist using a reader
     pub fn from_reader<R>(reader: R) -> Result<Self>
     where
         R: Read,
@@ -65,50 +48,35 @@ impl Netlist {
 impl FromStr for Netlist {
     type Err = Error;
 
-    /// Read a netlist from a string
     fn from_str(s: &str) -> Result<Self> {
         Ok(serde_json::from_str(s)?)
     }
 }
 
-/// A design unit encapsulating ports, cells, memories and wires
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Module {
-    /// Module attributes
     pub attributes: FnvHashMap<String, String>,
-    /// Default parameter values
     #[serde(default)]
     pub parameter_default_values: FnvHashMap<String, String>,
-    /// Module ports
     pub ports: FnvHashMap<String, Port>,
-    /// Module cells
     pub cells: FnvHashMap<String, Cell>,
-    /// Module memories
     #[serde(default)]
     pub memories: FnvHashMap<String, Memory>,
-    /// Module net names
-    pub netnames: FnvHashMap<String, Netname>,
+    pub netnames: FnvHashMap<String, NetName>,
 }
 
-/// A connection point for wires that is either an input, output or both
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Port {
-    /// Port direction
     pub direction: PortDirection,
-    /// The signal "bits" of the port
     pub bits: Vec<usize>,
-    /// The lowest bit index of the port
     #[serde(default)]
     pub offset: usize,
-    /// 1 if indexing starts at the MSB, otherwise 0
     #[serde(default)]
     pub upto: usize,
-    /// 1 if the port is signed, otherwise 0
     #[serde(default)]
     pub signed: usize,
 }
 
-/// Indicates the direction of a [`Port`]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PortDirection {
@@ -117,97 +85,65 @@ pub enum PortDirection {
     InOut,
 }
 
-/// A reference to a single wire "bit" or a constant value
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SignalBit {
-    /// A reference to a numbered wire
     Ref(usize),
-    /// A constant value
     Const(ConstBit),
 }
 
-/// The possible states of a wire
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ConstBit {
     #[serde(rename = "0")]
-    /// Logic "low"
     Zero,
     #[serde(rename = "1")]
-    /// Logic "high"
     One,
-    /// Unknown/invalid
     X,
-    /// High impedance
     Z,
 }
 
 impl fmt::Display for ConstBit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ConstBit::Zero => "0",
-                ConstBit::One => "1",
-                ConstBit::X => "x",
-                ConstBit::Z => "z",
-            }
-        )
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            ConstBit::Zero => "0",
+            ConstBit::One => "1",
+            ConstBit::X => "x",
+            ConstBit::Z => "z",
+        })
     }
 }
 
-/// A basic building block of a circuit such as logic gates or registers
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Cell {
-    /// 1 if the name of the cell is hidden, otherwise 0
     pub hide_name: usize,
-    /// The type of cell
     #[serde(rename = "type")]
     pub ty: String,
-    /// Cell parameters
     pub parameters: FnvHashMap<String, String>,
-    /// Cell attributes
     pub attributes: FnvHashMap<String, String>,
-    /// The directions of the cell's ports
     #[serde(default)]
     pub port_directions: FnvHashMap<String, PortDirection>,
-    /// The signal bits connected to the cell
     pub connections: FnvHashMap<String, Vec<SignalBit>>,
 }
 
-/// A block of memory
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Memory {
-    /// 1 if the name of the memory is hidden, otherwise 0
     pub hide_name: usize,
-    /// Memory attributes
     pub attributes: FnvHashMap<String, String>,
-    /// The memory word size
     pub width: usize,
-    /// The starting index offset
     pub start_offset: usize,
-    /// The number of words in memory
     pub size: usize,
 }
 
-/// The name given to a net in a circuit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Netname {
-    /// 1 if the net name is hidden, otherwise 0
+pub struct NetName {
     pub hide_name: usize,
-    /// Net name attributes
     pub attributes: FnvHashMap<String, String>,
-    /// The signal "bits" of the net
     pub bits: Vec<SignalBit>,
-    /// The lowest bit index
     #[serde(default)]
     pub offset: usize,
-    /// 1 if indexing starts at the MSB, otherwise 0
     #[serde(default)]
     pub upto: usize,
-    /// 1 if the net is signed, otherwise 0
     #[serde(default)]
     pub signed: usize,
 }
@@ -315,10 +251,10 @@ mod tests {
     },
     "bits": [2, "0", 3, "x"]
 }"#;
-        let parsed: Netname = serde_json::from_str(json).unwrap();
+        let parsed: NetName = serde_json::from_str(json).unwrap();
         assert_eq!(
             parsed,
-            Netname {
+            NetName {
                 hide_name: 0,
                 bits: vec![
                     SignalBit::Ref(2),

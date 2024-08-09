@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use pyo3::prelude::*;
-use vts_core::arch::{builder::prelude::*, prelude::*};
+use vts_core::arch1::{builder::prelude::*, prelude::*};
 
 use super::prelude::*;
 

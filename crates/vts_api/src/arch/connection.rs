@@ -3,7 +3,7 @@ use pyo3::{
     prelude::*,
     types::{PyString, PyTuple},
 };
-use vts_core::arch::{
+use vts_core::arch1::{
     builder::prelude::*,
     connection::{ComponentRefs, Concat},
     prelude::*,

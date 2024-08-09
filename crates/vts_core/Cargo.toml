@@ -9,8 +9,9 @@ itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
-slotmap = "1.0.7"
-serde_yaml = "0.9.34"
-toml = "0.8.12"
-ustr = { version = "1.0.0", features = ["serde"] }
+slotmap = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
+ustr = { version = "1.0", features = ["serde"] }

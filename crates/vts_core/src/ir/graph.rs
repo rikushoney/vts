@@ -2,10 +2,8 @@ use std::{collections::HashMap, fmt, slice};
 
 use thiserror::Error;
 
-use super::{
-    ops::{AnyOp, ConstOp},
-    yosys::{self, ConstBit, PortDirection, SignalBit},
-};
+use super::ops::{AnyOp, ConstOp};
+use crate::interchange::yosys::{self, ConstBit, PortDirection, SignalBit};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Node(usize);

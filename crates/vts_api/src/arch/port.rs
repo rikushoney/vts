@@ -5,7 +5,7 @@ use super::{
     SliceOrIndex,
 };
 
-use vts_core::arch::{
+use vts_core::arch1::{
     module::PortId,
     port::{PinRange, PortPins},
     PortClass, PortKind,

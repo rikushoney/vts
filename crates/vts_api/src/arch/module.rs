@@ -6,7 +6,7 @@ use pyo3::{
     prelude::*,
     types::{PyMapping, PyString},
 };
-use vts_core::arch::{
+use vts_core::arch1::{
     checker::Checker,
     json,
     module::{ComponentId, ComponentRefId, PortId},

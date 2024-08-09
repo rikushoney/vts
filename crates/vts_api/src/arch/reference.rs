@@ -2,7 +2,7 @@ use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 
-use vts_core::arch::{
+use vts_core::arch1::{
     connection::ComponentRefs, module::ComponentRefId, prelude::*, reference::ReferenceRange,
 };
 

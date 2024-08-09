@@ -4,7 +4,7 @@ use clap::Subcommand;
 use thiserror::Error;
 
 use vts_abc::{Abc, BlifLutMapper};
-use vts_core::ir::yosys::Netlist as YosysNetlist;
+use vts_core::interchange::yosys::Netlist as YosysNetlist;
 use vts_yosys::{Command as YosysCmd, FileFormat, Yosys};
 
 const GITHUB_REPO_ISSUES: &str = "https://github.com/rikushoney/vts/issues";
@@ -27,7 +27,7 @@ pub(super) enum Error {
     #[error(transparent)]
     Yosys(#[from] vts_yosys::Error),
     #[error(transparent)]
-    YosysNetlist(#[from] vts_core::ir::yosys::Error),
+    YosysNetlist(#[from] vts_core::interchange::yosys::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;

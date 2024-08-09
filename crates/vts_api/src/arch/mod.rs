@@ -14,7 +14,7 @@ use pyo3::{
     prelude::*,
     types::{PySlice, PySliceIndices},
 };
-use vts_core::arch::{checker, linker};
+use vts_core::arch1::{checker, linker};
 
 pub(crate) struct PyError(Error);
 
