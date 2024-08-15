@@ -1,3 +1,9 @@
+//! Yosys JSON netlist serialization.
+//!
+//! References:
+//! - https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/write_json.html
+//! - https://github.com/YosysHQ/yosys/blob/1eaf4e07/backends/json/json.cc
+
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -19,12 +25,12 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Netlist {
+pub struct Design {
     pub creator: String,
     pub modules: FnvHashMap<String, Module>,
 }
 
-impl Netlist {
+impl Design {
     pub fn from_file<P>(path: P) -> Result<Self>
     where
         P: AsRef<Path>,
@@ -45,7 +51,7 @@ impl Netlist {
     }
 }
 
-impl FromStr for Netlist {
+impl FromStr for Design {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
@@ -96,9 +102,9 @@ pub enum SignalBit {
 #[serde(rename_all = "lowercase")]
 pub enum ConstBit {
     #[serde(rename = "0")]
-    Zero,
+    _0,
     #[serde(rename = "1")]
-    One,
+    _1,
     X,
     Z,
 }
@@ -106,8 +112,8 @@ pub enum ConstBit {
 impl fmt::Display for ConstBit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            ConstBit::Zero => "0",
-            ConstBit::One => "1",
+            ConstBit::_0 => "0",
+            ConstBit::_1 => "1",
             ConstBit::X => "x",
             ConstBit::Z => "z",
         })
@@ -209,7 +215,7 @@ mod tests {
                     "A".to_string(),
                     vec![
                         SignalBit::Ref(4),
-                        SignalBit::Const(ConstBit::Zero),
+                        SignalBit::Const(ConstBit::_0),
                         SignalBit::Const(ConstBit::X),
                         SignalBit::Ref(5)
                     ]
@@ -258,7 +264,7 @@ mod tests {
                 hide_name: 0,
                 bits: vec![
                     SignalBit::Ref(2),
-                    SignalBit::Const(ConstBit::Zero),
+                    SignalBit::Const(ConstBit::_0),
                     SignalBit::Ref(3),
                     SignalBit::Const(ConstBit::X)
                 ],

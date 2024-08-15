@@ -4,7 +4,7 @@ use clap::Subcommand;
 use thiserror::Error;
 
 use vts_abc::{Abc, BlifLutMapper};
-use vts_core::interchange::yosys::Netlist as YosysNetlist;
+use vts_core::interchange::yosys::Design;
 use vts_yosys::{Command as YosysCmd, FileFormat, Yosys};
 
 const GITHUB_REPO_ISSUES: &str = "https://github.com/rikushoney/vts/issues";
@@ -66,7 +66,7 @@ fn check(input_filename: &PathBuf) -> Result<()> {
     check_file_is_not_pipe(input_filename)?;
     let input_format = check_file_exists_and_guess_format(input_filename)?;
     if input_format == FileFormat::Json {
-        let _netlist = YosysNetlist::from_file(input_filename)?;
+        let _design = Design::from_file(input_filename)?;
         return Ok(());
     }
     let yosys = Yosys::new()?;
