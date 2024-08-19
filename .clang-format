@@ -1,1 +1,3 @@
-BasedOnStyle: llvm
+---
+Language: Cpp
+BasedOnStyle: LLVM
