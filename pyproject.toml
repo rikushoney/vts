@@ -1,6 +1,6 @@
 [project]
 name = "vts"
-version = "0.1.2"
+version = "0.2.0"
 authors = [{ name = "Rikus Honey", email = "rikushoney2@gmail.com" }]
 requires-python = ">=3.8"
 description = "A framework for SFPGA architecture exploration"
@@ -46,7 +46,3 @@ select = [
   "PYI", # flake8-pyi
 ]
 ignore = ["E501"]
-
-[tool.ruff.lint.isort]
-combine-as-imports = true
-# required-imports = ["from __future__ import annotations"]
