@@ -25,3 +25,17 @@ flowmap; opt
 
 write_json sr_flowmap.json
 write_rtlil sr_flowmap.rtlil
+
+design -reset
+
+read_verilog -sv sr.sv
+hierarchy -check -top sr
+opt; proc; opt
+
+dffunmap
+simplemap
+abc -lut 4
+clean
+
+write_json sr_abc.json
+write_rtlil sr_abc.rtlil

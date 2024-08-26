@@ -1,0 +1,405 @@
+{
+  "creator": "Yosys 0.43 (git sha1 ead4718e5, g++ 14.1.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
+  "modules": {
+    "add4": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "add4.sv:2.1-28.16"
+      },
+      "ports": {
+        "A": {
+          "direction": "input",
+          "bits": [ 2, 3, 4, 5 ]
+        },
+        "B": {
+          "direction": "input",
+          "bits": [ 6, 7, 8, 9 ]
+        },
+        "Cin": {
+          "direction": "input",
+          "bits": [ 10 ]
+        },
+        "S": {
+          "direction": "output",
+          "bits": [ 11, 12, 13, 14 ]
+        },
+        "Cout": {
+          "direction": "output",
+          "bits": [ 15 ]
+        }
+      },
+      "cells": {
+        "$abc$263$auto$blifparse.cc:535:parse_blif$264": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1110111011101000",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 9, 16, 17 ],
+            "Y": [ 15 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$265": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1101010000000000",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 18, 3, 7, 19 ],
+            "Y": [ 16 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$266": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "00010111",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2, 6, 10 ],
+            "Y": [ 18 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$267": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0110",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 8 ],
+            "Y": [ 19 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$268": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1000",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 8 ],
+            "Y": [ 17 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$269": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "10010110",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2, 6, 10 ],
+            "Y": [ 11 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$270": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "01101001",
+            "WIDTH": "00000000000000000000000000000011"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 18, 3, 7 ],
+            "Y": [ 12 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$271": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "0010101111010100",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 18, 3, 7, 19 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$abc$263$auto$blifparse.cc:535:parse_blif$272": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1110000100011110",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 16, 17, 5, 9 ],
+            "Y": [ 14 ]
+          }
+        }
+      },
+      "netnames": {
+        "$abc$263$A[0]": {
+          "hide_name": 1,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "add4.sv:3.21-3.22"
+          }
+        },
+        "$abc$263$A[1]": {
+          "hide_name": 1,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "add4.sv:3.21-3.22"
+          }
+        },
+        "$abc$263$A[2]": {
+          "hide_name": 1,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "add4.sv:3.21-3.22"
+          }
+        },
+        "$abc$263$A[3]": {
+          "hide_name": 1,
+          "bits": [ 5 ],
+          "attributes": {
+            "src": "add4.sv:3.21-3.22"
+          }
+        },
+        "$abc$263$B[0]": {
+          "hide_name": 1,
+          "bits": [ 6 ],
+          "attributes": {
+            "src": "add4.sv:4.21-4.22"
+          }
+        },
+        "$abc$263$B[1]": {
+          "hide_name": 1,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "add4.sv:4.21-4.22"
+          }
+        },
+        "$abc$263$B[2]": {
+          "hide_name": 1,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "add4.sv:4.21-4.22"
+          }
+        },
+        "$abc$263$B[3]": {
+          "hide_name": 1,
+          "bits": [ 9 ],
+          "attributes": {
+            "src": "add4.sv:4.21-4.22"
+          }
+        },
+        "$abc$263$Cin": {
+          "hide_name": 1,
+          "bits": [ 10 ],
+          "attributes": {
+            "src": "add4.sv:5.15-5.18"
+          }
+        },
+        "$abc$263$Cout": {
+          "hide_name": 1,
+          "bits": [ 15 ],
+          "attributes": {
+            "src": "add4.sv:7.16-7.20"
+          }
+        },
+        "$abc$263$S[0]": {
+          "hide_name": 1,
+          "bits": [ 11 ],
+          "attributes": {
+            "src": "add4.sv:6.22-6.23"
+          }
+        },
+        "$abc$263$S[1]": {
+          "hide_name": 1,
+          "bits": [ 12 ],
+          "attributes": {
+            "src": "add4.sv:6.22-6.23"
+          }
+        },
+        "$abc$263$S[2]": {
+          "hide_name": 1,
+          "bits": [ 13 ],
+          "attributes": {
+            "src": "add4.sv:6.22-6.23"
+          }
+        },
+        "$abc$263$S[3]": {
+          "hide_name": 1,
+          "bits": [ 14 ],
+          "attributes": {
+            "src": "add4.sv:6.22-6.23"
+          }
+        },
+        "$abc$263$new_n17_": {
+          "hide_name": 1,
+          "bits": [ 16 ],
+          "attributes": {
+          }
+        },
+        "$abc$263$new_n18_": {
+          "hide_name": 1,
+          "bits": [ 18 ],
+          "attributes": {
+          }
+        },
+        "$abc$263$new_n19_": {
+          "hide_name": 1,
+          "bits": [ 19 ],
+          "attributes": {
+          }
+        },
+        "$abc$263$new_n20_": {
+          "hide_name": 1,
+          "bits": [ 17 ],
+          "attributes": {
+          }
+        },
+        "$and$add4.sv:21$237_Y": {
+          "hide_name": 1,
+          "bits": [ 20 ],
+          "attributes": {
+            "src": "add4.sv:21.29-21.48"
+          }
+        },
+        "$and$add4.sv:21$239_Y": {
+          "hide_name": 1,
+          "bits": [ 21 ],
+          "attributes": {
+            "src": "add4.sv:21.29-21.48"
+          }
+        },
+        "$and$add4.sv:21$241_Y": {
+          "hide_name": 1,
+          "bits": [ 22 ],
+          "attributes": {
+            "src": "add4.sv:21.29-21.48"
+          }
+        },
+        "$and$add4.sv:26$235_Y": {
+          "hide_name": 1,
+          "bits": [ 23 ],
+          "attributes": {
+            "src": "add4.sv:26.23-26.34"
+          }
+        },
+        "A": {
+          "hide_name": 0,
+          "bits": [ 2, 3, 4, 5 ],
+          "attributes": {
+            "src": "add4.sv:3.21-3.22"
+          }
+        },
+        "B": {
+          "hide_name": 0,
+          "bits": [ 6, 7, 8, 9 ],
+          "attributes": {
+            "src": "add4.sv:4.21-4.22"
+          }
+        },
+        "C": {
+          "hide_name": 0,
+          "bits": [ 10, 24, 25, 26 ],
+          "attributes": {
+            "src": "add4.sv:12.13-12.14"
+          }
+        },
+        "Cin": {
+          "hide_name": 0,
+          "bits": [ 10 ],
+          "attributes": {
+            "src": "add4.sv:5.15-5.18"
+          }
+        },
+        "Cout": {
+          "hide_name": 0,
+          "bits": [ 15 ],
+          "attributes": {
+            "src": "add4.sv:7.16-7.20"
+          }
+        },
+        "G": {
+          "hide_name": 0,
+          "bits": [ 27, 28, 29, 30 ],
+          "attributes": {
+            "src": "add4.sv:10.13-10.14"
+          }
+        },
+        "P": {
+          "hide_name": 0,
+          "bits": [ 31, 32, 33, 34 ],
+          "attributes": {
+            "src": "add4.sv:11.13-11.14"
+          }
+        },
+        "S": {
+          "hide_name": 0,
+          "bits": [ 11, 12, 13, 14 ],
+          "attributes": {
+            "src": "add4.sv:6.22-6.23"
+          }
+        }
+      }
+    }
+  }
+}

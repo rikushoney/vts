@@ -27,6 +27,17 @@ write_rtlil add4_flowmap.rtlil
 
 design -reset
 
+read_verilog -sv add4.sv
+hierarchy -check -top add4
+opt; proc; opt
+
+simplemap; opt
+abc -lut 4
+write_json add4_abc.json
+write_rtlil add4_abc.rtlil
+
+design -reset
+
 read_verilog -sv alu4.sv
 hierarchy -check -top alu4
 flatten
@@ -56,3 +67,13 @@ flowmap; opt
 
 write_json alu4_flowmap.json
 write_rtlil alu4_flowmap.rtlil
+
+design -reset
+
+read_verilog -sv alu4.sv
+hierarchy -check -top alu4
+opt; proc; opt
+
+abc -lut 4
+write_json alu4_abc.json
+write_rtlil alu4_abc.rtlil

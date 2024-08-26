@@ -33,53 +33,81 @@
         }
       },
       "cells": {
-        "$auto$ff.cc:266:slice$157": {
+        "$abc$201$auto$blifparse.cc:535:parse_blif$202": {
           "hide_name": 1,
-          "type": "$_SDFF_PN0_",
+          "type": "$lut",
           "parameters": {
+            "LUT": "1010110000000000",
+            "WIDTH": "00000000000000000000000000000100"
           },
           "attributes": {
-            "always_ff": "00000000000000000000000000000001",
-            "src": "sr.sv:13.1-21.4"
           },
           "port_directions": {
-            "C": "input",
-            "D": "input",
-            "Q": "output",
-            "R": "input"
+            "A": "input",
+            "Y": "output"
           },
           "connections": {
-            "C": [ 2 ],
-            "D": [ 10 ],
-            "Q": [ 5 ],
-            "R": [ 3 ]
+            "A": [ 8, 6, 9, 3 ],
+            "Y": [ 10 ]
           }
         },
-        "$auto$ff.cc:266:slice$158": {
+        "$abc$201$auto$blifparse.cc:535:parse_blif$203": {
           "hide_name": 1,
-          "type": "$_SDFF_PN0_",
+          "type": "$lut",
           "parameters": {
+            "LUT": "1100101000000000",
+            "WIDTH": "00000000000000000000000000000100"
           },
           "attributes": {
-            "always_ff": "00000000000000000000000000000001",
-            "src": "sr.sv:13.1-21.4"
           },
           "port_directions": {
-            "C": "input",
-            "D": "input",
-            "Q": "output",
-            "R": "input"
+            "A": "input",
+            "Y": "output"
           },
           "connections": {
-            "C": [ 2 ],
-            "D": [ 11 ],
-            "Q": [ 6 ],
-            "R": [ 3 ]
+            "A": [ 5, 7, 9, 3 ],
+            "Y": [ 11 ]
           }
         },
-        "$auto$ff.cc:266:slice$159": {
+        "$abc$201$auto$blifparse.cc:535:parse_blif$204": {
           "hide_name": 1,
-          "type": "$_SDFF_PN0_",
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1100101000000000",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 6, 9, 3 ],
+            "Y": [ 12 ]
+          }
+        },
+        "$abc$201$auto$blifparse.cc:535:parse_blif$205": {
+          "hide_name": 1,
+          "type": "$lut",
+          "parameters": {
+            "LUT": "1100101000000000",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 7, 4, 9, 3 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$auto$ff.cc:266:slice$189": {
+          "hide_name": 1,
+          "type": "$_DFF_P_",
           "parameters": {
           },
           "attributes": {
@@ -89,19 +117,17 @@
           "port_directions": {
             "C": "input",
             "D": "input",
-            "Q": "output",
-            "R": "input"
+            "Q": "output"
           },
           "connections": {
             "C": [ 2 ],
             "D": [ 12 ],
-            "Q": [ 7 ],
-            "R": [ 3 ]
+            "Q": [ 5 ]
           }
         },
-        "$auto$ff.cc:266:slice$160": {
+        "$auto$ff.cc:266:slice$190": {
           "hide_name": 1,
-          "type": "$_SDFF_PN0_",
+          "type": "$_DFF_P_",
           "parameters": {
           },
           "attributes": {
@@ -111,97 +137,77 @@
           "port_directions": {
             "C": "input",
             "D": "input",
-            "Q": "output",
-            "R": "input"
+            "Q": "output"
+          },
+          "connections": {
+            "C": [ 2 ],
+            "D": [ 11 ],
+            "Q": [ 6 ]
+          }
+        },
+        "$auto$ff.cc:266:slice$191": {
+          "hide_name": 1,
+          "type": "$_DFF_P_",
+          "parameters": {
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "sr.sv:13.1-21.4"
+          },
+          "port_directions": {
+            "C": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "C": [ 2 ],
+            "D": [ 10 ],
+            "Q": [ 7 ]
+          }
+        },
+        "$auto$ff.cc:266:slice$192": {
+          "hide_name": 1,
+          "type": "$_DFF_P_",
+          "parameters": {
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "sr.sv:13.1-21.4"
+          },
+          "port_directions": {
+            "C": "input",
+            "D": "input",
+            "Q": "output"
           },
           "connections": {
             "C": [ 2 ],
             "D": [ 13 ],
-            "Q": [ 8 ],
-            "R": [ 3 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$165": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "11001010",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "sr.sv:16.16-16.32|sr.sv:16.12-20.6"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 7, 4, 9 ],
-            "Y": [ 13 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$166": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "11001010",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "sr.sv:16.16-16.32|sr.sv:16.12-20.6"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 6, 8, 9 ],
-            "Y": [ 12 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$167": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "11001010",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "sr.sv:16.16-16.32|sr.sv:16.12-20.6"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 5, 7, 9 ],
-            "Y": [ 11 ]
-          }
-        },
-        "$auto$flowmap.cc:1412:pack_cells$168": {
-          "hide_name": 1,
-          "type": "$lut",
-          "parameters": {
-            "LUT": "11001010",
-            "WIDTH": "00000000000000000000000000000011"
-          },
-          "attributes": {
-            "src": "sr.sv:16.16-16.32|sr.sv:16.12-20.6"
-          },
-          "port_directions": {
-            "A": "input",
-            "Y": "output"
-          },
-          "connections": {
-            "A": [ 4, 6, 9 ],
-            "Y": [ 10 ]
+            "Q": [ 8 ]
           }
         }
       },
       "netnames": {
-        "$procmux$150_Y": {
+        "$abc$201$auto$rtlil.cc:2603:Mux$188[0]": {
           "hide_name": 1,
-          "bits": [ 10, 11, 12, 13 ],
+          "bits": [ 12 ],
+          "attributes": {
+          }
+        },
+        "$abc$201$auto$rtlil.cc:2603:Mux$188[1]": {
+          "hide_name": 1,
+          "bits": [ 11 ],
+          "attributes": {
+          }
+        },
+        "$abc$201$auto$rtlil.cc:2603:Mux$188[2]": {
+          "hide_name": 1,
+          "bits": [ 10 ],
+          "attributes": {
+          }
+        },
+        "$abc$201$auto$rtlil.cc:2603:Mux$188[3]": {
+          "hide_name": 1,
+          "bits": [ 13 ],
           "attributes": {
           }
         },
@@ -216,7 +222,7 @@
           "hide_name": 0,
           "bits": [ 9 ],
           "attributes": {
-            "enum_type": "$enum1",
+            "enum_type": "$enum2",
             "enum_value_0": "\\SHIFT_LEFT",
             "enum_value_1": "\\SHIFT_RIGHT",
             "src": "sr.sv:6.28-6.30",

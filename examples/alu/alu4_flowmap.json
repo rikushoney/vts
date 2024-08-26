@@ -1,5 +1,5 @@
 {
-  "creator": "Yosys 0.39 (git sha1 00338082b, g++ 13.2.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
+  "creator": "Yosys 0.43 (git sha1 ead4718e5, g++ 14.1.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
   "modules": {
     "alu4": {
       "attributes": {
@@ -29,7 +29,7 @@
         }
       },
       "cells": {
-        "$auto$flowmap.cc:1412:pack_cells$882": {
+        "$auto$flowmap.cc:1412:pack_cells$924": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -48,7 +48,7 @@
             "Y": [ 17 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$883": {
+        "$auto$flowmap.cc:1412:pack_cells$925": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -67,7 +67,7 @@
             "Y": [ 18 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$884": {
+        "$auto$flowmap.cc:1412:pack_cells$926": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -86,7 +86,7 @@
             "Y": [ 19 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$885": {
+        "$auto$flowmap.cc:1412:pack_cells$927": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -105,7 +105,7 @@
             "Y": [ 20 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$886": {
+        "$auto$flowmap.cc:1412:pack_cells$928": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -124,7 +124,7 @@
             "Y": [ 22 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$887": {
+        "$auto$flowmap.cc:1412:pack_cells$929": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -143,7 +143,7 @@
             "Y": [ 24 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$888": {
+        "$auto$flowmap.cc:1412:pack_cells$930": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -162,7 +162,7 @@
             "Y": [ 26 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$889": {
+        "$auto$flowmap.cc:1412:pack_cells$931": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -181,7 +181,7 @@
             "Y": [ 28 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$890": {
+        "$auto$flowmap.cc:1412:pack_cells$932": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -200,7 +200,7 @@
             "Y": [ 30 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$891": {
+        "$auto$flowmap.cc:1412:pack_cells$933": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -219,7 +219,7 @@
             "Y": [ 32 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$892": {
+        "$auto$flowmap.cc:1412:pack_cells$934": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -238,7 +238,7 @@
             "Y": [ 34 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$893": {
+        "$auto$flowmap.cc:1412:pack_cells$935": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -257,7 +257,7 @@
             "Y": [ 21 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$894": {
+        "$auto$flowmap.cc:1412:pack_cells$936": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -276,7 +276,7 @@
             "Y": [ 25 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$895": {
+        "$auto$flowmap.cc:1412:pack_cells$937": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -295,7 +295,7 @@
             "Y": [ 29 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$896": {
+        "$auto$flowmap.cc:1412:pack_cells$938": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -314,7 +314,7 @@
             "Y": [ 33 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$897": {
+        "$auto$flowmap.cc:1412:pack_cells$939": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -333,7 +333,7 @@
             "Y": [ 31 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$898": {
+        "$auto$flowmap.cc:1412:pack_cells$940": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -352,7 +352,7 @@
             "Y": [ 27 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$899": {
+        "$auto$flowmap.cc:1412:pack_cells$941": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -371,7 +371,7 @@
             "Y": [ 23 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$900": {
+        "$auto$flowmap.cc:1412:pack_cells$942": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -390,7 +390,7 @@
             "Y": [ 35 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$901": {
+        "$auto$flowmap.cc:1412:pack_cells$943": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -409,7 +409,7 @@
             "Y": [ 36 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$902": {
+        "$auto$flowmap.cc:1412:pack_cells$944": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -428,7 +428,7 @@
             "Y": [ 37 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$903": {
+        "$auto$flowmap.cc:1412:pack_cells$945": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -447,7 +447,7 @@
             "Y": [ 38 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$904": {
+        "$auto$flowmap.cc:1412:pack_cells$946": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -466,7 +466,7 @@
             "Y": [ 39 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$905": {
+        "$auto$flowmap.cc:1412:pack_cells$947": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -485,7 +485,7 @@
             "Y": [ 40 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$906": {
+        "$auto$flowmap.cc:1412:pack_cells$948": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -504,7 +504,7 @@
             "Y": [ 41 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$907": {
+        "$auto$flowmap.cc:1412:pack_cells$949": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -523,7 +523,7 @@
             "Y": [ 42 ]
           }
         },
-        "$auto$flowmap.cc:1412:pack_cells$908": {
+        "$auto$flowmap.cc:1412:pack_cells$950": {
           "hide_name": 1,
           "type": "$lut",
           "parameters": {
@@ -542,7 +542,7 @@
             "Y": [ 43 ]
           }
         },
-        "$procmux$784": {
+        "$procmux$826": {
           "hide_name": 1,
           "type": "$pmux",
           "parameters": {
@@ -566,7 +566,7 @@
             "Y": [ 14 ]
           }
         },
-        "$procmux$789": {
+        "$procmux$831": {
           "hide_name": 1,
           "type": "$pmux",
           "parameters": {
@@ -592,45 +592,45 @@
         }
       },
       "netnames": {
-        "$and$alu4.sv:46$775_Y": {
+        "$and$alu4.sv:46$817_Y": {
           "hide_name": 1,
           "bits": [ 39, 38, 37, 36 ],
           "attributes": {
             "src": "alu4.sv:46.11-46.16"
           }
         },
-        "$auto$opt_reduce.cc:134:opt_pmux$795": {
+        "$auto$opt_reduce.cc:134:opt_pmux$837": {
           "hide_name": 1,
           "bits": [ 43 ],
           "attributes": {
           }
         },
-        "$auto$opt_reduce.cc:134:opt_pmux$797": {
+        "$auto$opt_reduce.cc:134:opt_pmux$839": {
           "hide_name": 1,
           "bits": [ 42 ],
           "attributes": {
           }
         },
-        "$auto$simplemap.cc:246:simplemap_eqne$865": {
+        "$auto$simplemap.cc:246:simplemap_eqne$907": {
           "hide_name": 1,
           "bits": [ 33 ],
           "attributes": {
           }
         },
-        "$or$alu4.sv:50$776_Y": {
+        "$or$alu4.sv:50$818_Y": {
           "hide_name": 1,
           "bits": [ 20, 19, 18, 17 ],
           "attributes": {
             "src": "alu4.sv:50.11-50.16"
           }
         },
-        "$procmux$785_CMP": {
+        "$procmux$827_CMP": {
           "hide_name": 1,
           "bits": [ 41 ],
           "attributes": {
           }
         },
-        "$procmux$786_CMP": {
+        "$procmux$828_CMP": {
           "hide_name": 1,
           "bits": [ 40 ],
           "attributes": {

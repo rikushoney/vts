@@ -1,5 +1,5 @@
 {
-  "creator": "Yosys 0.39 (git sha1 00338082b, g++ 13.2.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
+  "creator": "Yosys 0.43 (git sha1 ead4718e5, g++ 14.1.1 -march=x86-64 -mtune=generic -O2 -fno-plt -fexceptions -fstack-clash-protection -fcf-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build/yosys/src=/usr/src/debug/yosys -fPIC -Os)",
   "modules": {
     "alu4": {
       "attributes": {
@@ -29,7 +29,7 @@
         }
       },
       "cells": {
-        "$auto$opt_expr.cc:613:replace_const_cells$874": {
+        "$auto$opt_expr.cc:613:replace_const_cells$916": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -45,7 +45,7 @@
             "Y": [ 17 ]
           }
         },
-        "$auto$opt_expr.cc:613:replace_const_cells$876": {
+        "$auto$opt_expr.cc:613:replace_const_cells$918": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -61,7 +61,7 @@
             "Y": [ 18 ]
           }
         },
-        "$auto$simplemap.cc:126:simplemap_reduce$805": {
+        "$auto$simplemap.cc:126:simplemap_reduce$847": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -80,7 +80,7 @@
             "Y": [ 21 ]
           }
         },
-        "$auto$simplemap.cc:126:simplemap_reduce$807": {
+        "$auto$simplemap.cc:126:simplemap_reduce$849": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -99,7 +99,7 @@
             "Y": [ 24 ]
           }
         },
-        "$auto$simplemap.cc:126:simplemap_reduce$848": {
+        "$auto$simplemap.cc:126:simplemap_reduce$890": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -118,7 +118,7 @@
             "Y": [ 25 ]
           }
         },
-        "$auto$simplemap.cc:126:simplemap_reduce$858": {
+        "$auto$simplemap.cc:126:simplemap_reduce$900": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -137,7 +137,7 @@
             "Y": [ 26 ]
           }
         },
-        "$auto$simplemap.cc:126:simplemap_reduce$868": {
+        "$auto$simplemap.cc:126:simplemap_reduce$910": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -156,7 +156,7 @@
             "Y": [ 27 ]
           }
         },
-        "$auto$simplemap.cc:167:logic_reduce$872": {
+        "$auto$simplemap.cc:167:logic_reduce$914": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -175,7 +175,7 @@
             "Y": [ 28 ]
           }
         },
-        "$auto$simplemap.cc:196:simplemap_lognot$850": {
+        "$auto$simplemap.cc:196:simplemap_lognot$892": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -192,7 +192,7 @@
             "Y": [ 19 ]
           }
         },
-        "$auto$simplemap.cc:196:simplemap_lognot$860": {
+        "$auto$simplemap.cc:196:simplemap_lognot$902": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -209,7 +209,7 @@
             "Y": [ 20 ]
           }
         },
-        "$auto$simplemap.cc:196:simplemap_lognot$873": {
+        "$auto$simplemap.cc:196:simplemap_lognot$915": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -226,7 +226,7 @@
             "Y": [ 23 ]
           }
         },
-        "$auto$simplemap.cc:267:simplemap_mux$836": {
+        "$auto$simplemap.cc:267:simplemap_mux$878": {
           "hide_name": 1,
           "type": "$_MUX_",
           "parameters": {
@@ -247,7 +247,7 @@
             "Y": [ 30 ]
           }
         },
-        "$auto$simplemap.cc:267:simplemap_mux$837": {
+        "$auto$simplemap.cc:267:simplemap_mux$879": {
           "hide_name": 1,
           "type": "$_MUX_",
           "parameters": {
@@ -268,7 +268,7 @@
             "Y": [ 32 ]
           }
         },
-        "$auto$simplemap.cc:267:simplemap_mux$838": {
+        "$auto$simplemap.cc:267:simplemap_mux$880": {
           "hide_name": 1,
           "type": "$_MUX_",
           "parameters": {
@@ -289,7 +289,7 @@
             "Y": [ 34 ]
           }
         },
-        "$auto$simplemap.cc:267:simplemap_mux$839": {
+        "$auto$simplemap.cc:267:simplemap_mux$881": {
           "hide_name": 1,
           "type": "$_MUX_",
           "parameters": {
@@ -310,7 +310,7 @@
             "Y": [ 36 ]
           }
         },
-        "$auto$simplemap.cc:267:simplemap_mux$840": {
+        "$auto$simplemap.cc:267:simplemap_mux$882": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -327,7 +327,7 @@
             "Y": [ 22 ]
           }
         },
-        "$auto$simplemap.cc:38:simplemap_not$828": {
+        "$auto$simplemap.cc:38:simplemap_not$870": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -344,7 +344,7 @@
             "Y": [ 29 ]
           }
         },
-        "$auto$simplemap.cc:38:simplemap_not$829": {
+        "$auto$simplemap.cc:38:simplemap_not$871": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -361,7 +361,7 @@
             "Y": [ 31 ]
           }
         },
-        "$auto$simplemap.cc:38:simplemap_not$830": {
+        "$auto$simplemap.cc:38:simplemap_not$872": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -378,7 +378,7 @@
             "Y": [ 33 ]
           }
         },
-        "$auto$simplemap.cc:38:simplemap_not$831": {
+        "$auto$simplemap.cc:38:simplemap_not$873": {
           "hide_name": 1,
           "type": "$_NOT_",
           "parameters": {
@@ -395,7 +395,7 @@
             "Y": [ 35 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$800": {
+        "$auto$simplemap.cc:75:simplemap_bitop$842": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -414,7 +414,7 @@
             "Y": [ 37 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$801": {
+        "$auto$simplemap.cc:75:simplemap_bitop$843": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -433,7 +433,7 @@
             "Y": [ 38 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$802": {
+        "$auto$simplemap.cc:75:simplemap_bitop$844": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -452,7 +452,7 @@
             "Y": [ 39 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$803": {
+        "$auto$simplemap.cc:75:simplemap_bitop$845": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -471,7 +471,7 @@
             "Y": [ 40 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$808": {
+        "$auto$simplemap.cc:75:simplemap_bitop$850": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -490,7 +490,7 @@
             "Y": [ 41 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$809": {
+        "$auto$simplemap.cc:75:simplemap_bitop$851": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -509,7 +509,7 @@
             "Y": [ 42 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$810": {
+        "$auto$simplemap.cc:75:simplemap_bitop$852": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -528,7 +528,7 @@
             "Y": [ 43 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$811": {
+        "$auto$simplemap.cc:75:simplemap_bitop$853": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -547,7 +547,7 @@
             "Y": [ 44 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$812": {
+        "$auto$simplemap.cc:75:simplemap_bitop$854": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -566,7 +566,7 @@
             "Y": [ 46 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$813": {
+        "$auto$simplemap.cc:75:simplemap_bitop$855": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -585,7 +585,7 @@
             "Y": [ 49 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$814": {
+        "$auto$simplemap.cc:75:simplemap_bitop$856": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -604,7 +604,7 @@
             "Y": [ 52 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$815": {
+        "$auto$simplemap.cc:75:simplemap_bitop$857": {
           "hide_name": 1,
           "type": "$_AND_",
           "parameters": {
@@ -623,7 +623,7 @@
             "Y": [ 55 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$816": {
+        "$auto$simplemap.cc:75:simplemap_bitop$858": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -642,7 +642,7 @@
             "Y": [ 47 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$817": {
+        "$auto$simplemap.cc:75:simplemap_bitop$859": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -661,7 +661,7 @@
             "Y": [ 50 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$818": {
+        "$auto$simplemap.cc:75:simplemap_bitop$860": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -680,7 +680,7 @@
             "Y": [ 53 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$819": {
+        "$auto$simplemap.cc:75:simplemap_bitop$861": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -699,7 +699,7 @@
             "Y": [ 56 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$820": {
+        "$auto$simplemap.cc:75:simplemap_bitop$862": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -718,7 +718,7 @@
             "Y": [ 45 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$821": {
+        "$auto$simplemap.cc:75:simplemap_bitop$863": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -737,7 +737,7 @@
             "Y": [ 48 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$822": {
+        "$auto$simplemap.cc:75:simplemap_bitop$864": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -756,7 +756,7 @@
             "Y": [ 51 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$823": {
+        "$auto$simplemap.cc:75:simplemap_bitop$865": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -775,7 +775,7 @@
             "Y": [ 54 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$824": {
+        "$auto$simplemap.cc:75:simplemap_bitop$866": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -794,7 +794,7 @@
             "Y": [ 57 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$825": {
+        "$auto$simplemap.cc:75:simplemap_bitop$867": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -813,7 +813,7 @@
             "Y": [ 58 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$826": {
+        "$auto$simplemap.cc:75:simplemap_bitop$868": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -832,7 +832,7 @@
             "Y": [ 59 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$827": {
+        "$auto$simplemap.cc:75:simplemap_bitop$869": {
           "hide_name": 1,
           "type": "$_XOR_",
           "parameters": {
@@ -851,7 +851,7 @@
             "Y": [ 60 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$832": {
+        "$auto$simplemap.cc:75:simplemap_bitop$874": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -870,7 +870,7 @@
             "Y": [ 61 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$833": {
+        "$auto$simplemap.cc:75:simplemap_bitop$875": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -889,7 +889,7 @@
             "Y": [ 62 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$834": {
+        "$auto$simplemap.cc:75:simplemap_bitop$876": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -908,7 +908,7 @@
             "Y": [ 63 ]
           }
         },
-        "$auto$simplemap.cc:75:simplemap_bitop$835": {
+        "$auto$simplemap.cc:75:simplemap_bitop$877": {
           "hide_name": 1,
           "type": "$_OR_",
           "parameters": {
@@ -927,7 +927,7 @@
             "Y": [ 64 ]
           }
         },
-        "$procmux$784": {
+        "$procmux$826": {
           "hide_name": 1,
           "type": "$pmux",
           "parameters": {
@@ -951,7 +951,7 @@
             "Y": [ 14 ]
           }
         },
-        "$procmux$789": {
+        "$procmux$831": {
           "hide_name": 1,
           "type": "$pmux",
           "parameters": {
@@ -977,116 +977,116 @@
         }
       },
       "netnames": {
-        "$and$alu4.sv:46$775_Y": {
+        "$and$alu4.sv:46$817_Y": {
           "hide_name": 1,
           "bits": [ 37, 38, 39, 40 ],
           "attributes": {
             "src": "alu4.sv:46.11-46.16"
           }
         },
-        "$auto$opt_reduce.cc:134:opt_pmux$795": {
+        "$auto$opt_reduce.cc:134:opt_pmux$837": {
           "hide_name": 1,
           "bits": [ 21 ],
           "attributes": {
           }
         },
-        "$auto$opt_reduce.cc:134:opt_pmux$797": {
+        "$auto$opt_reduce.cc:134:opt_pmux$839": {
           "hide_name": 1,
           "bits": [ 24 ],
           "attributes": {
           }
         },
-        "$auto$rtlil.cc:2684:NotGate$875": {
+        "$auto$rtlil.cc:2705:NotGate$917": {
           "hide_name": 1,
           "bits": [ 17 ],
           "attributes": {
           }
         },
-        "$auto$rtlil.cc:2684:NotGate$877": {
+        "$auto$rtlil.cc:2705:NotGate$919": {
           "hide_name": 1,
           "bits": [ 18 ],
           "attributes": {
           }
         },
-        "$auto$simplemap.cc:158:logic_reduce$871": {
+        "$auto$simplemap.cc:158:logic_reduce$913": {
           "hide_name": 1,
           "bits": [ 28 ],
           "attributes": {
           }
         },
-        "$auto$simplemap.cc:246:simplemap_eqne$845": {
+        "$auto$simplemap.cc:246:simplemap_eqne$887": {
           "hide_name": 1,
           "bits": [ 25 ],
           "attributes": {
           }
         },
-        "$auto$simplemap.cc:246:simplemap_eqne$855": {
+        "$auto$simplemap.cc:246:simplemap_eqne$897": {
           "hide_name": 1,
           "bits": [ 26 ],
           "attributes": {
           }
         },
-        "$auto$simplemap.cc:246:simplemap_eqne$865": {
+        "$auto$simplemap.cc:246:simplemap_eqne$907": {
           "hide_name": 1,
           "bits": [ 27 ],
           "attributes": {
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$765_Y": {
+        "$flatten\\adder.$and$add4.sv:21$807_Y": {
           "hide_name": 1,
           "bits": [ 46 ],
           "attributes": {
             "src": "add4.sv:21.29-21.48"
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$767_Y": {
+        "$flatten\\adder.$and$add4.sv:21$809_Y": {
           "hide_name": 1,
           "bits": [ 49 ],
           "attributes": {
             "src": "add4.sv:21.29-21.48"
           }
         },
-        "$flatten\\adder.$and$add4.sv:21$769_Y": {
+        "$flatten\\adder.$and$add4.sv:21$811_Y": {
           "hide_name": 1,
           "bits": [ 52 ],
           "attributes": {
             "src": "add4.sv:21.29-21.48"
           }
         },
-        "$flatten\\adder.$and$add4.sv:26$763_Y": {
+        "$flatten\\adder.$and$add4.sv:26$805_Y": {
           "hide_name": 1,
           "bits": [ 55 ],
           "attributes": {
             "src": "add4.sv:26.23-26.34"
           }
         },
-        "$not$alu4.sv:25$773_Y": {
+        "$not$alu4.sv:25$815_Y": {
           "hide_name": 1,
           "bits": [ 29, 31, 33, 35 ],
           "attributes": {
             "src": "alu4.sv:25.11-25.13"
           }
         },
-        "$or$alu4.sv:50$776_Y": {
+        "$or$alu4.sv:50$818_Y": {
           "hide_name": 1,
           "bits": [ 61, 62, 63, 64 ],
           "attributes": {
             "src": "alu4.sv:50.11-50.16"
           }
         },
-        "$procmux$785_CMP": {
+        "$procmux$827_CMP": {
           "hide_name": 1,
           "bits": [ 19 ],
           "attributes": {
           }
         },
-        "$procmux$786_CMP": {
+        "$procmux$828_CMP": {
           "hide_name": 1,
           "bits": [ 20 ],
           "attributes": {
           }
         },
-        "$procmux$788_CMP": {
+        "$procmux$830_CMP": {
           "hide_name": 1,
           "bits": [ 23 ],
           "attributes": {
